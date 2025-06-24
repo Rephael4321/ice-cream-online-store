@@ -32,7 +32,9 @@ export default function SingleProduct({
         <p className="font-semibold text-lg sm:text-xl text-white">
           {productName}
         </p>
-        <p className="text-base sm:text-lg text-white">{productPrice} ש"ח</p>
+        <p className="text-base sm:text-lg text-white">
+          {productPrice} ש&quot;ח
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">

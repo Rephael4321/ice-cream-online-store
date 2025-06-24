@@ -41,7 +41,7 @@ export default function Cart() {
                   <div className="text-sm sm:text-base space-y-1">
                     <p className="font-semibold">{item.productName}</p>
                     <p>כמות: {item.quantity}</p>
-                    <p>מחיר: {item.productPrice} ש"ח</p>
+                    <p>מחיר: {item.productPrice} ש&quot;"ח</p>
                   </div>
                   <button
                     onClick={() => removeFromCart(item.productName)}
