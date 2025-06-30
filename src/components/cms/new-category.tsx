@@ -106,7 +106,7 @@ export default function NewCategory() {
     }
 
     try {
-      const res = await fetch("http://localhost:3001/api/categories", {
+      const res = await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

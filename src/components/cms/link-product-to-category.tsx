@@ -22,14 +22,14 @@ export default function LinkProductToCategory() {
 
   useEffect(() => {
     async function fetchProducts() {
-      const res = await fetch("http://localhost:3001/api/products");
+      const res = await fetch("/api/products");
       if (!res.ok) throw new Error("Failed to fetch products");
       const data = await res.json();
       setProducts(data.products);
     }
 
     async function fetchCategories() {
-      const res = await fetch("http://localhost:3001/api/categories");
+      const res = await fetch("/api/categories");
       if (!res.ok) throw new Error("Failed to fetch categories");
       const data = await res.json();
       setCategories(data.categories);
@@ -48,17 +48,14 @@ export default function LinkProductToCategory() {
     }
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/api/product-category",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productId: selectedProductId,
-            categoryId: selectedCategoryId,
-          }),
-        }
-      );
+      const response = await fetch("/api/product-category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: selectedProductId,
+          categoryId: selectedCategoryId,
+        }),
+      });
 
       if (!response.ok) {
         const errData = await response.json();

@@ -28,15 +28,13 @@ export default function ProductsByCategory({
         const { category } = await params;
         setCategorySlug(category);
 
-        const res = await fetch(
-          `http://localhost:3001/api/categories/name/${category}/products`
-        );
-        if (!res.ok) throw new Error("Failed to fetch products");
+        const res = await fetch(`/api/categories/name/${category}/products`);
+        if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצרים");
 
         const data = await res.json();
         setProducts(data.products || []);
       } catch (err: any) {
-        setError(err.message || "Something went wrong");
+        setError(err.message || "קרתה תקלה");
       } finally {
         setLoading(false);
       }

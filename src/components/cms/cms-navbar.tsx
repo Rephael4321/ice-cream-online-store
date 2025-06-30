@@ -27,7 +27,7 @@ export default function CmsNavbar() {
           href="/management-menu"
           className="text-lg sm:text-xl md:text-2xl hover:underline"
         >
-          חזרה לתפריט ניהול
+          חזרה לכלי ניהול
         </Link>
       </div>
 

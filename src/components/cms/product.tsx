@@ -31,8 +31,8 @@ export default function Product({
     async function fetchProduct() {
       try {
         const { id } = await params;
-        const res = await fetch(`http://localhost:3001/api/products/${id}`);
-        if (!res.ok) throw new Error("Failed to fetch product");
+        const res = await fetch(`/api/products/${id}`);
+        if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצר");
         const data = await res.json();
         const loaded = data.product ?? data;
 
@@ -83,7 +83,7 @@ export default function Product({
     } = product;
 
     if (!name.trim() || isNaN(Number(price))) {
-      alert("Name and price are required and must be valid");
+      alert("חובה למלא שם ומחיר");
       return;
     }
 
@@ -133,16 +133,16 @@ export default function Product({
 
     setSaving(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/products/${id}`, {
+      const res = await fetch(`/api/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedProduct),
       });
-      if (!res.ok) throw new Error("Failed to update product");
-      alert("Product saved!");
+      if (!res.ok) throw new Error("ארעה תקלה בשמירת מוצר");
+      alert("מוצר נשמר!");
     } catch (err) {
       console.error(err);
-      alert("Error saving product");
+      alert("תקלה בשמירת מוצר!");
     } finally {
       setSaving(false);
     }
@@ -151,22 +151,19 @@ export default function Product({
   const handleDelete = async () => {
     if (!product) return;
 
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) return;
 
     try {
-      const res = await fetch(
-        `http://localhost:3001/api/products/${product.id}`,
-        {
-          method: "DELETE",
-        }
-      );
-      if (!res.ok) throw new Error("Failed to delete product");
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("ארעה תקלה במחיקת המוצר");
 
-      alert("Product deleted");
+      alert("מוצר נמחק!");
       window.location.href = "/products";
     } catch (err) {
       console.error(err);
-      alert("Error deleting product");
+      alert("תקלה במחיקת מוצר");
     }
   };
 
@@ -186,7 +183,7 @@ export default function Product({
     images.find((img) => getDisplayName(img) === (product?.image || "")) ||
     "";
 
-  if (loading) return <p>טוען מוצר</p>;
+  if (loading) return <p>טוען מוצר...</p>;
   if (error) return <p>שגיאה: {error}</p>;
   if (!product) return <p>מוצר לא נמצא.</p>;
 

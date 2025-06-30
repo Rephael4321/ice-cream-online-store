@@ -20,8 +20,8 @@ export default function Products() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const res = await fetch("http://localhost:3001/api/products");
-        if (!res.ok) throw new Error("Failed to fetch products");
+        const res = await fetch("/api/products");
+        if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצרים");
         const data = await res.json();
         setProducts(data.products ?? data);
       } catch (err) {

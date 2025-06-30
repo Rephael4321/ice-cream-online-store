@@ -30,12 +30,12 @@ export default function MainMenu() {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch("http://localhost:3001/api/categories");
-        if (!res.ok) throw new Error("Failed to fetch categories");
+        const res = await fetch("/api/categories");
+        if (!res.ok) throw new Error("ארעה תקלה בטעינת קטגוריות");
         const data = await res.json();
         setCategories(data.categories || []);
       } catch (err) {
-        console.error("Error fetching categories:", err);
+        console.error("תקלה בטעינת קטגוריות:", err);
       }
     }
 
