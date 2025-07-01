@@ -22,7 +22,7 @@ export default function Categories() {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch("/api/categories");
+        const res = await fetch("/api/categories?full=true");
         if (!res.ok) throw new Error("Failed to load categories");
         const data = await res.json();
         setCategories(data.categories || []);
@@ -35,6 +35,27 @@ export default function Categories() {
 
     fetchCategories();
   }, []);
+
+  const handleToggleShowInMenu = async (categoryId: number) => {
+    try {
+      const res = await fetch(`/api/categories/${categoryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ show_in_menu: true }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update");
+
+      setCategories((prev) =>
+        prev.map((cat) =>
+          cat.id === categoryId ? { ...cat, show_in_menu: 1 } : cat
+        )
+      );
+    } catch (err) {
+      alert("שגיאה בעדכון הקטגוריה");
+      console.error(err);
+    }
+  };
 
   if (loading) return <div className="p-4">טוען...</div>;
   if (error) return <div className="p-4 text-red-600">שגיאה: {error}</div>;
@@ -81,10 +102,20 @@ export default function Categories() {
                 <td className="border px-2 py-1">
                   {cat.show_in_menu ? "✓" : "✗"}
                 </td>
-                <td className="border px-2 py-1">
+                <td className="border px-2 py-1 space-y-1">
                   <Button size="sm" variant="outline" disabled>
                     עריכה
                   </Button>
+
+                  {cat.type === "sale" && !cat.show_in_menu && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleToggleShowInMenu(cat.id)}
+                    >
+                      הפוך לקטגוריה גלויה
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -36,32 +36,60 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// === Sale Pricing Logic ===
+// === Sale Pricing Helpers ===
 
-function getEffectiveUnitPrice(item: CartItem, cart: CartItem[]): number {
+function getCategoryBundleMap(cart: CartItem[]) {
+  const bundleMap = new Map<number, { totalQty: number; bundles: number }>();
+
+  for (const item of cart) {
+    const sale = item.sale;
+    if (sale?.fromCategory && sale.category?.id != null) {
+      const { id } = sale.category;
+      const existing = bundleMap.get(id) ?? { totalQty: 0, bundles: 0 };
+      const totalQty = existing.totalQty + item.quantity;
+      const bundles = Math.floor(totalQty / sale.amount);
+      bundleMap.set(id, { totalQty, bundles });
+    }
+  }
+
+  return bundleMap;
+}
+
+function getEffectiveTotalPrice(
+  item: CartItem,
+  cart: CartItem[],
+  bundleMap: Map<number, { totalQty: number; bundles: number }>
+): number {
   const base = item.productPrice;
+  const qty = item.quantity;
 
-  if (!item.sale) return base;
+  if (!item.sale) return base * qty;
 
   const { amount, price, fromCategory, category } = item.sale;
 
-  // Simple product-level sale
+  // Product-level sale
   if (!fromCategory) {
-    return item.quantity >= amount ? price / amount : base;
+    const bundles = Math.floor(qty / amount);
+    const remainder = qty % amount;
+    return bundles * price + remainder * base;
   }
 
   // Category-level sale
   if (fromCategory && category?.id != null) {
-    const groupQty = cart
-      .filter(
-        (i) => i.sale?.fromCategory && i.sale?.category?.id === category.id
-      )
-      .reduce((sum, i) => sum + i.quantity, 0);
+    const info = bundleMap.get(category.id);
+    if (!info || info.totalQty < amount || info.bundles === 0)
+      return base * qty;
 
-    return groupQty >= amount ? price / amount : base;
+    const { totalQty, bundles } = info;
+    const ratio = qty / totalQty;
+    const myBundles = Math.floor(bundles * ratio);
+    const discountedQty = myBundles * amount;
+    const remainingQty = Math.max(0, qty - discountedQty);
+
+    return myBundles * price + remainingQty * base;
   }
 
-  return base;
+  return base * qty;
 }
 
 // === Provider ===
@@ -102,7 +130,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeFromCart,
         clearCart,
-        getEffectiveUnitPrice: (item) => getEffectiveUnitPrice(item, cartItems),
+        getEffectiveUnitPrice: (item) => {
+          if (item.quantity === 0) return item.productPrice;
+          const bundleMap = getCategoryBundleMap(cartItems);
+          const total = getEffectiveTotalPrice(item, cartItems, bundleMap);
+          return total / item.quantity;
+        },
       }}
     >
       {children}

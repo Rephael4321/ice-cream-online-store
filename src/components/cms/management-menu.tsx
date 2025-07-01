@@ -19,11 +19,17 @@ const services = [
     slug: "new-category",
   },
   {
+    name: "רשימת קטגוריות",
+    description: "צפה ונהל קטגוריות קיימות.",
+    slug: "categories",
+  },
+  {
     name: "ניהול קטגוריות",
     description: "הוסף פריטים לקטגוריות. צור תתי קטגוריות.",
     slug: "link-product-to-category",
   },
 ];
+
 
 export default function ManagementMenu() {
   return (

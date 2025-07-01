@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart } from "@/context/cart-context";
 import Image from "next/image";
+import { useRouter, usePathname } from "next/navigation";
 
 type SaleCategoryInfo = {
   id: number;
@@ -31,6 +32,17 @@ export default function SingleProduct({
 }: SingleProductProps) {
   const { addToCart } = useCart();
   const [amount, setAmount] = useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Compute category slug if present
+  const currentCategorySlug = sale?.category?.name
+    ?.replace(/\s+/g, "-")
+    .toLowerCase();
+
+  const alreadyInCategoryPage =
+    decodeURIComponent(pathname || "") ===
+    `/category-products/${currentCategorySlug}`;
 
   return (
     <div className="shadow-md p-4 w-full sm:w-[300px] flex flex-col items-center space-y-4 relative">
@@ -65,10 +77,17 @@ export default function SingleProduct({
             <p className="text-lg sm:text-xl font-bold text-green-300">
               {sale.amount} ב- {sale.price} ש״ח
             </p>
-            {sale.fromCategory && sale.category && (
+
+            {sale.fromCategory && sale.category && !alreadyInCategoryPage && (
               <p className="text-sm text-yellow-200 italic">
-                מקטגוריית{" "}
-                <span className="font-bold">{sale.category.name}</span>
+                <button
+                  onClick={() =>
+                    router.push(`/category-products/${currentCategorySlug}`)
+                  }
+                  className="underline hover:text-yellow-100 font-bold"
+                >
+                  גלו עוד מוצרים במבצע
+                </button>
               </p>
             )}
           </>

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const fullView = req.nextUrl.searchParams.get("full") === "true";
+
     const [rows]: any = await pool.query(
-      "SELECT id, name, type, description, image, parent_id, show_in_menu FROM categories"
+      `SELECT id, name, type, description, image, parent_id, show_in_menu FROM categories
+       ${fullView ? "" : "WHERE show_in_menu = true"}`
     );
+
     return NextResponse.json({ categories: rows });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

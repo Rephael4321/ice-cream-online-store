@@ -23,14 +23,14 @@ export default function LinkProductToCategory() {
   useEffect(() => {
     async function fetchProducts() {
       const res = await fetch("/api/products");
-      if (!res.ok) throw new Error("Failed to fetch products");
+      if (!res.ok) throw new Error("שגיאה בטעינת מוצרים");
       const data = await res.json();
       setProducts(data.products);
     }
 
     async function fetchCategories() {
-      const res = await fetch("/api/categories");
-      if (!res.ok) throw new Error("Failed to fetch categories");
+      const res = await fetch("/api/categories?full=true");
+      if (!res.ok) throw new Error("שגיאה בטעינת קטגוריות");
       const data = await res.json();
       setCategories(data.categories);
     }
@@ -43,7 +43,7 @@ export default function LinkProductToCategory() {
     e.preventDefault();
 
     if (selectedProductId === "" || selectedCategoryId === "") {
-      alert("Please select both product and category");
+      alert("אנא בחר מוצר וקטגוריה");
       return;
     }
 
@@ -59,10 +59,10 @@ export default function LinkProductToCategory() {
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.error || "Failed to link product and category");
+        throw new Error(errData.error || "שגיאה בקישור מוצר לקטגוריה");
       }
 
-      alert("Product linked to category successfully!");
+      alert("המוצר קושר בהצלחה!");
       setSelectedProductId("");
       setSelectedCategoryId("");
     } catch (err: any) {
@@ -71,24 +71,23 @@ export default function LinkProductToCategory() {
   };
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-center">
-        Link Product to Category
-      </h1>
+    <div className="max-w-xl mx-auto p-6 space-y-6" dir="rtl">
+      <h1 className="text-2xl font-bold text-center">קישור מוצר לקטגוריה</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label htmlFor="product">Product</Label>
+          <Label htmlFor="product">מוצר</Label>
           <select
             id="product"
             value={selectedProductId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedProductId(val === "" ? "" : Number(val));
-            }}
+            onChange={(e) =>
+              setSelectedProductId(
+                e.target.value === "" ? "" : Number(e.target.value)
+              )
+            }
             required
             className="w-full border rounded p-2"
           >
-            <option value="">Select product</option>
+            <option value="">בחר מוצר</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -98,18 +97,19 @@ export default function LinkProductToCategory() {
         </div>
 
         <div>
-          <Label htmlFor="category">Category</Label>
+          <Label htmlFor="category">קטגוריה</Label>
           <select
             id="category"
             value={selectedCategoryId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedCategoryId(val === "" ? "" : Number(val));
-            }}
+            onChange={(e) =>
+              setSelectedCategoryId(
+                e.target.value === "" ? "" : Number(e.target.value)
+              )
+            }
             required
             className="w-full border rounded p-2"
           >
-            <option value="">Select category</option>
+            <option value="">בחר קטגוריה</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -119,7 +119,7 @@ export default function LinkProductToCategory() {
         </div>
 
         <Button type="submit" className="w-full cursor-pointer">
-          Link Product to Category
+          קשר מוצר לקטגוריה
         </Button>
       </form>
     </div>

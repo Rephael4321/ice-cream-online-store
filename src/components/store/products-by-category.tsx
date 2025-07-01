@@ -59,7 +59,7 @@ export default function ProductsByCategory({
     <>
       <div className="flex justify-center mt-10">
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-pink-700">
-          {categorySlug.replace(/-/g, " ")}
+          {decodeURIComponent(categorySlug.replace(/-/g, " "))}
         </h1>
       </div>
 

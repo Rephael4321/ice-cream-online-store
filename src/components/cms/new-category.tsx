@@ -17,10 +17,11 @@ import { images } from "@/data/images";
 export default function NewCategory() {
   const [category, setCategory] = useState({
     name: "",
-    type: "brand",
+    type: "collection",
     image: "",
     saleQuantity: "",
     salePrice: "",
+    showInMenu: false,
   });
 
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
@@ -41,7 +42,12 @@ export default function NewCategory() {
       type: value,
       saleQuantity: "",
       salePrice: "",
+      showInMenu: false,
     }));
+  };
+
+  const toggleShowInMenu = () => {
+    setCategory((prev) => ({ ...prev, showInMenu: !prev.showInMenu }));
   };
 
   const clearName = () => {
@@ -82,6 +88,7 @@ export default function NewCategory() {
     if (category.type === "sale") {
       payload.saleQuantity = Number(category.saleQuantity);
       payload.salePrice = Number(category.salePrice);
+      payload.show_in_menu = category.showInMenu;
     }
 
     try {
@@ -102,10 +109,11 @@ export default function NewCategory() {
 
       setCategory({
         name: "",
-        type: "brand",
+        type: "collection",
         image: "",
         saleQuantity: "",
         salePrice: "",
+        showInMenu: false,
       });
     } catch (err) {
       console.error(err);
@@ -125,7 +133,6 @@ export default function NewCategory() {
       >
         {/* Left Column: Form */}
         <div className="w-full md:w-1/2 space-y-4">
-          {/* Image Input */}
           <ImageSelector
             value={category.image}
             onChange={(imageName, fullPath) => {
@@ -140,7 +147,6 @@ export default function NewCategory() {
             label="שם תמונה"
           />
 
-          {/* Category Name */}
           <div>
             <Label htmlFor="name">שם:</Label>
             <div className="flex gap-2">
@@ -165,7 +171,6 @@ export default function NewCategory() {
             </div>
           </div>
 
-          {/* Type */}
           <div>
             <Label>סוג קטגוריה:</Label>
             <Select value={category.type} onValueChange={handleTypeChange}>
@@ -173,38 +178,48 @@ export default function NewCategory() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="brand">מותג</SelectItem>
                 <SelectItem value="collection">אוסף</SelectItem>
                 <SelectItem value="sale">מבצע</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Sale Fields */}
           {category.type === "sale" && (
-            <div>
-              <Label>מבצע (למשל 3 ב-30)</Label>
+            <div className="space-y-3">
+              <div>
+                <Label>מבצע (למשל 3 ב־30)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    name="saleQuantity"
+                    type="number"
+                    min="1"
+                    value={category.saleQuantity}
+                    onChange={handleChange}
+                    placeholder="כמות"
+                    className="w-1/2"
+                  />
+                  <span className="text-sm">ב־</span>
+                  <Input
+                    name="salePrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={category.salePrice}
+                    onChange={handleChange}
+                    placeholder="מחיר"
+                    className="w-1/2"
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
-                <Input
-                  name="saleQuantity"
-                  type="number"
-                  min="1"
-                  value={category.saleQuantity}
-                  onChange={handleChange}
-                  placeholder="כמות"
-                  className="w-1/2"
+                <input
+                  id="showInMenu"
+                  type="checkbox"
+                  checked={category.showInMenu}
+                  onChange={toggleShowInMenu}
                 />
-                <span className="text-sm">ב־</span>
-                <Input
-                  name="salePrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={category.salePrice}
-                  onChange={handleChange}
-                  placeholder="מחיר"
-                  className="w-1/2"
-                />
+                <Label htmlFor="showInMenu">הצג בתפריט כמו אוסף</Label>
               </div>
             </div>
           )}
