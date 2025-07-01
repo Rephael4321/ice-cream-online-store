@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
+import ImageSelector from "./ui/image-selector";
 import { images } from "@/data/images";
 
 export default function NewProduct() {
@@ -109,45 +110,17 @@ export default function NewProduct() {
         {/* Left Column: Form */}
         <div className="w-full md:w-1/2 space-y-4">
           {/* Image Input */}
-          <div className="relative">
-            <Label htmlFor="image">תמונה:</Label>
-            <Input
-              id="image"
-              name="image"
-              value={product.image}
-              onChange={handleChange}
-              placeholder="ארטיק שוקו"
-              onFocus={() => setFocused(true)}
-              onBlur={() => setTimeout(() => setFocused(false), 100)}
-            />
-            {focused && filteredImages.length > 0 && (
-              <ul className="absolute z-10 w-full max-h-60 overflow-y-auto bg-white border rounded-md shadow top-full mt-1">
-                {filteredImages.map((img, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                    onMouseDown={() => handleSuggestionClick(img)}
-                  >
-                    <img
-                      src={img}
-                      alt=""
-                      className="w-8 h-8 object-cover rounded border"
-                    />
-                    <span>{getDisplayName(img)}</span>
-                  </li>
-                ))}
-                <li className="text-center px-3 py-2 border-t bg-gray-50">
-                  <button
-                    type="button"
-                    onMouseDown={() => setShowGallery(true)}
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    הצג את כל התמונות
-                  </button>
-                </li>
-              </ul>
-            )}
-          </div>
+          <ImageSelector
+            value={product.image}
+            onChange={(imageName, fullPath) => {
+              setProduct((prev) => ({
+                ...prev,
+                image: imageName,
+                name: imageName, // ← overwrite name as in NewProduct
+              }));
+              setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
+            }}
+          />
 
           {/* Product Name */}
           <div>

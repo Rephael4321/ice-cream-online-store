@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Select,
   SelectTrigger,
@@ -11,6 +11,7 @@ import {
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
+import ImageSelector from "./ui/image-selector";
 import { images } from "@/data/images";
 
 export default function NewCategory() {
@@ -22,29 +23,16 @@ export default function NewCategory() {
     salePrice: "",
   });
 
-  const [focused, setFocused] = useState(false);
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
 
   const getDisplayName = (path: string) => {
-    const parts = path.split("/");
-    const file = parts[parts.length - 1];
+    const file = path.split("/").pop() || "";
     return file.split(".")[0];
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setCategory((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSuggestionClick = (fullPath: string) => {
-    const nameOnly = getDisplayName(fullPath);
-    setCategory((prev) => ({
-      ...prev,
-      image: nameOnly,
-      name: prev.name ? prev.name : nameOnly,
-    }));
-    setImagePathMap((prev) => ({ ...prev, [nameOnly]: fullPath }));
-    setFocused(false);
   };
 
   const handleTypeChange = (value: string) => {
@@ -59,15 +47,6 @@ export default function NewCategory() {
   const clearName = () => {
     setCategory((prev) => ({ ...prev, name: "" }));
   };
-
-  const filteredImages = useMemo(() => {
-    if (!category.image) return images.slice(0, 10);
-    return images
-      .filter((img) =>
-        getDisplayName(img).toLowerCase().includes(category.image.toLowerCase())
-      )
-      .slice(0, 10);
-  }, [category.image]);
 
   const previewSrc =
     imagePathMap[category.image] ||
@@ -147,36 +126,19 @@ export default function NewCategory() {
         {/* Left Column: Form */}
         <div className="w-full md:w-1/2 space-y-4">
           {/* Image Input */}
-          <div className="relative">
-            <Label htmlFor="image">שם תמונה</Label>
-            <Input
-              id="image"
-              name="image"
-              value={category.image}
-              onChange={handleChange}
-              placeholder="גלידה וניל"
-              onFocus={() => setFocused(true)}
-              onBlur={() => setTimeout(() => setFocused(false), 100)}
-            />
-            {focused && filteredImages.length > 0 && (
-              <ul className="absolute z-10 w-full max-h-60 overflow-y-auto bg-white border rounded-md shadow top-full mt-1">
-                {filteredImages.map((img, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                    onMouseDown={() => handleSuggestionClick(img)}
-                  >
-                    <img
-                      src={img}
-                      alt=""
-                      className="w-8 h-8 object-cover rounded border"
-                    />
-                    <span>{getDisplayName(img)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ImageSelector
+            value={category.image}
+            onChange={(imageName, fullPath) => {
+              setCategory((prev) => ({
+                ...prev,
+                image: imageName,
+                name: prev.name ? prev.name : imageName,
+              }));
+              setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
+            }}
+            placeholder="גלידה וניל"
+            label="שם תמונה"
+          />
 
           {/* Category Name */}
           <div>
@@ -218,7 +180,7 @@ export default function NewCategory() {
             </Select>
           </div>
 
-          {/* Sale */}
+          {/* Sale Fields */}
           {category.type === "sale" && (
             <div>
               <Label>מבצע (למשל 3 ב-30)</Label>

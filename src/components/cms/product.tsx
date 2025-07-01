@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
+import ImageSelector from "./ui/image-selector";
 import { images } from "@/data/images";
 
 interface ProductDetail {
@@ -24,7 +25,6 @@ export default function Product({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -49,25 +49,15 @@ export default function Product({
     fetchProduct();
   }, [params]);
 
+  const getDisplayName = (path: string) => {
+    const file = path.split("/").pop() || "";
+    return file.split(".")[0];
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!product) return;
     const { name, value } = e.target;
     setProduct({ ...product, [name]: value });
-  };
-
-  const getDisplayName = (path: string) => {
-    const parts = path.split("/");
-    const file = parts[parts.length - 1];
-    return file.split(".")[0];
-  };
-
-  const handleSuggestionClick = (fullPath: string) => {
-    const nameOnly = getDisplayName(fullPath);
-    setProduct((prev) =>
-      prev ? { ...prev, image: nameOnly, name: prev.name || nameOnly } : null
-    );
-    setImagePathMap((prev) => ({ ...prev, [nameOnly]: fullPath }));
-    setFocused(false);
   };
 
   const handleSave = async () => {
@@ -98,8 +88,7 @@ export default function Product({
       Number.isInteger(quantity) &&
       quantity > 0;
 
-    const isValidSalePrice =
-      !isSalePriceEmpty && !isNaN(sale) && Number(sale) >= 0;
+    const isValidSalePrice = !isSalePriceEmpty && !isNaN(sale) && sale >= 0;
 
     const fullImagePath =
       imagePathMap[displayImage || ""] ||
@@ -167,17 +156,6 @@ export default function Product({
     }
   };
 
-  const filteredImages = useMemo(() => {
-    if (!product?.image) return images.slice(0, 10);
-    return images
-      .filter((img) =>
-        getDisplayName(img)
-          .toLowerCase()
-          .includes((product.image || "").toLowerCase())
-      )
-      .slice(0, 10);
-  }, [product?.image]);
-
   const previewSrc =
     imagePathMap[product?.image || ""] ||
     images.find((img) => getDisplayName(img) === (product?.image || "")) ||
@@ -201,37 +179,18 @@ export default function Product({
         className="flex flex-col md:flex-row gap-6 items-start"
       >
         <div className="w-full md:w-1/2 space-y-4">
-          {/* Image Input with Suggestions */}
-          <div className="relative">
-            <Label htmlFor="image">תמונה:</Label>
-            <Input
-              id="image"
-              name="image"
-              value={product.image || ""}
-              onChange={handleChange}
-              placeholder="גלידה"
-              onFocus={() => setFocused(true)}
-              onBlur={() => setTimeout(() => setFocused(false), 100)}
-            />
-            {focused && filteredImages.length > 0 && (
-              <ul className="absolute z-10 w-full max-h-60 overflow-y-auto bg-white border rounded-md shadow top-full mt-1">
-                {filteredImages.map((img, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                    onMouseDown={() => handleSuggestionClick(img)}
-                  >
-                    <img
-                      src={img}
-                      alt=""
-                      className="w-8 h-8 object-cover rounded border"
-                    />
-                    <span>{getDisplayName(img)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {/* 🔁 Replaced input+suggestions with reusable ImageSelector */}
+          <ImageSelector
+            value={product.image || ""}
+            onChange={(imageName, fullPath) => {
+              setProduct((prev) =>
+                prev
+                  ? { ...prev, image: imageName, name: prev.name || imageName }
+                  : prev
+              );
+              setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
+            }}
+          />
 
           {/* Name */}
           <div>
@@ -276,7 +235,7 @@ export default function Product({
                 onChange={handleChange}
                 className="w-1/2"
               />
-              <span className="text-sm">ב-</span>
+              <span className="text-sm">ב־</span>
               <Input
                 name="salePrice"
                 type="number"
@@ -290,12 +249,10 @@ export default function Product({
             </div>
           </div>
 
-          {/* Save */}
           <Button type="submit" className="w-full mt-4">
             {saving ? "שומר..." : "שמור"}
           </Button>
 
-          {/* Delete */}
           <Button
             type="button"
             className="w-full mt-2 bg-red-600 text-white hover:bg-red-700"
