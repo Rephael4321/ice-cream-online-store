@@ -24,72 +24,74 @@ type Product = {
 
 type CartItem = Product & { quantity: number };
 
+type GroupedCartItem = {
+  categoryId: number;
+  categoryName: string;
+  amount: number;
+  price: number;
+  items: CartItem[];
+  totalQty: number;
+  totalPrice: number;
+  fullPrice: number;
+  discount: number;
+};
+
 type CartContextType = {
   cartItems: CartItem[];
   addToCart: (product: Product, quantity: number) => void;
   removeFromCart: (productName: string) => void;
   clearCart: () => void;
-  getEffectiveUnitPrice: (item: CartItem) => number;
+  removeGroupedCategory: (categoryId: number) => void;
+  getGroupedCart: () => GroupedCartItem[];
 };
 
 // === Context Setup ===
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// === Sale Pricing Helpers ===
+// === Logic Helpers ===
 
-function getCategoryBundleMap(cart: CartItem[]) {
-  const bundleMap = new Map<number, { totalQty: number; bundles: number }>();
+function groupCartItems(cart: CartItem[]): GroupedCartItem[] {
+  const map = new Map<number, GroupedCartItem>();
 
   for (const item of cart) {
-    const sale = item.sale;
+    const { sale } = item;
+
     if (sale?.fromCategory && sale.category?.id != null) {
-      const { id } = sale.category;
-      const existing = bundleMap.get(id) ?? { totalQty: 0, bundles: 0 };
-      const totalQty = existing.totalQty + item.quantity;
-      const bundles = Math.floor(totalQty / sale.amount);
-      bundleMap.set(id, { totalQty, bundles });
+      const categoryId = sale.category.id;
+      const existing = map.get(categoryId);
+
+      if (existing) {
+        existing.items.push(item);
+        existing.totalQty += item.quantity;
+        existing.fullPrice += item.productPrice * item.quantity;
+      } else {
+        map.set(categoryId, {
+          categoryId,
+          categoryName: sale.category.name,
+          amount: sale.amount,
+          price: sale.price,
+          items: [item],
+          totalQty: item.quantity,
+          fullPrice: item.productPrice * item.quantity,
+          totalPrice: 0,
+          discount: 0,
+        });
+      }
     }
   }
 
-  return bundleMap;
-}
+  for (const group of map.values()) {
+    const bundles = Math.floor(group.totalQty / group.amount);
+    const discountedQty = bundles * group.amount;
+    const remainingQty = group.totalQty - discountedQty;
+    const basePrice = group.items[0].productPrice;
 
-function getEffectiveTotalPrice(
-  item: CartItem,
-  cart: CartItem[],
-  bundleMap: Map<number, { totalQty: number; bundles: number }>
-): number {
-  const base = item.productPrice;
-  const qty = item.quantity;
-
-  if (!item.sale) return base * qty;
-
-  const { amount, price, fromCategory, category } = item.sale;
-
-  // Product-level sale
-  if (!fromCategory) {
-    const bundles = Math.floor(qty / amount);
-    const remainder = qty % amount;
-    return bundles * price + remainder * base;
+    group.totalPrice = bundles * group.price + remainingQty * basePrice;
+    group.discount = group.fullPrice - group.totalPrice;
   }
 
-  // Category-level sale
-  if (fromCategory && category?.id != null) {
-    const info = bundleMap.get(category.id);
-    if (!info || info.totalQty < amount || info.bundles === 0)
-      return base * qty;
-
-    const { totalQty, bundles } = info;
-    const ratio = qty / totalQty;
-    const myBundles = Math.floor(bundles * ratio);
-    const discountedQty = myBundles * amount;
-    const remainingQty = Math.max(0, qty - discountedQty);
-
-    return myBundles * price + remainingQty * base;
-  }
-
-  return base * qty;
+  return Array.from(map.values());
 }
 
 // === Provider ===
@@ -119,6 +121,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  function removeGroupedCategory(categoryId: number) {
+    setCartItems((prev) =>
+      prev.filter(
+        (item) =>
+          !item.sale?.fromCategory || item.sale.category?.id !== categoryId
+      )
+    );
+  }
+
   function clearCart() {
     setCartItems([]);
   }
@@ -130,12 +141,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeFromCart,
         clearCart,
-        getEffectiveUnitPrice: (item) => {
-          if (item.quantity === 0) return item.productPrice;
-          const bundleMap = getCategoryBundleMap(cartItems);
-          const total = getEffectiveTotalPrice(item, cartItems, bundleMap);
-          return total / item.quantity;
-        },
+        removeGroupedCategory,
+        getGroupedCart: () => groupCartItems(cartItems),
       }}
     >
       {children}
