@@ -27,8 +27,12 @@ export async function initializeTables() {
       CREATE TABLE IF NOT EXISTS categories (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
-        type ENUM('brand', 'collection', 'sale') NOT NULL,
-        image TEXT
+        description TEXT,
+        type ENUM('collection', 'sale') NOT NULL,
+        image TEXT,
+        parent_id INT DEFAULT NULL,
+        show_in_menu BOOLEAN DEFAULT FALSE,
+        FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
       )
     `);
 
