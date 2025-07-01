@@ -1,3 +1,4 @@
+import JwtGatekeeper from "@/components/auth/jwt-gatekeeper";
 import CmsNavbar from "@/components/cms/cms-navbar";
 
 export default function StoreLayout({
@@ -7,8 +8,10 @@ export default function StoreLayout({
 }>) {
   return (
     <>
-      <CmsNavbar />
-      {children}
+      <JwtGatekeeper>
+        <CmsNavbar />
+        {children}
+      </JwtGatekeeper>
     </>
   );
 }

@@ -1,5 +1,10 @@
+import JwtGatekeeper from "@/components/auth/jwt-gatekeeper";
 import ManagementMenu from "@/components/cms/management-menu";
 
 export default function ManagementMenuPage() {
-  return <ManagementMenu />;
+  return (
+    <JwtGatekeeper>
+      <ManagementMenu />
+    </JwtGatekeeper>
+  );
 }
