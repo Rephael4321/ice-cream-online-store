@@ -2,31 +2,90 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
+type SaleCategory = {
+  id: number;
+  name: string;
+  quantity: number;
+  sale_price: number;
+};
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const [rows]: any = await pool.query(
+    const productId = params.id;
+
+    // 1. Get base product + product sale (if any)
+    const [productRows]: any = await pool.query(
       `SELECT 
          p.id, 
          p.name, 
          p.price, 
          p.image, 
-         s.quantity AS saleQuantity, 
-         s.sale_price AS salePrice
+         s.quantity AS productSaleQuantity, 
+         s.sale_price AS productSalePrice
        FROM products p
        LEFT JOIN sales s ON s.product_id = p.id
        WHERE p.id = ?`,
-      [params.id]
+      [productId]
     );
 
-    if (rows.length === 0) {
+    if (productRows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ product: rows[0] });
+    const product = productRows[0];
+
+    // 2. Get all sale categories the product belongs to
+    const [saleCategories]: any = await pool.query(
+      `SELECT 
+         c.id, c.name, cs.quantity, cs.sale_price
+       FROM categories c
+       JOIN product_categories pc ON pc.category_id = c.id
+       JOIN category_sales cs ON cs.category_id = c.id
+       WHERE c.type = 'sale' AND pc.product_id = ?`,
+      [productId]
+    );
+
+    // 3. Determine which sale applies (priority: category > product)
+    let effectiveSale = null;
+
+    if (saleCategories.length > 0) {
+      const best = (saleCategories as SaleCategory[]).sort(
+        (a: SaleCategory, b: SaleCategory) => a.sale_price - b.sale_price
+      )[0];
+      effectiveSale = {
+        fromCategory: true,
+        quantity: best.quantity,
+        price: best.sale_price,
+        category: {
+          id: best.id,
+          name: best.name,
+        },
+      };
+    } else if (
+      product.productSaleQuantity != null &&
+      product.productSalePrice != null
+    ) {
+      effectiveSale = {
+        fromCategory: false,
+        quantity: product.productSaleQuantity,
+        price: product.productSalePrice,
+      };
+    }
+
+    return NextResponse.json({
+      product: {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        sale: effectiveSale,
+      },
+    });
   } catch (err: any) {
+    console.error("GET /api/products/[id] failed:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

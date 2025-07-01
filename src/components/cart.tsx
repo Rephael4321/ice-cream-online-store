@@ -4,24 +4,9 @@ import { useCart } from "@/context/cart-context";
 import { useState } from "react";
 
 export default function Cart() {
-  const { cartItems, removeFromCart, clearCart } = useCart();
+  const { cartItems, removeFromCart, clearCart, getEffectiveUnitPrice } =
+    useCart();
   const [isOpen, setIsOpen] = useState(false);
-
-  function calculateDiscountedPrice(item: {
-    quantity: number;
-    productPrice: number;
-    sale?: { amount: number; price: number };
-  }): number {
-    const { quantity, productPrice, sale } = item;
-
-    if (sale) {
-      const bundlesCount = Math.floor(quantity / sale.amount);
-      const remainder = quantity % sale.amount;
-      return bundlesCount * sale.price + remainder * productPrice;
-    }
-
-    return quantity * productPrice;
-  }
 
   return (
     <>
@@ -45,29 +30,54 @@ export default function Cart() {
             <p className="text-gray-500 text-center mt-10">העגלה ריקה</p>
           ) : (
             <ul className="flex flex-col gap-4 overflow-y-auto flex-grow">
-              {cartItems.map((item) => (
-                <li
-                  key={item.productName}
-                  className="flex justify-between items-start border-b pb-2"
-                >
-                  <div className="text-sm sm:text-base space-y-1">
-                    <p className="font-semibold">{item.productName}</p>
-                    <p>כמות: {item.quantity}</p>
-                    <p>מחיר: {calculateDiscountedPrice(item)} ש״ח</p>
-                  </div>
-                  <button
-                    onClick={() => removeFromCart(item.productName)}
-                    className="text-red-500 hover:text-red-700 text-sm cursor-pointer"
+              {cartItems.map((item) => {
+                const unitPrice = getEffectiveUnitPrice(item);
+                const itemTotal = unitPrice * item.quantity;
+
+                return (
+                  <li
+                    key={item.productName}
+                    className="flex justify-between items-start border-b pb-2"
                   >
-                    הסר
-                  </button>
-                </li>
-              ))}
+                    <div className="text-sm sm:text-base space-y-1">
+                      <p className="font-semibold">{item.productName}</p>
+                      <p>כמות: {item.quantity}</p>
+                      <p>מחיר: {itemTotal.toFixed(2)} ש״ח</p>
+                      {item.sale?.fromCategory && item.sale?.category && (
+                        <p className="text-sm text-green-600">
+                          מבצע מקטגוריית{" "}
+                          <span className="font-bold">
+                            {item.sale.category.name}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeFromCart(item.productName)}
+                      className="text-red-500 hover:text-red-700 text-sm cursor-pointer"
+                    >
+                      הסר
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
           {cartItems.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-4 space-y-3">
+              <p className="text-right font-bold">
+                סה״כ:{" "}
+                {cartItems
+                  .reduce(
+                    (sum, item) =>
+                      sum + getEffectiveUnitPrice(item) * item.quantity,
+                    0
+                  )
+                  .toFixed(2)}{" "}
+                ש״ח
+              </p>
+
               <button
                 onClick={() => alert("המשך לתשלום (בעתיד)")}
                 className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition cursor-pointer"

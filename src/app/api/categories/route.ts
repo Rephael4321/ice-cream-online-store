@@ -1,11 +1,10 @@
-// src/app/api/categories/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
 export async function GET() {
   try {
     const [rows]: any = await pool.query(
-      "SELECT id, name, type, image FROM categories"
+      "SELECT id, name, type, description, image, parent_id, show_in_menu FROM categories"
     );
     return NextResponse.json({ categories: rows });
   } catch (err: any) {
@@ -15,18 +14,32 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, type, image, saleQuantity, salePrice } = await req.json();
+    const {
+      name,
+      type,
+      image = "",
+      description = "",
+      parent_id = null,
+      show_in_menu = false,
+      saleQuantity,
+      salePrice,
+    } = await req.json();
 
-    if (!name || !type) {
+    if (!name || !type || !["collection", "sale"].includes(type)) {
       return NextResponse.json(
-        { error: "Name and type are required" },
+        { error: "Invalid name or type" },
         { status: 400 }
       );
     }
 
+    const parentIdOrNull = parent_id ? Number(parent_id) : null;
+    const visible = type === "collection" ? true : !!show_in_menu;
+
     const [result]: any = await pool.query(
-      "INSERT INTO categories (name, type, image) VALUES (?, ?, ?)",
-      [name, type, image]
+      `INSERT INTO categories 
+         (name, type, image, description, parent_id, show_in_menu)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [name, type, image, description, parentIdOrNull, visible]
     );
 
     const categoryId = result.insertId;
@@ -55,10 +68,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: "Category added", categoryId },
+      { message: "Category created", categoryId },
       { status: 201 }
     );
   } catch (err: any) {
+    console.error("POST /categories error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

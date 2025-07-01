@@ -8,8 +8,15 @@ interface Product {
   name: string;
   price: number;
   image?: string;
-  saleQuantity?: number;
-  salePrice?: number;
+  sale?: {
+    amount: number;
+    price: number;
+    fromCategory?: boolean;
+    category?: {
+      id: number;
+      name: string;
+    };
+  };
 }
 
 export default function ProductsByCategory({
@@ -64,14 +71,7 @@ export default function ProductsByCategory({
             productImage={product.image || ""}
             productName={product.name}
             productPrice={product.price}
-            sale={
-              product.saleQuantity && product.salePrice
-                ? {
-                    amount: product.saleQuantity,
-                    price: product.salePrice,
-                  }
-                : undefined
-            }
+            sale={product.sale}
           />
         ))}
       </div>

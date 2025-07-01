@@ -4,6 +4,11 @@ import { useState } from "react";
 import { useCart } from "@/context/cart-context";
 import Image from "next/image";
 
+type SaleCategoryInfo = {
+  id: number;
+  name: string;
+};
+
 type SingleProductProps = {
   id: number;
   productImage: string;
@@ -12,6 +17,8 @@ type SingleProductProps = {
   sale?: {
     amount: number;
     price: number;
+    fromCategory?: boolean;
+    category?: SaleCategoryInfo;
   };
 };
 
@@ -52,10 +59,19 @@ export default function SingleProduct({
         >
           {productPrice} ש״ח
         </p>
+
         {sale ? (
-          <p className="text-lg sm:text-xl font-bold text-green-300">
-            {sale.amount} ב- {sale.price} ש״ח
-          </p>
+          <>
+            <p className="text-lg sm:text-xl font-bold text-green-300">
+              {sale.amount} ב- {sale.price} ש״ח
+            </p>
+            {sale.fromCategory && sale.category && (
+              <p className="text-sm text-yellow-200 italic">
+                מקטגוריית{" "}
+                <span className="font-bold">{sale.category.name}</span>
+              </p>
+            )}
+          </>
         ) : (
           <p className="text-lg sm:text-xl font-bold opacity-0 select-none">
             0 ב- 0 ש״ח
