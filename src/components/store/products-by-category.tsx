@@ -60,6 +60,7 @@ export default function ProductsByCategory({
         {products.map((product) => (
           <SingleProduct
             key={product.id}
+            id={product.id}
             productImage={product.image || ""}
             productName={product.name}
             productPrice={product.price}

@@ -5,6 +5,7 @@ import { useCart } from "@/context/cart-context";
 import Image from "next/image";
 
 type SingleProductProps = {
+  id: number;
   productImage: string;
   productName: string;
   productPrice: number;
@@ -15,6 +16,7 @@ type SingleProductProps = {
 };
 
 export default function SingleProduct({
+  id,
   productImage,
   productName,
   productPrice,
@@ -33,7 +35,6 @@ export default function SingleProduct({
         className="rounded-md"
       />
 
-      {/* Sale badge */}
       {sale && (
         <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
           מבצע!
@@ -44,8 +45,6 @@ export default function SingleProduct({
         <p className="font-semibold text-lg sm:text-xl text-white">
           {productName}
         </p>
-
-        {/* Original Price */}
         <p
           className={`text-base sm:text-lg text-white ${
             sale ? "line-through opacity-70" : ""
@@ -53,8 +52,6 @@ export default function SingleProduct({
         >
           {productPrice} ש״ח
         </p>
-
-        {/* Sale Price or placeholder */}
         {sale ? (
           <p className="text-lg sm:text-xl font-bold text-green-300">
             {sale.amount} ב- {sale.price} ש״ח
@@ -69,7 +66,10 @@ export default function SingleProduct({
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={() =>
-            addToCart({ productImage, productName, productPrice }, amount)
+            addToCart(
+              { id, productImage, productName, productPrice, sale },
+              amount
+            )
           }
           className="px-4 py-2 bg-[#3333f6] rounded text-white hover:bg-[#45df43] transition cursor-pointer text-sm sm:text-base"
         >
@@ -85,7 +85,7 @@ export default function SingleProduct({
           </button>
           <p className="w-6 text-center">{amount}</p>
           <button
-            onClick={() => setAmount((prev) => Math.max(0, prev - 1))}
+            onClick={() => setAmount((prev) => Math.max(1, prev - 1))}
             className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 cursor-pointer"
           >
             -

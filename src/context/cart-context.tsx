@@ -3,9 +3,14 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
 type Product = {
+  id: number;
   productImage: string;
   productName: string;
   productPrice: number;
+  sale?: {
+    amount: number;
+    price: number;
+  };
 };
 
 type CartItem = Product & { quantity: number };
