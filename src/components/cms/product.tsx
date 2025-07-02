@@ -37,7 +37,17 @@ export default function Product({
         const loaded = data.product ?? data;
 
         const displayName = getDisplayName(loaded.image || "");
-        setProduct({ ...loaded, image: displayName });
+
+        // ✅ Correct usage — include sale fields and avoid overwrite
+        setProduct({
+          id: loaded.id,
+          name: loaded.name,
+          price: loaded.price,
+          image: displayName,
+          saleQuantity: loaded.sale?.quantity ?? "",
+          salePrice: loaded.sale?.price ?? "",
+        });
+
         setImagePathMap({ [displayName]: loaded.image });
       } catch (err) {
         setError((err as Error).message);
@@ -179,7 +189,6 @@ export default function Product({
         className="flex flex-col md:flex-row gap-6 items-start"
       >
         <div className="w-full md:w-1/2 space-y-4">
-          {/* 🔁 Replaced input+suggestions with reusable ImageSelector */}
           <ImageSelector
             value={product.image || ""}
             onChange={(imageName, fullPath) => {
@@ -192,7 +201,6 @@ export default function Product({
             }}
           />
 
-          {/* Name */}
           <div>
             <Label htmlFor="name">שם:</Label>
             <Input
@@ -205,7 +213,6 @@ export default function Product({
             />
           </div>
 
-          {/* Price */}
           <div>
             <Label htmlFor="price">מחיר: (₪)</Label>
             <Input
@@ -221,7 +228,6 @@ export default function Product({
             />
           </div>
 
-          {/* Sale */}
           <div>
             <Label>מבצע: (רשות)</Label>
             <div className="flex items-center gap-2">
@@ -262,7 +268,6 @@ export default function Product({
           </Button>
         </div>
 
-        {/* Preview */}
         <div className="w-full md:w-1/2">
           {previewSrc && (
             <img

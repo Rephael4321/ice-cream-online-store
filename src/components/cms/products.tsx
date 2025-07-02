@@ -23,7 +23,7 @@ export default function Products() {
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצרים");
         const data = await res.json();
-        setProducts(data.products ?? data);
+        setProducts((data.products ?? data).reverse());
       } catch (err) {
         setError((err as Error).message);
       } finally {

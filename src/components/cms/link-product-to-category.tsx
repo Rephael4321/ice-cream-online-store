@@ -25,14 +25,14 @@ export default function LinkProductToCategory() {
       const res = await fetch("/api/products");
       if (!res.ok) throw new Error("שגיאה בטעינת מוצרים");
       const data = await res.json();
-      setProducts(data.products);
+      setProducts((data.products ?? data).reverse());
     }
 
     async function fetchCategories() {
       const res = await fetch("/api/categories?full=true");
       if (!res.ok) throw new Error("שגיאה בטעינת קטגוריות");
       const data = await res.json();
-      setCategories(data.categories);
+      setCategories((data.categories ?? data).reverse());
     }
 
     fetchProducts().catch(console.error);
