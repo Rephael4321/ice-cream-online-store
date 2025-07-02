@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image"; // ✅ Required for images
+import Image from "next/image";
 
 type Order = {
   orderId: number;
@@ -14,7 +14,7 @@ type Order = {
 type Item = {
   productId: number;
   productName: string;
-  productImage: string; // ✅ new
+  productImage: string;
   quantity: number;
   unitPrice: number;
   saleQuantity: number | null;
@@ -23,7 +23,8 @@ type Item = {
 
 export default function OrderDetails() {
   const params = useParams();
-  const id = params?.id;
+  const id = params?.id as string | undefined;
+
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,19 +34,22 @@ export default function OrderDetails() {
 
     fetch(`/api/orders/${id}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: { order: Order; items: Item[] }) => {
         setOrder(data.order);
 
-        const parsedItems = (data.items || []).map((item: any) => ({
+        const parsedItems = data.items.map((item) => ({
           ...item,
-          unitPrice: parseFloat(item.unitPrice),
+          unitPrice: parseFloat(item.unitPrice as unknown as string),
           salePrice:
-            item.salePrice !== null ? parseFloat(item.salePrice) : null,
+            item.salePrice !== null
+              ? parseFloat(item.salePrice as unknown as string)
+              : null,
         }));
 
         setItems(parsedItems);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, [id]);
 
   if (loading) return <p className="p-6">טוען...</p>;

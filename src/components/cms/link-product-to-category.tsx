@@ -14,6 +14,14 @@ interface Category {
   name: string;
 }
 
+interface ProductResponse {
+  products: Product[];
+}
+
+interface CategoryResponse {
+  categories: Category[];
+}
+
 export default function LinkProductToCategory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -24,15 +32,17 @@ export default function LinkProductToCategory() {
     async function fetchProducts() {
       const res = await fetch("/api/products");
       if (!res.ok) throw new Error("שגיאה בטעינת מוצרים");
-      const data = await res.json();
-      setProducts((data.products ?? data).reverse());
+      const data: ProductResponse | Product[] = await res.json();
+      const result = Array.isArray(data) ? data : data.products;
+      setProducts(result.reverse());
     }
 
     async function fetchCategories() {
       const res = await fetch("/api/categories?full=true");
       if (!res.ok) throw new Error("שגיאה בטעינת קטגוריות");
-      const data = await res.json();
-      setCategories((data.categories ?? data).reverse());
+      const data: CategoryResponse | Category[] = await res.json();
+      const result = Array.isArray(data) ? data : data.categories;
+      setCategories(result.reverse());
     }
 
     fetchProducts().catch(console.error);
@@ -58,15 +68,19 @@ export default function LinkProductToCategory() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        const errData: { error?: string } = await response.json();
         throw new Error(errData.error || "שגיאה בקישור מוצר לקטגוריה");
       }
 
       alert("המוצר קושר בהצלחה!");
       setSelectedProductId("");
       setSelectedCategoryId("");
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("אירעה שגיאה לא ידועה");
+      }
     }
   };
 

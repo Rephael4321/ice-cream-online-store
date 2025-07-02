@@ -14,8 +14,26 @@ import { Label } from "./ui/label";
 import ImageSelector from "./ui/image-selector";
 import { images } from "@/data/images";
 
+type CategoryForm = {
+  name: string;
+  type: "collection" | "sale";
+  image: string;
+  saleQuantity: string;
+  salePrice: string;
+  showInMenu: boolean;
+};
+
+type CategoryPayload = {
+  name: string;
+  type: "collection" | "sale";
+  image: string;
+  saleQuantity?: number;
+  salePrice?: number;
+  show_in_menu?: boolean;
+};
+
 export default function NewCategory() {
-  const [category, setCategory] = useState({
+  const [category, setCategory] = useState<CategoryForm>({
     name: "",
     type: "collection",
     image: "",
@@ -26,7 +44,7 @@ export default function NewCategory() {
 
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
 
-  const getDisplayName = (path: string) => {
+  const getDisplayName = (path: string): string => {
     const file = path.split("/").pop() || "";
     return file.split(".")[0];
   };
@@ -36,7 +54,7 @@ export default function NewCategory() {
     setCategory((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleTypeChange = (value: string) => {
+  const handleTypeChange = (value: "collection" | "sale") => {
     setCategory((prev) => ({
       ...prev,
       type: value,
@@ -67,11 +85,12 @@ export default function NewCategory() {
       return;
     }
 
-    if (category.type === "sale") {
-      if (!category.saleQuantity || !category.salePrice) {
-        alert("נא למלא כמות ומחיר מבצע");
-        return;
-      }
+    if (
+      category.type === "sale" &&
+      (!category.saleQuantity || !category.salePrice)
+    ) {
+      alert("נא למלא כמות ומחיר מבצע");
+      return;
     }
 
     const fullImagePath =
@@ -79,7 +98,7 @@ export default function NewCategory() {
       images.find((img) => getDisplayName(img) === category.image) ||
       "";
 
-    const payload: any = {
+    const payload: CategoryPayload = {
       name: category.name,
       type: category.type,
       image: fullImagePath,
@@ -139,7 +158,7 @@ export default function NewCategory() {
               setCategory((prev) => ({
                 ...prev,
                 image: imageName,
-                name: prev.name ? prev.name : imageName,
+                name: prev.name || imageName,
               }));
               setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
             }}

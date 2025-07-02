@@ -3,27 +3,31 @@
 import { useEffect, useState } from "react";
 import SingleProduct from "@/components/single-product";
 
+interface CategoryRef {
+  id: number;
+  name: string;
+}
+
+interface Sale {
+  amount: number;
+  price: number;
+  fromCategory?: boolean;
+  category?: CategoryRef;
+}
+
 interface Product {
   id: number;
   name: string;
   price: number;
   image?: string;
-  sale?: {
-    amount: number;
-    price: number;
-    fromCategory?: boolean;
-    category?: {
-      id: number;
-      name: string;
-    };
-  };
+  sale?: Sale;
 }
 
-export default function ProductsByCategory({
-  params,
-}: {
+interface Props {
   params: Promise<{ category: string }>;
-}) {
+}
+
+export default function ProductsByCategory({ params }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +44,12 @@ export default function ProductsByCategory({
 
         const data = await res.json();
         setProducts(data.products || []);
-      } catch (err: any) {
-        setError(err.message || "קרתה תקלה");
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("קרתה תקלה");
+        }
       } finally {
         setLoading(false);
       }

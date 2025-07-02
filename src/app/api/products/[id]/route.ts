@@ -1,12 +1,21 @@
-// src/app/api/products/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { RowDataPacket, OkPacket } from "mysql2";
 
 type SaleCategory = {
   id: number;
   name: string;
   quantity: number;
   sale_price: number;
+};
+
+type ProductRow = {
+  id: number;
+  name: string;
+  price: number;
+  image: string;
+  productSaleQuantity: number | null;
+  productSalePrice: number | null;
 };
 
 export async function GET(
@@ -17,7 +26,7 @@ export async function GET(
     const productId = params.id;
 
     // 1. Get base product + product sale (if any)
-    const [productRows]: any = await pool.query(
+    const [productRows] = await pool.query<ProductRow[] & RowDataPacket[]>(
       `SELECT 
          p.id, 
          p.name, 
@@ -38,7 +47,7 @@ export async function GET(
     const product = productRows[0];
 
     // 2. Get all sale categories the product belongs to
-    const [saleCategories]: any = await pool.query(
+    const [saleCategories] = await pool.query<SaleCategory[] & RowDataPacket[]>(
       `SELECT 
          c.id, c.name, cs.quantity, cs.sale_price
        FROM categories c
@@ -49,12 +58,13 @@ export async function GET(
     );
 
     // 3. Determine which sale applies (priority: category > product)
-    let effectiveSale = null;
+    let effectiveSale: any = null;
 
     if (saleCategories.length > 0) {
-      const best = (saleCategories as SaleCategory[]).sort(
-        (a: SaleCategory, b: SaleCategory) => a.sale_price - b.sale_price
+      const best = saleCategories.sort(
+        (a, b) => a.sale_price - b.sale_price
       )[0];
+
       effectiveSale = {
         fromCategory: true,
         quantity: best.quantity,
@@ -84,9 +94,11 @@ export async function GET(
         sale: effectiveSale,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("GET /api/products/[id] failed:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }
 
@@ -105,7 +117,7 @@ export async function PUT(
       );
     }
 
-    await pool.query(
+    await pool.query<OkPacket>(
       "UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?",
       [name, price, image, params.id]
     );
@@ -116,22 +128,24 @@ export async function PUT(
     const isValidSalePrice = !isNaN(sale) && sale >= 0;
 
     if (saleQuantity === null && salePrice === null) {
-      await pool.query("DELETE FROM sales WHERE product_id = ?", [params.id]);
+      await pool.query<OkPacket>("DELETE FROM sales WHERE product_id = ?", [
+        params.id,
+      ]);
       return NextResponse.json({ message: "Product updated and sale removed" });
     } else if (isValidQuantity && isValidSalePrice) {
-      const [saleRows]: any = await pool.query(
+      const [saleRows] = await pool.query<RowDataPacket[]>(
         "SELECT id FROM sales WHERE product_id = ?",
         [params.id]
       );
 
       if (saleRows.length > 0) {
-        await pool.query(
+        await pool.query<OkPacket>(
           "UPDATE sales SET quantity = ?, sale_price = ? WHERE product_id = ?",
           [quantity, sale, params.id]
         );
         return NextResponse.json({ message: "Product and sale updated" });
       } else {
-        await pool.query(
+        await pool.query<OkPacket>(
           "INSERT INTO sales (product_id, quantity, sale_price) VALUES (?, ?, ?)",
           [params.id, quantity, sale]
         );
@@ -140,8 +154,10 @@ export async function PUT(
     } else {
       return NextResponse.json({ message: "Product updated (sale unchanged)" });
     }
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }
 
@@ -150,7 +166,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const [result]: any = await pool.query(
+    const [result] = await pool.query<OkPacket>(
       "DELETE FROM products WHERE id = ?",
       [params.id]
     );
@@ -160,7 +176,9 @@ export async function DELETE(
     }
 
     return NextResponse.json({ message: "Product deleted" });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }

@@ -1,6 +1,25 @@
 // src/app/api/categories/name/[name]/products/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { RowDataPacket } from "mysql2";
+
+// DB types
+type ProductRow = {
+  id: number;
+  name: string;
+  price: number;
+  image: string;
+  productSaleQuantity: number | null;
+  productSalePrice: number | null;
+};
+
+type CategorySaleRow = {
+  productId: number;
+  categoryId: number;
+  categoryName: string;
+  quantity: number;
+  sale_price: number;
+};
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +28,7 @@ export async function GET(
   try {
     const { name } = params;
 
-    const [products]: any = await pool.query(
+    const [products] = await pool.query<ProductRow[] & RowDataPacket[]>(
       `SELECT 
          p.id, p.name, p.price, p.image,
          s.quantity AS productSaleQuantity,
@@ -27,10 +46,12 @@ export async function GET(
     }
 
     // Extract all product IDs
-    const productIds = products.map((p: any) => p.id);
+    const productIds = products.map((p) => p.id);
 
     // Get all category sales linked to these products
-    const [categorySales]: any = await pool.query(
+    const [categorySales] = await pool.query<
+      CategorySaleRow[] & RowDataPacket[]
+    >(
       `SELECT 
          pc.product_id AS productId,
          c.id AS categoryId,
@@ -56,10 +77,7 @@ export async function GET(
 
     for (const row of categorySales) {
       const existing = saleMap.get(row.productId);
-      if (
-        !existing ||
-        row.sale_price < existing.price // prioritize lower price
-      ) {
+      if (!existing || row.sale_price < existing.price) {
         saleMap.set(row.productId, {
           amount: row.quantity,
           price: row.sale_price,
@@ -71,8 +89,8 @@ export async function GET(
       }
     }
 
-    const finalProducts = products.map((product: any) => {
-      let sale = undefined;
+    const finalProducts = products.map((product) => {
+      let sale;
 
       const categorySale = saleMap.get(product.id);
       if (categorySale) {
@@ -103,8 +121,10 @@ export async function GET(
     });
 
     return NextResponse.json({ products: finalProducts });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error in /api/categories/name/[name]/products:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }

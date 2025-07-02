@@ -7,8 +7,24 @@ import { Label } from "./ui/label";
 import ImageSelector from "./ui/image-selector";
 import { images } from "@/data/images";
 
+type ProductForm = {
+  name: string;
+  price: string;
+  image: string;
+  saleQuantity: string;
+  salePrice: string;
+};
+
+type ProductPayload = {
+  name: string;
+  price: string;
+  image: string;
+  saleQuantity?: string;
+  salePrice?: string;
+};
+
 export default function NewProduct() {
-  const [product, setProduct] = useState({
+  const [product, setProduct] = useState<ProductForm>({
     name: "",
     price: "",
     image: "",
@@ -29,7 +45,7 @@ export default function NewProduct() {
     setProduct((prev) => ({ ...prev, name: "" }));
   };
 
-  const getDisplayName = (path: string) => {
+  const getDisplayName = (path: string): string => {
     const parts = path.split("/");
     const file = parts[parts.length - 1];
     return file.split(".")[0];
@@ -37,13 +53,11 @@ export default function NewProduct() {
 
   const handleSuggestionClick = (fullPath: string) => {
     const nameOnly = getDisplayName(fullPath);
-
-    setProduct((prev) => ({
-      ...prev,
+    setProduct({
+      ...product,
       image: nameOnly,
-      name: nameOnly, // ← always overwrite name
-    }));
-
+      name: nameOnly,
+    });
     setImagePathMap((prev) => ({ ...prev, [nameOnly]: fullPath }));
   };
 
@@ -55,10 +69,14 @@ export default function NewProduct() {
       images.find((img) => getDisplayName(img) === product.image) ||
       "";
 
-    const payload = {
-      ...product,
+    const payload: ProductPayload = {
+      name: product.name,
+      price: product.price,
       image: fullImagePath,
     };
+
+    if (product.saleQuantity) payload.saleQuantity = product.saleQuantity;
+    if (product.salePrice) payload.salePrice = product.salePrice;
 
     try {
       const response = await fetch("/api/products", {
@@ -70,6 +88,7 @@ export default function NewProduct() {
       if (!response.ok) throw new Error("Failed to save product");
       const result = await response.json();
       alert("Saved with ID: " + result.productId);
+
       setProduct({
         name: "",
         price: "",
@@ -109,14 +128,13 @@ export default function NewProduct() {
       >
         {/* Left Column: Form */}
         <div className="w-full md:w-1/2 space-y-4">
-          {/* Image Input */}
           <ImageSelector
             value={product.image}
             onChange={(imageName, fullPath) => {
               setProduct((prev) => ({
                 ...prev,
                 image: imageName,
-                name: imageName, // ← overwrite name as in NewProduct
+                name: imageName,
               }));
               setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
             }}
@@ -206,14 +224,15 @@ export default function NewProduct() {
           )}
         </div>
       </form>
+
       {showGallery && (
         <div
           className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center"
-          onClick={() => setShowGallery(false)} // 🔹 closes when clicking the dark background
+          onClick={() => setShowGallery(false)}
         >
           <div
             className="bg-white max-w-4xl w-full max-h-[80vh] overflow-y-auto p-4 rounded shadow-lg relative"
-            onClick={(e) => e.stopPropagation()} // 🔸 prevent closing when clicking inside the modal
+            onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-bold mb-4">גלריית תמונות</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">

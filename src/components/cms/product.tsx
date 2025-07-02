@@ -12,15 +12,23 @@ interface ProductDetail {
   name: string;
   price: string | number;
   image?: string;
-  saleQuantity?: number | string;
-  salePrice?: number | string;
+  saleQuantity?: string | number;
+  salePrice?: string | number;
 }
 
-export default function Product({
-  params,
-}: {
+interface ParamsProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+interface ProductUpdatePayload {
+  name: string;
+  price: number;
+  image: string | null;
+  saleQuantity?: number | null;
+  salePrice?: number | null;
+}
+
+export default function Product({ params }: ParamsProps) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +46,6 @@ export default function Product({
 
         const displayName = getDisplayName(loaded.image || "");
 
-        // ✅ Correct usage — include sale fields and avoid overwrite
         setProduct({
           id: loaded.id,
           name: loaded.name,
@@ -105,7 +112,7 @@ export default function Product({
       images.find((img) => getDisplayName(img) === (displayImage || "")) ||
       "";
 
-    const updatedProduct: any = {
+    const updatedProduct: ProductUpdatePayload = {
       name,
       price: Number(price),
       image: fullImagePath || null,
@@ -121,7 +128,7 @@ export default function Product({
       (isValidQuantity && isSalePriceEmpty) ||
       (isValidSalePrice && isQuantityEmpty)
     ) {
-      // ignore
+      // ignore invalid combo
     } else {
       setProduct((prev) =>
         prev ? { ...prev, saleQuantity: "", salePrice: "" } : prev
@@ -149,7 +156,6 @@ export default function Product({
 
   const handleDelete = async () => {
     if (!product) return;
-
     if (!confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) return;
 
     try {

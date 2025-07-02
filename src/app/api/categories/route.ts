@@ -1,21 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { RowDataPacket, OkPacket } from "mysql2";
 
+// Shared Types
+type Category = {
+  id: number;
+  name: string;
+  type: "collection" | "sale";
+  description: string | null;
+  image: string | null;
+  parent_id: number | null;
+  show_in_menu: boolean;
+};
+
+type SaleInsert = {
+  category_id: number;
+  quantity: number;
+  sale_price: number;
+};
+
+// GET /api/categories
 export async function GET(req: NextRequest) {
   try {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
 
-    const [rows]: any = await pool.query(
+    const [rows] = await pool.query<Category[] & RowDataPacket[]>(
       `SELECT id, name, type, description, image, parent_id, show_in_menu FROM categories
        ${fullView ? "" : "WHERE show_in_menu = true"}`
     );
 
     return NextResponse.json({ categories: rows });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }
 
+// POST /api/categories
 export async function POST(req: NextRequest) {
   try {
     const {
@@ -27,6 +49,15 @@ export async function POST(req: NextRequest) {
       show_in_menu = false,
       saleQuantity,
       salePrice,
+    }: {
+      name: string;
+      type: "collection" | "sale";
+      image?: string;
+      description?: string;
+      parent_id?: number | null;
+      show_in_menu?: boolean;
+      saleQuantity?: number;
+      salePrice?: number;
     } = await req.json();
 
     if (!name || !type || !["collection", "sale"].includes(type)) {
@@ -39,7 +70,7 @@ export async function POST(req: NextRequest) {
     const parentIdOrNull = parent_id ? Number(parent_id) : null;
     const visible = type === "collection" ? true : !!show_in_menu;
 
-    const [result]: any = await pool.query(
+    const [result] = await pool.query<OkPacket>(
       `INSERT INTO categories 
          (name, type, image, description, parent_id, show_in_menu)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -65,7 +96,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await pool.query(
+      await pool.query<OkPacket>(
         "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES (?, ?, ?)",
         [categoryId, quantity, price]
       );
@@ -75,12 +106,15 @@ export async function POST(req: NextRequest) {
       { message: "Category created", categoryId },
       { status: 201 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("POST /categories error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }
 
+// PATCH /api/categories
 export async function PATCH(req: NextRequest) {
   try {
     const {
@@ -93,6 +127,16 @@ export async function PATCH(req: NextRequest) {
       show_in_menu = false,
       saleQuantity,
       salePrice,
+    }: {
+      id: number;
+      name: string;
+      type: "collection" | "sale";
+      image?: string;
+      description?: string;
+      parent_id?: number | null;
+      show_in_menu?: boolean;
+      saleQuantity?: number;
+      salePrice?: number;
     } = await req.json();
 
     if (!id || !name || !type || !["collection", "sale"].includes(type)) {
@@ -106,7 +150,7 @@ export async function PATCH(req: NextRequest) {
     const parentIdOrNull = parent_id ? Number(parent_id) : null;
     const visible = type === "collection" ? true : !!show_in_menu;
 
-    await pool.query(
+    await pool.query<OkPacket>(
       `UPDATE categories
        SET name = ?, type = ?, image = ?, description = ?, parent_id = ?, show_in_menu = ?
        WHERE id = ?`,
@@ -130,32 +174,35 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
-      const [rows]: any = await pool.query(
+      const [rows] = await pool.query<RowDataPacket[]>(
         "SELECT id FROM category_sales WHERE category_id = ?",
         [categoryId]
       );
 
       if (rows.length > 0) {
-        await pool.query(
+        await pool.query<OkPacket>(
           "UPDATE category_sales SET quantity = ?, sale_price = ? WHERE category_id = ?",
           [quantity, price, categoryId]
         );
       } else {
-        await pool.query(
+        await pool.query<OkPacket>(
           "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES (?, ?, ?)",
           [categoryId, quantity, price]
         );
       }
     } else {
       // Remove sale if type changed
-      await pool.query("DELETE FROM category_sales WHERE category_id = ?", [
-        categoryId,
-      ]);
+      await pool.query<OkPacket>(
+        "DELETE FROM category_sales WHERE category_id = ?",
+        [categoryId]
+      );
     }
 
     return NextResponse.json({ message: "Category updated" });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("PATCH /categories error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
   }
 }

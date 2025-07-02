@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { RowDataPacket } from "mysql2";
+
+// DB types based on schema
+type OrderRow = {
+  orderId: number;
+  phone: string;
+  createdAt: string; // TIMESTAMP returned as ISO string
+};
+
+type OrderItemRow = {
+  productId: number | null;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  saleQuantity: number | null;
+  salePrice: number | null;
+  productImage: string;
+};
 
 export async function GET(
   _req: NextRequest,
@@ -12,7 +30,7 @@ export async function GET(
 
   const connection = await pool.getConnection();
   try {
-    const [[order]]: any = await connection.query(
+    const [[order]] = await connection.query<OrderRow[] & RowDataPacket[]>(
       "SELECT id AS orderId, phone, created_at AS createdAt FROM orders WHERE id = ?",
       [orderId]
     );
@@ -21,7 +39,7 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const [items]: any = await connection.query(
+    const [items] = await connection.query<OrderItemRow[] & RowDataPacket[]>(
       `SELECT
          product_id AS productId,
          product_name AS productName,
@@ -36,12 +54,10 @@ export async function GET(
     );
 
     return NextResponse.json({ order, items });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching order:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch order" },
-      { status: 500 }
-    );
+    const error = err instanceof Error ? err.message : "Failed to fetch order";
+    return NextResponse.json({ error }, { status: 500 });
   } finally {
     connection.release();
   }

@@ -7,11 +7,15 @@ import { Button } from "@/components/cms/ui/button";
 type Category = {
   id: number;
   name: string;
-  type: string;
+  type: "collection" | "sale";
   image: string;
   description: string;
   parent_id: number | null;
-  show_in_menu: number;
+  show_in_menu: 0 | 1;
+};
+
+type ApiResponse = {
+  categories: Category[];
 };
 
 export default function Categories() {
@@ -24,7 +28,7 @@ export default function Categories() {
       try {
         const res = await fetch("/api/categories?full=true");
         if (!res.ok) throw new Error("Failed to load categories");
-        const data = await res.json();
+        const data: ApiResponse = await res.json();
         setCategories(data.categories || []);
       } catch (err: any) {
         setError(err.message || "Unknown error");

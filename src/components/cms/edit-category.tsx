@@ -14,11 +14,25 @@ import {
 } from "./ui/select";
 import { images } from "@/data/images";
 
+type CategoryType = "collection" | "sale";
+
+interface Category {
+  id: number;
+  name: string;
+  type: CategoryType;
+  image: string;
+  description: string;
+  parent_id: number | null;
+  show_in_menu: 0 | 1;
+  saleQuantity?: string;
+  salePrice?: string;
+}
+
 type Props = { id: string };
 
 export default function EditCategory({ id }: Props) {
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<any>(null);
+  const [category, setCategory] = useState<Category | null>(null);
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -26,7 +40,7 @@ export default function EditCategory({ id }: Props) {
       try {
         const res = await fetch(`/api/categories/${id}`);
         if (!res.ok) throw new Error("Failed to load category");
-        const data = await res.json();
+        const data: { category: Category } = await res.json();
         setCategory(data.category);
       } catch (err) {
         alert("שגיאה בטעינת הקטגוריה");
@@ -40,22 +54,27 @@ export default function EditCategory({ id }: Props) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setCategory((prev: any) => ({ ...prev, [name]: value }));
+    setCategory((prev) => (prev ? { ...prev, [name]: value } : prev));
   };
 
-  const handleTypeChange = (value: string) => {
-    setCategory((prev: any) => ({
-      ...prev,
-      type: value,
-      saleQuantity: "",
-      salePrice: "",
-    }));
+  const handleTypeChange = (value: CategoryType) => {
+    setCategory((prev) =>
+      prev
+        ? {
+            ...prev,
+            type: value,
+            saleQuantity: "",
+            salePrice: "",
+          }
+        : prev
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!category) return;
 
-    const payload: any = {
+    const payload: Record<string, any> = {
       name: category.name,
       type: category.type,
       image: imagePathMap[category.image] || category.image,
@@ -112,7 +131,9 @@ export default function EditCategory({ id }: Props) {
           <ImageSelector
             value={category.image}
             onChange={(imageName, fullPath) => {
-              setCategory((prev: any) => ({ ...prev, image: imageName }));
+              setCategory((prev) =>
+                prev ? { ...prev, image: imageName } : prev
+              );
               setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
             }}
             placeholder="שם תמונה"
