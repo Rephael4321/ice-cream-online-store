@@ -1,7 +1,8 @@
 "use client";
 
 import { useCart } from "@/context/cart-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Cookies from "js-cookie";
 
 export default function Cart() {
   const {
@@ -12,6 +13,8 @@ export default function Cart() {
     getGroupedCart,
   } = useCart();
   const [isOpen, setIsOpen] = useState(false);
+  const [phoneModal, setPhoneModal] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
 
   const grouped = getGroupedCart();
   const singleItems = cartItems.filter(
@@ -26,6 +29,41 @@ export default function Cart() {
       return bundles * item.sale.price + remainder * item.productPrice;
     }),
   ].reduce((a, b) => a + b, 0);
+
+  const handlePayment = () => {
+    const customerPhone = Cookies.get("phoneNumber");
+    const businessPhone = process.env.NEXT_PUBLIC_PHONE;
+
+    if (!businessPhone) {
+      console.error("WhatsApp number is not defined in env.");
+      return;
+    }
+
+    const orderNumber = Math.floor(Math.random() * 1000000)
+      .toString()
+      .padStart(6, "0");
+
+    const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${orderNumber}`;
+    const whatsappURL = `https://wa.me/${businessPhone}?text=${encodeURIComponent(
+      msg
+    )}`;
+
+    if (customerPhone) {
+      window.open(whatsappURL, "_blank");
+    } else {
+      setPhoneModal(true);
+    }
+  };
+
+  const savePhoneNumber = () => {
+    if (!phoneInput.trim()) return;
+    Cookies.set("phoneNumber", phoneInput.trim(), {
+      expires: 3650,
+      sameSite: "Lax",
+    });
+    setPhoneModal(false);
+    handlePayment();
+  };
 
   return (
     <>
@@ -49,7 +87,6 @@ export default function Cart() {
             <p className="text-gray-500 text-center mt-10">העגלה ריקה</p>
           ) : (
             <ul className="flex flex-col gap-4 overflow-y-auto flex-grow">
-              {/* Grouped Sale Items */}
               {grouped.map((group) => (
                 <li
                   key={group.categoryId}
@@ -82,7 +119,6 @@ export default function Cart() {
                 </li>
               ))}
 
-              {/* Regular / Single Items */}
               {singleItems.map((item) => {
                 const baseTotal = item.productPrice * item.quantity;
                 let finalPrice = baseTotal;
@@ -129,7 +165,7 @@ export default function Cart() {
                 סה״כ: {total.toFixed(2)} ש״ח
               </p>
               <button
-                onClick={() => alert("המשך לתשלום (בעתיד)")}
+                onClick={handlePayment}
                 className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition cursor-pointer"
               >
                 לתשלום
@@ -142,6 +178,38 @@ export default function Cart() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {phoneModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100]">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+            <h2 className="text-lg font-bold mb-4 text-center">
+              הזן מספר טלפון
+            </h2>
+            <input
+              type="tel"
+              placeholder="למשל: 0501234567"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              className="w-full border px-3 py-2 mb-4 rounded text-right"
+              dir="rtl"
+            />
+            <div className="flex justify-between gap-4">
+              <button
+                onClick={() => setPhoneModal(false)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={savePhoneNumber}
+                className="flex-1 bg-green-500 text-white py-2 rounded"
+              >
+                שמור והמשך
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
