@@ -1,6 +1,6 @@
 import EditCategory from "@/components/cms/edit-category";
 
-export default function EditCategoryPage({
+export default async function EditCategoryPage({
   params,
 }: {
   params: { id: string };
