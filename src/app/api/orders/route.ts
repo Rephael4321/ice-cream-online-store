@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket, OkPacket } from "mysql2";
+import pool from "@/lib/db.neon";
 
 // Order payload types
 type OrderItemInput = {
@@ -27,7 +26,7 @@ type OrderSummaryRow = {
 
 // POST /api/orders
 export async function POST(req: NextRequest) {
-  const connection = await pool.getConnection();
+  const client = await pool.connect();
   try {
     const body: OrderInput = await req.json();
     const { phone, items } = body;
@@ -39,14 +38,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await connection.beginTransaction();
+    await client.query("BEGIN");
 
     // 1. Insert order
-    const [orderResult] = await connection.query<OkPacket>(
-      "INSERT INTO orders (phone) VALUES (?)",
+    const orderResult = await client.query<{ id: number }>(
+      "INSERT INTO orders (phone) VALUES ($1) RETURNING id",
       [phone]
     );
-    const orderId = orderResult.insertId;
+    const orderId = orderResult.rows[0].id;
 
     // 2. Insert order items
     for (const item of items) {
@@ -60,10 +59,10 @@ export async function POST(req: NextRequest) {
         salePrice = null,
       } = item;
 
-      await connection.query<OkPacket>(
+      await client.query(
         `INSERT INTO order_items
          (order_id, product_id, product_name, product_image, quantity, unit_price, sale_quantity, sale_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           orderId,
           productId,
@@ -77,29 +76,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await connection.commit();
+    await client.query("COMMIT");
     return NextResponse.json({ orderId });
   } catch (err: unknown) {
-    await connection.rollback();
+    await client.query("ROLLBACK");
     console.error("Error creating order:", err);
     const error = err instanceof Error ? err.message : "Failed to create order";
     return NextResponse.json({ error }, { status: 500 });
   } finally {
-    connection.release();
+    client.release();
   }
 }
 
 // GET /api/orders
 export async function GET() {
-  const connection = await pool.getConnection();
   try {
-    const [rows] = await connection.query<OrderSummaryRow[] & RowDataPacket[]>(
+    const result = await pool.query<OrderSummaryRow>(
       `
       SELECT
-        o.id AS orderId,
+        o.id AS "orderId",
         o.phone,
-        o.created_at AS createdAt,
-        COUNT(oi.id) AS itemCount
+        o.created_at AS "createdAt",
+        COUNT(oi.id) AS "itemCount"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       GROUP BY o.id
@@ -107,12 +105,10 @@ export async function GET() {
     `
     );
 
-    return NextResponse.json({ orders: rows });
+    return NextResponse.json({ orders: result.rows });
   } catch (err: unknown) {
     console.error("Error fetching orders:", err);
     const error = err instanceof Error ? err.message : "Failed to fetch orders";
     return NextResponse.json({ error }, { status: 500 });
-  } finally {
-    connection.release();
   }
 }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket, OkPacket } from "mysql2";
+import pool from "@/lib/db.neon";
 
 // Request body type
 type LinkProductToCategoryPayload = {
@@ -8,7 +7,6 @@ type LinkProductToCategoryPayload = {
   categoryId: number;
 };
 
-// Result row types
 type CategoryRow = {
   type: "collection" | "sale";
 };
@@ -29,12 +27,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 1: Check if the category is a sale category
-    const [[category]] = await pool.query<CategoryRow[] & RowDataPacket[]>(
-      "SELECT type FROM categories WHERE id = ?",
+    // Step 1: Check category type
+    const categoryResult = await pool.query<CategoryRow>(
+      "SELECT type FROM categories WHERE id = $1",
       [categoryId]
     );
 
+    const category = categoryResult.rows[0];
     if (!category) {
       return NextResponse.json(
         { error: "Category not found" },
@@ -44,9 +43,11 @@ export async function POST(req: NextRequest) {
 
     if (category.type === "sale") {
       // Step 2: Get the price of the new product
-      const [[newProduct]] = await pool.query<
-        ProductPriceRow[] & RowDataPacket[]
-      >("SELECT price FROM products WHERE id = ?", [productId]);
+      const productResult = await pool.query<ProductPriceRow>(
+        "SELECT price FROM products WHERE id = $1",
+        [productId]
+      );
+      const newProduct = productResult.rows[0];
 
       if (!newProduct) {
         return NextResponse.json(
@@ -55,17 +56,16 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Step 3: Get one existing product in the category to compare price
-      const [[existing]] = await pool.query<
-        ProductPriceRow[] & RowDataPacket[]
-      >(
+      // Step 3: Get one existing product in the category
+      const existingResult = await pool.query<ProductPriceRow>(
         `SELECT p.price
          FROM products p
          JOIN product_categories pc ON pc.product_id = p.id
-         WHERE pc.category_id = ?
+         WHERE pc.category_id = $1
          LIMIT 1`,
         [categoryId]
       );
+      const existing = existingResult.rows[0];
 
       if (existing && existing.price !== newProduct.price) {
         return NextResponse.json(
@@ -78,9 +78,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 4: Perform the insert
-    await pool.query<OkPacket>(
-      "INSERT IGNORE INTO product_categories (product_id, category_id) VALUES (?, ?)",
+    // Step 4: Insert relation (avoid duplicates using ON CONFLICT)
+    await pool.query(
+      `INSERT INTO product_categories (product_id, category_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
       [productId, categoryId]
     );
 

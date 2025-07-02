@@ -1,9 +1,6 @@
-// src/app/api/categories/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import pool from "@/lib/db.neon"; // ✅ Your Neon PostgreSQL pool
 
-// Types based on your MySQL schema
 type Category = {
   id: number;
   name: string;
@@ -32,22 +29,22 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const [rows] = await pool.query<CategoryWithSale[] & RowDataPacket[]>(
-      `SELECT c.*, cs.quantity AS saleQuantity, cs.sale_price AS salePrice
+    const result = await pool.query<CategoryWithSale>(
+      `SELECT c.*, cs.quantity AS "saleQuantity", cs.sale_price AS "salePrice"
        FROM categories c
        LEFT JOIN category_sales cs ON cs.category_id = c.id
-       WHERE c.id = ?`,
+       WHERE c.id = $1`,
       [params.id]
     );
 
-    if (!rows.length) {
+    if (!result.rows.length) {
       return NextResponse.json(
         { error: "Category not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ category: rows[0] });
+    return NextResponse.json({ category: result.rows[0] });
   } catch (err: unknown) {
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
@@ -91,8 +88,8 @@ export async function PUT(
 
     await pool.query(
       `UPDATE categories
-       SET name = ?, type = ?, image = ?, description = ?, parent_id = ?, show_in_menu = ?
-       WHERE id = ?`,
+       SET name = $1, type = $2, image = $3, description = $4, parent_id = $5, show_in_menu = $6
+       WHERE id = $7`,
       [name, type, image, description, parentIdOrNull, visible, id]
     );
 
@@ -107,25 +104,24 @@ export async function PUT(
         );
       }
 
-      const [existingSale] = await pool.query<CategorySale[] & RowDataPacket[]>(
-        "SELECT * FROM category_sales WHERE category_id = ?",
+      const existingSale = await pool.query<CategorySale>(
+        "SELECT * FROM category_sales WHERE category_id = $1",
         [id]
       );
 
-      if (existingSale.length > 0) {
+      if (existingSale.rows.length > 0) {
         await pool.query(
-          "UPDATE category_sales SET quantity = ?, sale_price = ? WHERE category_id = ?",
+          "UPDATE category_sales SET quantity = $1, sale_price = $2 WHERE category_id = $3",
           [quantity, price, id]
         );
       } else {
         await pool.query(
-          "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES (?, ?, ?)",
+          "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
           [id, quantity, price]
         );
       }
     } else {
-      // Remove any existing sale if type changed
-      await pool.query("DELETE FROM category_sales WHERE category_id = ?", [
+      await pool.query("DELETE FROM category_sales WHERE category_id = $1", [
         id,
       ]);
     }

@@ -1,7 +1,5 @@
-// src/app/api/categories/name/[name]/products/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import pool from "@/lib/db.neon";
 
 // DB types
 type ProductRow = {
@@ -23,49 +21,53 @@ type CategorySaleRow = {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { name: string } }
+  context: { params: { name: string } }
 ) {
   try {
-    const { name } = params;
+    const { name } = context.params;
+    console.log(">>>> CATEGORY NAME PARAM:", name);
 
-    const [products] = await pool.query<ProductRow[] & RowDataPacket[]>(
+    // 1. Fetch products in this category
+    const result = await pool.query<ProductRow>(
       `SELECT 
          p.id, p.name, p.price, p.image,
-         s.quantity AS productSaleQuantity,
-         s.sale_price AS productSalePrice
+         s.quantity AS "productSaleQuantity",
+         s.sale_price AS "productSalePrice"
        FROM products p
        JOIN product_categories pc ON pc.product_id = p.id
        JOIN categories c          ON c.id = pc.category_id
        LEFT JOIN sales s          ON s.product_id = p.id
-       WHERE LOWER(REPLACE(c.name, ' ', '-')) = LOWER(?)`,
+       WHERE LOWER(REPLACE(c.name, ' ', '-')) = LOWER($1)`,
       [name]
     );
 
+    const products = result.rows;
     if (!products.length) {
       return NextResponse.json({ products: [] });
     }
 
-    // Extract all product IDs
+    // 2. Prepare category sales data
     const productIds = products.map((p) => p.id);
+    const placeholders = productIds.map((_, i) => `$${i + 1}`).join(", ");
+    const queryParams = productIds;
 
-    // Get all category sales linked to these products
-    const [categorySales] = await pool.query<
-      CategorySaleRow[] & RowDataPacket[]
-    >(
+    const categorySalesResult = await pool.query<CategorySaleRow>(
       `SELECT 
-         pc.product_id AS productId,
-         c.id AS categoryId,
-         c.name AS categoryName,
+         pc.product_id AS "productId",
+         c.id AS "categoryId",
+         c.name AS "categoryName",
          cs.quantity,
          cs.sale_price
        FROM product_categories pc
        JOIN categories c ON c.id = pc.category_id
        JOIN category_sales cs ON cs.category_id = c.id
-       WHERE c.type = 'sale' AND pc.product_id IN (?)`,
-      [productIds]
+       WHERE c.type = 'sale' AND pc.product_id IN (${placeholders})`,
+      queryParams
     );
 
-    // Organize category sale entries by productId
+    const categorySales = categorySalesResult.rows;
+
+    // 3. Map sales per product
     const saleMap = new Map<
       number,
       {
@@ -89,6 +91,7 @@ export async function GET(
       }
     }
 
+    // 4. Final product response
     const finalProducts = products.map((product) => {
       let sale;
 

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket } from "mysql2";
+import pool from "@/lib/db.neon";
 
 // DB types based on schema
 type OrderRow = {
   orderId: number;
   phone: string;
-  createdAt: string; // TIMESTAMP returned as ISO string
+  createdAt: string; // ISO format
 };
 
 type OrderItemRow = {
@@ -28,37 +27,39 @@ export async function GET(
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
-  const connection = await pool.getConnection();
   try {
-    const [[order]] = await connection.query<OrderRow[] & RowDataPacket[]>(
-      "SELECT id AS orderId, phone, created_at AS createdAt FROM orders WHERE id = ?",
+    // Get the order
+    const orderResult = await pool.query<OrderRow>(
+      `SELECT id AS "orderId", phone, created_at AS "createdAt"
+       FROM orders
+       WHERE id = $1`,
       [orderId]
     );
 
+    const order = orderResult.rows[0];
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const [items] = await connection.query<OrderItemRow[] & RowDataPacket[]>(
+    // Get the items
+    const itemsResult = await pool.query<OrderItemRow>(
       `SELECT
-         product_id AS productId,
-         product_name AS productName,
+         product_id     AS "productId",
+         product_name   AS "productName",
          quantity,
-         unit_price AS unitPrice,
-         sale_quantity AS saleQuantity,
-         sale_price AS salePrice,
-         product_image AS productImage
+         unit_price     AS "unitPrice",
+         sale_quantity  AS "saleQuantity",
+         sale_price     AS "salePrice",
+         product_image  AS "productImage"
        FROM order_items
-       WHERE order_id = ?`,
+       WHERE order_id = $1`,
       [orderId]
     );
 
-    return NextResponse.json({ order, items });
+    return NextResponse.json({ order, items: itemsResult.rows });
   } catch (err: unknown) {
     console.error("Error fetching order:", err);
     const error = err instanceof Error ? err.message : "Failed to fetch order";
     return NextResponse.json({ error }, { status: 500 });
-  } finally {
-    connection.release();
   }
 }

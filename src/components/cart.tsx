@@ -84,6 +84,8 @@ export default function Cart() {
     });
 
     if (!res.ok) {
+      const text = await res.text();
+      console.error("Failed to create order:", text);
       alert("שגיאה בשליחת ההזמנה");
       return;
     }

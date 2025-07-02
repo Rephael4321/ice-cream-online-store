@@ -18,7 +18,16 @@ export default function CmsNavbar() {
           href="/"
           className="text-lg sm:text-xl md:text-2xl hover:underline"
         >
-          חזרה לחנות
+          חנות
+        </Link>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 mt-2 sm:mt-0">
+        <Link
+          href="/orders"
+          className="text-lg sm:text-xl md:text-2xl hover:underline"
+        >
+          הזמנות
         </Link>
       </div>
 
@@ -27,7 +36,7 @@ export default function CmsNavbar() {
           href="/management-menu"
           className="text-lg sm:text-xl md:text-2xl hover:underline"
         >
-          חזרה לכלי ניהול
+          כלי ניהול
         </Link>
       </div>
 

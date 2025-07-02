@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket, OkPacket } from "mysql2";
+import pool from "@/lib/db.neon";
 
+// Types
 type SaleCategory = {
   id: number;
   name: string;
@@ -34,50 +34,54 @@ type EffectiveSale =
       price: number;
     };
 
+// GET /api/products/[id]
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const productId = params.id;
+    const productId = Number(params.id);
+    if (isNaN(productId)) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
+    }
 
-    // 1. Get base product + product sale (if any)
-    const [productRows] = await pool.query<ProductRow[] & RowDataPacket[]>(
+    const productResult = await pool.query<ProductRow>(
       `SELECT 
          p.id, 
          p.name, 
          p.price, 
          p.image, 
-         s.quantity AS productSaleQuantity, 
-         s.sale_price AS productSalePrice
+         s.quantity AS "productSaleQuantity", 
+         s.sale_price AS "productSalePrice"
        FROM products p
        LEFT JOIN sales s ON s.product_id = p.id
-       WHERE p.id = ?`,
+       WHERE p.id = $1`,
       [productId]
     );
 
-    if (productRows.length === 0) {
+    if (productResult.rows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const product = productRows[0];
+    const product = productResult.rows[0];
 
-    // 2. Get all sale categories the product belongs to
-    const [saleCategories] = await pool.query<SaleCategory[] & RowDataPacket[]>(
+    const saleCategoriesResult = await pool.query<SaleCategory>(
       `SELECT 
          c.id, c.name, cs.quantity, cs.sale_price
        FROM categories c
        JOIN product_categories pc ON pc.category_id = c.id
        JOIN category_sales cs ON cs.category_id = c.id
-       WHERE c.type = 'sale' AND pc.product_id = ?`,
+       WHERE c.type = 'sale' AND pc.product_id = $1`,
       [productId]
     );
 
-    // 3. Determine which sale applies (priority: category > product)
     let effectiveSale: EffectiveSale | null = null;
 
-    if (saleCategories.length > 0) {
-      const best = saleCategories.sort(
+    if (saleCategoriesResult.rows.length > 0) {
+      const best = saleCategoriesResult.rows.sort(
         (a, b) => a.sale_price - b.sale_price
       )[0];
 
@@ -111,20 +115,28 @@ export async function GET(
       },
     });
   } catch (err: unknown) {
-    console.error("GET /api/products/[id] failed:", err);
+    console.error("GET /products/[id] failed:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
+// PUT /api/products/[id]
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await req.json();
-    const { name, price, image, saleQuantity, salePrice } = body;
+    const id = Number(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
+    }
+
+    const { name, price, image, saleQuantity, salePrice } = await req.json();
 
     if (!name || typeof price === "undefined") {
       return NextResponse.json(
@@ -133,9 +145,9 @@ export async function PUT(
       );
     }
 
-    await pool.query<OkPacket>(
-      "UPDATE products SET name = ?, price = ?, image = ? WHERE id = ?",
-      [name, price, image, params.id]
+    await pool.query(
+      "UPDATE products SET name = $1, price = $2, image = $3 WHERE id = $4",
+      [name, price, image, id]
     );
 
     const quantity = Number(saleQuantity);
@@ -144,26 +156,24 @@ export async function PUT(
     const isValidSalePrice = !isNaN(sale) && sale >= 0;
 
     if (saleQuantity === null && salePrice === null) {
-      await pool.query<OkPacket>("DELETE FROM sales WHERE product_id = ?", [
-        params.id,
-      ]);
+      await pool.query("DELETE FROM sales WHERE product_id = $1", [id]);
       return NextResponse.json({ message: "Product updated and sale removed" });
     } else if (isValidQuantity && isValidSalePrice) {
-      const [saleRows] = await pool.query<RowDataPacket[]>(
-        "SELECT id FROM sales WHERE product_id = ?",
-        [params.id]
+      const result = await pool.query(
+        "SELECT id FROM sales WHERE product_id = $1",
+        [id]
       );
 
-      if (saleRows.length > 0) {
-        await pool.query<OkPacket>(
-          "UPDATE sales SET quantity = ?, sale_price = ? WHERE product_id = ?",
-          [quantity, sale, params.id]
+      if (result.rows.length > 0) {
+        await pool.query(
+          "UPDATE sales SET quantity = $1, sale_price = $2 WHERE product_id = $3",
+          [quantity, sale, id]
         );
         return NextResponse.json({ message: "Product and sale updated" });
       } else {
-        await pool.query<OkPacket>(
-          "INSERT INTO sales (product_id, quantity, sale_price) VALUES (?, ?, ?)",
-          [params.id, quantity, sale]
+        await pool.query(
+          "INSERT INTO sales (product_id, quantity, sale_price) VALUES ($1, $2, $3)",
+          [id, quantity, sale]
         );
         return NextResponse.json({ message: "Product updated and sale added" });
       }
@@ -177,17 +187,23 @@ export async function PUT(
   }
 }
 
+// DELETE /api/products/[id]
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const [result] = await pool.query<OkPacket>(
-      "DELETE FROM products WHERE id = ?",
-      [params.id]
-    );
+    const id = Number(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
+    }
 
-    if (result.affectedRows === 0) {
+    const result = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+
+    if (result.rowCount === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 

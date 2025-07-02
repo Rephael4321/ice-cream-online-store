@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { RowDataPacket, OkPacket } from "mysql2";
+import pool from "@/lib/db.neon";
 
 // Shared Types
 type Category = {
@@ -18,13 +17,15 @@ export async function GET(req: NextRequest) {
   try {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
 
-    const [rows] = await pool.query<Category[] & RowDataPacket[]>(
-      `SELECT id, name, type, description, image, parent_id, show_in_menu FROM categories
+    const result = await pool.query<Category>(
+      `SELECT id, name, type, description, image, parent_id, show_in_menu 
+       FROM categories
        ${fullView ? "" : "WHERE show_in_menu = true"}`
     );
 
-    return NextResponse.json({ categories: rows });
+    return NextResponse.json({ categories: result.rows });
   } catch (err: unknown) {
+    console.error("GET /categories error:", err); // ✅ log actual error
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
     return NextResponse.json({ error }, { status: 500 });
@@ -64,23 +65,21 @@ export async function POST(req: NextRequest) {
     const parentIdOrNull = parent_id ? Number(parent_id) : null;
     const visible = type === "collection" ? true : !!show_in_menu;
 
-    const [result] = await pool.query<OkPacket>(
+    const result = await pool.query(
       `INSERT INTO categories 
          (name, type, image, description, parent_id, show_in_menu)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
       [name, type, image, description, parentIdOrNull, visible]
     );
 
-    const categoryId = result.insertId;
+    const categoryId = result.rows[0].id;
 
     if (type === "sale") {
       const quantity = Number(saleQuantity);
       const price = Number(salePrice);
 
-      const isValidQuantity = !isNaN(quantity) && quantity > 0;
-      const isValidSalePrice = !isNaN(price) && price >= 0;
-
-      if (!isValidQuantity || !isValidSalePrice) {
+      if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
         return NextResponse.json(
           {
             error:
@@ -90,8 +89,8 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await pool.query<OkPacket>(
-        "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES (?, ?, ?)",
+      await pool.query(
+        "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
         [categoryId, quantity, price]
       );
     }
@@ -144,10 +143,10 @@ export async function PATCH(req: NextRequest) {
     const parentIdOrNull = parent_id ? Number(parent_id) : null;
     const visible = type === "collection" ? true : !!show_in_menu;
 
-    await pool.query<OkPacket>(
+    await pool.query(
       `UPDATE categories
-       SET name = ?, type = ?, image = ?, description = ?, parent_id = ?, show_in_menu = ?
-       WHERE id = ?`,
+       SET name = $1, type = $2, image = $3, description = $4, parent_id = $5, show_in_menu = $6
+       WHERE id = $7`,
       [name, type, image, description, parentIdOrNull, visible, categoryId]
     );
 
@@ -155,10 +154,7 @@ export async function PATCH(req: NextRequest) {
       const quantity = Number(saleQuantity);
       const price = Number(salePrice);
 
-      const isValidQuantity = !isNaN(quantity) && quantity > 0;
-      const isValidSalePrice = !isNaN(price) && price >= 0;
-
-      if (!isValidQuantity || !isValidSalePrice) {
+      if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
         return NextResponse.json(
           {
             error:
@@ -168,27 +164,26 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
-      const [rows] = await pool.query<RowDataPacket[]>(
-        "SELECT id FROM category_sales WHERE category_id = ?",
+      const result = await pool.query(
+        "SELECT id FROM category_sales WHERE category_id = $1",
         [categoryId]
       );
 
-      if (rows.length > 0) {
-        await pool.query<OkPacket>(
-          "UPDATE category_sales SET quantity = ?, sale_price = ? WHERE category_id = ?",
+      if (result.rows.length > 0) {
+        await pool.query(
+          "UPDATE category_sales SET quantity = $1, sale_price = $2 WHERE category_id = $3",
           [quantity, price, categoryId]
         );
       } else {
-        await pool.query<OkPacket>(
-          "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES (?, ?, ?)",
+        await pool.query(
+          "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
           [categoryId, quantity, price]
         );
       }
     } else {
-      await pool.query<OkPacket>(
-        "DELETE FROM category_sales WHERE category_id = ?",
-        [categoryId]
-      );
+      await pool.query("DELETE FROM category_sales WHERE category_id = $1", [
+        categoryId,
+      ]);
     }
 
     return NextResponse.json({ message: "Category updated" });
