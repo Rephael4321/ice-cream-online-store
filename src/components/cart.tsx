@@ -1,7 +1,7 @@
 "use client";
 
 import { useCart } from "@/context/cart-context";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Cookies from "js-cookie";
 
 export default function Cart() {
@@ -12,6 +12,7 @@ export default function Cart() {
     clearCart,
     getGroupedCart,
   } = useCart();
+
   const [isOpen, setIsOpen] = useState(false);
   const [phoneModal, setPhoneModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
@@ -20,6 +21,7 @@ export default function Cart() {
   const singleItems = cartItems.filter(
     (item) => !item.sale?.fromCategory || !item.sale.category?.id
   );
+
   const total = [
     ...grouped.map((g) => g.totalPrice),
     ...singleItems.map((item) => {
@@ -30,8 +32,32 @@ export default function Cart() {
     }),
   ].reduce((a, b) => a + b, 0);
 
-  const handlePayment = () => {
-    const customerPhone = Cookies.get("phoneNumber");
+  function getOrderItems() {
+    const groupedItems = grouped.flatMap((group) =>
+      group.items.map((item) => ({
+        productId: item.id,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.productPrice,
+        saleQuantity: group.amount,
+        salePrice: group.price,
+      }))
+    );
+
+    const singleSaleItems = singleItems.map((item) => ({
+      productId: item.id,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.productPrice,
+      saleQuantity: item.sale?.fromCategory ? null : item.sale?.amount,
+      salePrice: item.sale?.fromCategory ? null : item.sale?.price,
+    }));
+
+    return [...groupedItems, ...singleSaleItems];
+  }
+
+  const handlePayment = async () => {
+    const phone = Cookies.get("phoneNumber");
     const businessPhone = process.env.NEXT_PUBLIC_PHONE;
 
     if (!businessPhone) {
@@ -39,20 +65,36 @@ export default function Cart() {
       return;
     }
 
-    const orderNumber = Math.floor(Math.random() * 1000000)
-      .toString()
-      .padStart(6, "0");
+    if (!phone) {
+      setPhoneModal(true);
+      return;
+    }
 
-    const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${orderNumber}`;
+    const payload = {
+      phone,
+      items: getOrderItems(),
+    };
+
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!res.ok) {
+      alert("שגיאה בשליחת ההזמנה");
+      return;
+    }
+
+    const { orderId } = await res.json();
+
+    clearCart();
+
+    const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${orderId}`;
     const whatsappURL = `https://wa.me/${businessPhone}?text=${encodeURIComponent(
       msg
     )}`;
-
-    if (customerPhone) {
-      window.open(whatsappURL, "_blank");
-    } else {
-      setPhoneModal(true);
-    }
+    window.open(whatsappURL, "_blank");
   };
 
   const savePhoneNumber = () => {
