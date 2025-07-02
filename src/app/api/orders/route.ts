@@ -64,3 +64,30 @@ export async function POST(req: NextRequest) {
     connection.release();
   }
 }
+
+export async function GET() {
+  const connection = await pool.getConnection();
+  try {
+    const [rows]: any = await connection.query(`
+      SELECT
+        o.id AS orderId,
+        o.phone,
+        o.created_at AS createdAt,
+        COUNT(oi.id) AS itemCount
+      FROM orders o
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+    `);
+
+    return NextResponse.json({ orders: rows });
+  } catch (err: any) {
+    console.error("Error fetching orders:", err);
+    return NextResponse.json(
+      { error: "Failed to fetch orders" },
+      { status: 500 }
+    );
+  } finally {
+    connection.release();
+  }
+}
