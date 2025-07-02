@@ -74,6 +74,7 @@ export async function initializeTables() {
         unit_price DECIMAL(10,2),
         sale_quantity INT,
         sale_price DECIMAL(10,2),
+        product_image TEXT,
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
       )

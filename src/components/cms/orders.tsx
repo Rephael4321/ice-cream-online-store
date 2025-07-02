@@ -47,7 +47,7 @@ export default function Orders() {
                 <p>כמות מוצרים: {order.itemCount}</p>
               </div>
               <Link
-                href={`/cms/orders/${order.orderId}`}
+                href={`/orders/${order.orderId}`}
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
               >
                 צפייה

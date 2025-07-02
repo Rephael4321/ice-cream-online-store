@@ -28,7 +28,8 @@ export async function GET(
          quantity,
          unit_price AS unitPrice,
          sale_quantity AS saleQuantity,
-         sale_price AS salePrice
+         sale_price AS salePrice,
+         product_image AS productImage
        FROM order_items
        WHERE order_id = ?`,
       [orderId]

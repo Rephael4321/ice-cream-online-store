@@ -37,6 +37,7 @@ export default function Cart() {
       group.items.map((item) => ({
         productId: item.id,
         productName: item.productName,
+        productImage: item.productImage, // ✅ ADD THIS
         quantity: item.quantity,
         unitPrice: item.productPrice,
         saleQuantity: group.amount,
@@ -47,6 +48,7 @@ export default function Cart() {
     const singleSaleItems = singleItems.map((item) => ({
       productId: item.id,
       productName: item.productName,
+      productImage: item.productImage, // ✅ ADD THIS
       quantity: item.quantity,
       unitPrice: item.productPrice,
       saleQuantity: item.sale?.fromCategory ? null : item.sale?.amount,

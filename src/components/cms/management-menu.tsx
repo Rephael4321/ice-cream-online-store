@@ -28,8 +28,12 @@ const services = [
     description: "הוסף פריטים לקטגוריות. צור תתי קטגוריות.",
     slug: "link-product-to-category",
   },
+  {
+    name: "הזמנות",
+    description: "נהל הזמנות.",
+    slug: "orders",
+  },
 ];
-
 
 export default function ManagementMenu() {
   return (

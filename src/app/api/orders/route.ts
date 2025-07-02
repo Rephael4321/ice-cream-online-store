@@ -16,18 +16,19 @@ export async function POST(req: NextRequest) {
 
     await connection.beginTransaction();
 
-    // 1. Insert into orders
+    // 1. Insert order
     const [orderResult]: any = await connection.query(
       "INSERT INTO orders (phone) VALUES (?)",
       [phone]
     );
     const orderId = orderResult.insertId;
 
-    // 2. Insert each item
+    // 2. Insert items with image
     for (const item of items) {
       const {
         productId,
         productName,
+        productImage = null,
         quantity,
         unitPrice,
         saleQuantity = null,
@@ -36,12 +37,13 @@ export async function POST(req: NextRequest) {
 
       await connection.query(
         `INSERT INTO order_items
-         (order_id, product_id, product_name, quantity, unit_price, sale_quantity, sale_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (order_id, product_id, product_name, product_image, quantity, unit_price, sale_quantity, sale_price)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           productId,
           productName,
+          productImage,
           quantity,
           unitPrice,
           saleQuantity,
@@ -51,7 +53,6 @@ export async function POST(req: NextRequest) {
     }
 
     await connection.commit();
-
     return NextResponse.json({ orderId });
   } catch (err) {
     await connection.rollback();
