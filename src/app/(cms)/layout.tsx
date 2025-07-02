@@ -1,17 +1,14 @@
-import JwtGatekeeper from "@/components/auth/jwt-gatekeeper";
+// app/(cms)/layout.tsx
 import CmsNavbar from "@/components/cms/cms-navbar";
+import JwtWrapper from "@/components/auth/jwt-wrapper";
 
-export default function StoreLayout({
+export default function CmsLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <>
-      <JwtGatekeeper>
-        <CmsNavbar />
-        {children}
-      </JwtGatekeeper>
-    </>
+    <JwtWrapper>
+      <CmsNavbar />
+      {children}
+    </JwtWrapper>
   );
 }
