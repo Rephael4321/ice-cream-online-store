@@ -95,7 +95,8 @@ export default function Cart() {
     clearCart();
 
     const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${orderId}`;
-    const whatsappURL = `https://wa.me/${businessPhone}?text=${encodeURIComponent(
+    const phoneNumber = businessPhone.replace(/\D/g, ""); // Ensure it's only digits
+    const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
       msg
     )}`;
     window.open(whatsappURL, "_blank");
