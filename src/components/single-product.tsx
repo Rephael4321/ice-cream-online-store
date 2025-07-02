@@ -35,7 +35,6 @@ export default function SingleProduct({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Compute category slug if present
   const currentCategorySlug = sale?.category?.name
     ?.replace(/\s+/g, "-")
     .toLowerCase();
@@ -46,13 +45,14 @@ export default function SingleProduct({
 
   return (
     <div className="shadow-md p-4 w-full sm:w-[300px] flex flex-col items-center space-y-4 relative">
-      <Image
-        src={productImage}
-        width={90}
-        height={120}
-        alt={productName}
-        className="rounded-md"
-      />
+      <div className="w-[120px] h-[120px] relative rounded-md bg-white">
+        <Image
+          src={productImage}
+          alt={productName}
+          fill
+          className="object-contain"
+        />
+      </div>
 
       {sale && (
         <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">

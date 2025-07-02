@@ -48,22 +48,24 @@ export default function MainMenu() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row justify-center items-center gap-10 mt-20 px-4 flex-wrap">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 px-4 py-12">
       {categories.map((cat) => (
         <div
           key={cat.id}
           onClick={() => handleClick(cat.name)}
-          className="cursor-pointer text-center hover:scale-105 transition w-48"
+          className="cursor-pointer text-center hover:scale-105 transition-transform duration-200"
         >
-          <div className="flex flex-col gap-4 items-center">
-            <Image
-              src={cat.image || fallbackImageMap[cat.type] || "/default.png"}
-              width={180}
-              height={240}
-              alt={cat.name}
-            />
+          <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
+            <div className="w-[120px] h-[120px] relative rounded-md bg-white">
+              <Image
+                src={cat.image || fallbackImageMap[cat.type] || "/default.png"}
+                alt={cat.name}
+                fill
+                className="object-contain"
+              />
+            </div>
             <h2
-              className={`text-2xl md:text-3xl font-semibold ${
+              className={`text-lg font-semibold ${
                 colorMap[cat.type] || "text-gray-700"
               }`}
             >

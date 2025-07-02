@@ -1,5 +1,6 @@
 import Cart from "@/components/cart";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
   return (
@@ -7,9 +8,16 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
       {/* Logo / Brand */}
       <Link
         href="/"
-        className="text-xl sm:text-2xl font-bold text-pink-700 whitespace-nowrap"
+        className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-pink-700 whitespace-nowrap"
       >
-        🍭 המפנק
+        <Image
+          src="/images/RAW/גלידות חיים/IMG_8444 fimmm.png" // <- replace with your actual image path
+          alt="המפנק"
+          width={32}
+          height={32}
+          className="object-contain"
+        />
+        המפנק
       </Link>
 
       {/* Nav Links */}
