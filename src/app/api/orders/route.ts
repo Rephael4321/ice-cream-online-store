@@ -1,0 +1,66 @@
+import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/db";
+
+export async function POST(req: NextRequest) {
+  const connection = await pool.getConnection();
+  try {
+    const body = await req.json();
+    const { phone, items } = body;
+
+    if (!phone || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { error: "Invalid order payload" },
+        { status: 400 }
+      );
+    }
+
+    await connection.beginTransaction();
+
+    // 1. Insert into orders
+    const [orderResult]: any = await connection.query(
+      "INSERT INTO orders (phone) VALUES (?)",
+      [phone]
+    );
+    const orderId = orderResult.insertId;
+
+    // 2. Insert each item
+    for (const item of items) {
+      const {
+        productId,
+        productName,
+        quantity,
+        unitPrice,
+        saleQuantity = null,
+        salePrice = null,
+      } = item;
+
+      await connection.query(
+        `INSERT INTO order_items
+         (order_id, product_id, product_name, quantity, unit_price, sale_quantity, sale_price)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderId,
+          productId,
+          productName,
+          quantity,
+          unitPrice,
+          saleQuantity,
+          salePrice,
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return NextResponse.json({ orderId });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Error creating order:", err);
+    return NextResponse.json(
+      { error: "Failed to create order" },
+      { status: 500 }
+    );
+  } finally {
+    connection.release();
+  }
+}
