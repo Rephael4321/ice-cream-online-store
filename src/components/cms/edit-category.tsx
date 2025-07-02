@@ -28,6 +28,17 @@ interface Category {
   salePrice?: string;
 }
 
+type UpdateCategoryPayload = {
+  name: string;
+  type: CategoryType;
+  image: string;
+  description: string;
+  parent_id: number | null;
+  show_in_menu: 0 | 1;
+  saleQuantity?: number;
+  salePrice?: number;
+};
+
 type Props = { id: string };
 
 export default function EditCategory({ id }: Props) {
@@ -42,7 +53,7 @@ export default function EditCategory({ id }: Props) {
         if (!res.ok) throw new Error("Failed to load category");
         const data: { category: Category } = await res.json();
         setCategory(data.category);
-      } catch (err) {
+      } catch {
         alert("שגיאה בטעינת הקטגוריה");
       } finally {
         setLoading(false);
@@ -74,7 +85,7 @@ export default function EditCategory({ id }: Props) {
     e.preventDefault();
     if (!category) return;
 
-    const payload: Record<string, any> = {
+    const payload: UpdateCategoryPayload = {
       name: category.name,
       type: category.type,
       image: imagePathMap[category.image] || category.image,

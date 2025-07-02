@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -32,7 +32,6 @@ export default function NewProduct() {
     salePrice: "",
   });
 
-  const [focused, setFocused] = useState(false);
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
   const [showGallery, setShowGallery] = useState(false);
 
@@ -101,15 +100,6 @@ export default function NewProduct() {
       alert("Error saving product");
     }
   };
-
-  const filteredImages = useMemo(() => {
-    if (!product.image) return images.slice(0, 10);
-    return images
-      .filter((img) =>
-        getDisplayName(img).toLowerCase().includes(product.image.toLowerCase())
-      )
-      .slice(0, 10);
-  }, [product.image]);
 
   const previewSrc =
     imagePathMap[product.image] ||

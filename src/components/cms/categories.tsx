@@ -30,8 +30,12 @@ export default function Categories() {
         if (!res.ok) throw new Error("Failed to load categories");
         const data: ApiResponse = await res.json();
         setCategories(data.categories || []);
-      } catch (err: any) {
-        setError(err.message || "Unknown error");
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Unknown error");
+        }
       } finally {
         setLoading(false);
       }

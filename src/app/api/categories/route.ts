@@ -13,12 +13,6 @@ type Category = {
   show_in_menu: boolean;
 };
 
-type SaleInsert = {
-  category_id: number;
-  quantity: number;
-  sale_price: number;
-};
-
 // GET /api/categories
 export async function GET(req: NextRequest) {
   try {
@@ -191,7 +185,6 @@ export async function PATCH(req: NextRequest) {
         );
       }
     } else {
-      // Remove sale if type changed
       await pool.query<OkPacket>(
         "DELETE FROM category_sales WHERE category_id = ?",
         [categoryId]

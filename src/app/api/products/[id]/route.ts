@@ -18,6 +18,22 @@ type ProductRow = {
   productSalePrice: number | null;
 };
 
+type EffectiveSale =
+  | {
+      fromCategory: true;
+      quantity: number;
+      price: number;
+      category: {
+        id: number;
+        name: string;
+      };
+    }
+  | {
+      fromCategory: false;
+      quantity: number;
+      price: number;
+    };
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -58,7 +74,7 @@ export async function GET(
     );
 
     // 3. Determine which sale applies (priority: category > product)
-    let effectiveSale: any = null;
+    let effectiveSale: EffectiveSale | null = null;
 
     if (saleCategories.length > 0) {
       const best = saleCategories.sort(
