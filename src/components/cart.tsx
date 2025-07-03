@@ -99,7 +99,7 @@ export default function Cart() {
     const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
       msg
     )}`;
-    window.open(whatsappURL, "_blank");
+    window.location.href = whatsappURL;
   };
 
   const savePhoneNumber = () => {

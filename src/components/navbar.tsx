@@ -24,9 +24,9 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
       <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 mt-2 sm:mt-0">
         <Link
           href="/"
-          className="text-lg sm:text-xl md:text-2xl hover:underline"
+          className="px-4 py-2 bg-white text-pink-700 text-base sm:text-lg rounded-md shadow hover:bg-pink-200 hover:text-pink-900 transition font-semibold"
         >
-          חזרה לתפריט
+          חזרה לתפריט ראשי
         </Link>
 
         {isAdmin && (
