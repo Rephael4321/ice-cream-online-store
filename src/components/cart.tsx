@@ -16,6 +16,8 @@ export default function Cart() {
   const [isOpen, setIsOpen] = useState(false);
   const [phoneModal, setPhoneModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+  const [showWhatsappConfirm, setShowWhatsappConfirm] = useState(false);
 
   const grouped = getGroupedCart();
   const singleItems = cartItems.filter(
@@ -58,17 +60,19 @@ export default function Cart() {
     return [...groupedItems, ...singleSaleItems];
   }
 
-  const handlePayment = async () => {
+  const initiatePayment = () => {
     const phone = Cookies.get("phoneNumber");
-    const businessPhone = process.env.NEXT_PUBLIC_PHONE;
-
-    if (!businessPhone) {
-      console.error("WhatsApp number is not defined in env.");
-      return;
-    }
-
     if (!phone) {
       setPhoneModal(true);
+    } else {
+      finalizeOrder(phone);
+    }
+  };
+
+  const finalizeOrder = async (phone: string) => {
+    const businessPhone = process.env.NEXT_PUBLIC_PHONE;
+    if (!businessPhone) {
+      console.error("WhatsApp number not defined.");
       return;
     }
 
@@ -91,25 +95,31 @@ export default function Cart() {
     }
 
     const { orderId } = await res.json();
-
+    setPendingOrderId(orderId);
+    setShowWhatsappConfirm(true);
     clearCart();
-
-    const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${orderId}`;
-    const phoneNumber = businessPhone.replace(/\D/g, "");
-    const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-      msg
-    )}`;
-    window.location.href = whatsappURL;
   };
 
   const savePhoneNumber = () => {
-    if (!phoneInput.trim()) return;
-    Cookies.set("phoneNumber", phoneInput.trim(), {
+    const trimmed = phoneInput.trim();
+    if (!trimmed) return;
+    Cookies.set("phoneNumber", trimmed, {
       expires: 3650,
       sameSite: "Lax",
     });
     setPhoneModal(false);
-    handlePayment();
+    finalizeOrder(trimmed);
+  };
+
+  const confirmAndRedirectToWhatsapp = () => {
+    if (!pendingOrderId) return;
+    const businessPhone = process.env.NEXT_PUBLIC_PHONE!;
+    const phoneNumber = businessPhone.replace(/\D/g, "");
+    const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${pendingOrderId}`;
+    const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
+      msg
+    )}`;
+    window.location.href = whatsappURL;
   };
 
   return (
@@ -212,7 +222,7 @@ export default function Cart() {
                 סה״כ: {total.toFixed(2)} ש״ח
               </p>
               <button
-                onClick={handlePayment}
+                onClick={initiatePayment}
                 className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition cursor-pointer"
               >
                 לתשלום
@@ -232,7 +242,7 @@ export default function Cart() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100]">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
             <h2 className="text-lg font-bold mb-4 text-center">
-              הזן מספר טלפון
+              נא להזין טלפון נייד לצורך ביצוע הזמנה
             </h2>
             <input
               type="tel"
@@ -245,15 +255,41 @@ export default function Cart() {
             <div className="flex justify-between gap-4">
               <button
                 onClick={() => setPhoneModal(false)}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded"
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400 cursor-pointer"
               >
                 ביטול
               </button>
               <button
                 onClick={savePhoneNumber}
-                className="flex-1 bg-green-500 text-white py-2 rounded"
+                className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 cursor-pointer"
               >
                 שמור והמשך
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWhatsappConfirm && pendingOrderId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100]">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center space-y-4">
+            <p className="text-lg font-bold">
+              ההזמנה בוצעה בהצלחה. מספר הזמנה {pendingOrderId}.
+              <br />
+              רוצה ליידע את ספק השירות עם הודעת וואטסאפ (חשוב לשיפור השירות)
+            </p>
+            <div className="flex gap-4">
+              <button
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400 cursor-pointer"
+                onClick={() => setShowWhatsappConfirm(false)}
+              >
+                לא עכשיו
+              </button>
+              <button
+                className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 cursor-pointer"
+                onClick={confirmAndRedirectToWhatsapp}
+              >
+                כן, שלח
               </button>
             </div>
           </div>
