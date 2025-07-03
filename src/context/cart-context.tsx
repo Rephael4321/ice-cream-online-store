@@ -39,7 +39,7 @@ type GroupedCartItem = {
 type CartContextType = {
   cartItems: CartItem[];
   addToCart: (product: Product, quantity: number) => void;
-  removeFromCart: (productName: string) => void;
+  removeFromCart: (productId: number) => void;
   clearCart: () => void;
   removeGroupedCategory: (categoryId: number) => void;
   getGroupedCart: () => GroupedCartItem[];
@@ -101,24 +101,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   function addToCart(product: Product, quantity: number) {
     setCartItems((prev) => {
-      const existing = prev.find(
-        (item) => item.productName === product.productName
-      );
+      const existing = prev.find((item) => item.id === product.id);
+
       if (existing) {
+        const newQuantity = existing.quantity + quantity;
+
+        if (newQuantity <= 0) {
+          // Remove the item if quantity drops to 0 or below
+          return prev.filter((item) => item.id !== product.id);
+        }
+
         return prev.map((item) =>
-          item.productName === product.productName
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+          item.id === product.id ? { ...item, quantity: newQuantity } : item
         );
       }
-      return [...prev, { ...product, quantity }];
+
+      // Add item only if quantity is positive
+      if (quantity > 0) {
+        return [...prev, { ...product, quantity }];
+      }
+
+      return prev; // Prevent adding item with non-positive quantity
     });
   }
 
-  function removeFromCart(productName: string) {
-    setCartItems((prev) =>
-      prev.filter((item) => item.productName !== productName)
-    );
+  function removeFromCart(productId: number) {
+    setCartItems((prev) => prev.filter((item) => item.id !== productId));
   }
 
   function removeGroupedCategory(categoryId: number) {

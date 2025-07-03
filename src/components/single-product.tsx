@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useCart } from "@/context/cart-context";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -30,10 +29,12 @@ export default function SingleProduct({
   productPrice,
   sale,
 }: SingleProductProps) {
-  const { addToCart } = useCart();
-  const [amount, setAmount] = useState(1);
+  const { cartItems, addToCart, removeFromCart } = useCart();
   const router = useRouter();
   const pathname = usePathname();
+
+  const cartItem = cartItems.find((item) => item.id === id);
+  const quantity = cartItem?.quantity || 0;
 
   const currentCategorySlug = sale?.category?.name
     ?.replace(/\s+/g, "-")
@@ -42,6 +43,21 @@ export default function SingleProduct({
   const alreadyInCategoryPage =
     decodeURIComponent(pathname || "") ===
     `/category-products/${currentCategorySlug}`;
+
+  const handleAdd = () => {
+    addToCart({ id, productImage, productName, productPrice, sale }, 1);
+  };
+
+  const handleRemove = () => {
+    if (quantity <= 1) {
+      removeFromCart(id);
+    } else {
+      addToCart(
+        { id, productImage, productName, productPrice, sale },
+        -1 // decreasing by one
+      );
+    }
+  };
 
   return (
     <div className="shadow-md p-4 w-full sm:w-[300px] flex flex-col items-center space-y-4 relative">
@@ -98,34 +114,25 @@ export default function SingleProduct({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="flex items-center gap-2">
         <button
-          onClick={() =>
-            addToCart(
-              { id, productImage, productName, productPrice, sale },
-              amount
-            )
-          }
-          className="px-4 py-2 bg-[#3333f6] rounded text-white hover:bg-[#45df43] transition cursor-pointer text-sm sm:text-base"
+          onClick={handleAdd}
+          className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 cursor-pointer"
         >
-          הוסף
+          +
         </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAmount((prev) => prev + 1)}
-            className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 cursor-pointer"
-          >
-            +
-          </button>
-          <p className="w-6 text-center">{amount}</p>
-          <button
-            onClick={() => setAmount((prev) => Math.max(1, prev - 1))}
-            className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 cursor-pointer"
-          >
-            -
-          </button>
-        </div>
+        <p className="w-6 text-center text-lg font-bold">{quantity}</p>
+
+        <button
+          onClick={handleRemove}
+          className={`w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 ${
+            quantity === 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+          }`}
+          disabled={quantity === 0}
+        >
+          –
+        </button>
       </div>
     </div>
   );

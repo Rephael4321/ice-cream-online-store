@@ -37,7 +37,7 @@ export default function Cart() {
       group.items.map((item) => ({
         productId: item.id,
         productName: item.productName,
-        productImage: item.productImage, // ✅ ADD THIS
+        productImage: item.productImage,
         quantity: item.quantity,
         unitPrice: item.productPrice,
         saleQuantity: group.amount,
@@ -48,7 +48,7 @@ export default function Cart() {
     const singleSaleItems = singleItems.map((item) => ({
       productId: item.id,
       productName: item.productName,
-      productImage: item.productImage, // ✅ ADD THIS
+      productImage: item.productImage,
       quantity: item.quantity,
       unitPrice: item.productPrice,
       saleQuantity: item.sale?.fromCategory ? null : item.sale?.amount,
@@ -95,7 +95,7 @@ export default function Cart() {
     clearCart();
 
     const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${orderId}`;
-    const phoneNumber = businessPhone.replace(/\D/g, ""); // Ensure it's only digits
+    const phoneNumber = businessPhone.replace(/\D/g, "");
     const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
       msg
     )}`;
@@ -152,7 +152,7 @@ export default function Cart() {
                   </div>
                   <ul className="pl-3 list-disc text-xs">
                     {group.items.map((item) => (
-                      <li key={item.productName}>
+                      <li key={item.id}>
                         {item.productName} × {item.quantity}
                       </li>
                     ))}
@@ -181,7 +181,7 @@ export default function Cart() {
 
                 return (
                   <li
-                    key={item.productName}
+                    key={item.id}
                     className="flex justify-between items-start border-b pb-2 text-sm sm:text-base"
                   >
                     <div>
@@ -195,7 +195,7 @@ export default function Cart() {
                       )}
                     </div>
                     <button
-                      onClick={() => removeFromCart(item.productName)}
+                      onClick={() => removeFromCart(item.id)}
                       className="text-red-500 hover:text-red-700 text-sm cursor-pointer"
                     >
                       הסר
