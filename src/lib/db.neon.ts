@@ -8,7 +8,7 @@ const pgPool = new Pool({
   password: process.env.PG_PASSWORD,
   database: process.env.PG_DATABASE,
   ssl: {
-    rejectUnauthorized: false, // required for Neon
+    rejectUnauthorized: false,
   },
 });
 

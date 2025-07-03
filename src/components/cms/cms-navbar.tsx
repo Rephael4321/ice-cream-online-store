@@ -1,5 +1,6 @@
 import Cart from "@/components/cart";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function CmsNavbar() {
   return (
@@ -7,9 +8,16 @@ export default function CmsNavbar() {
       {/* Logo / Brand */}
       <Link
         href="/"
-        className="text-xl sm:text-2xl font-bold text-pink-700 whitespace-nowrap"
+        className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-pink-700 whitespace-nowrap"
       >
-        🍭 המפנק
+        <Image
+          src="/favicon_io/android-chrome-192x192.png"
+          alt="המפנק"
+          width={32}
+          height={32}
+          sizes="(max-width: 640px) 32px, (max-width: 1024px) 64px, 128px"
+        />
+        המפנק
       </Link>
 
       {/* Nav Links */}
