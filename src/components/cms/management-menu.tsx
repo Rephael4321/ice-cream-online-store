@@ -33,6 +33,11 @@ const services = [
     description: "נהל הזמנות.",
     slug: "orders",
   },
+  {
+    name: "מכירות לפי קבוצה",
+    description: "צפה במוצרים לפי הצעת מכירה.",
+    slug: "sale-groups",
+  },
 ];
 
 export default function ManagementMenu() {
