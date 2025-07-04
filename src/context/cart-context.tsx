@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 
 // === Types ===
 
@@ -98,6 +104,27 @@ function groupCartItems(cart: CartItem[]): GroupedCartItem[] {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate from localStorage after mount (safe)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("cart");
+      if (stored) {
+        setCartItems(JSON.parse(stored));
+      }
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  // Persist to localStorage
+  useEffect(() => {
+    if (hydrated) {
+      try {
+        localStorage.setItem("cart", JSON.stringify(cartItems));
+      } catch {}
+    }
+  }, [cartItems, hydrated]);
 
   function addToCart(product: Product, quantity: number) {
     setCartItems((prev) => {
@@ -107,7 +134,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const newQuantity = existing.quantity + quantity;
 
         if (newQuantity <= 0) {
-          // Remove the item if quantity drops to 0 or below
           return prev.filter((item) => item.id !== product.id);
         }
 
@@ -116,12 +142,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      // Add item only if quantity is positive
       if (quantity > 0) {
         return [...prev, { ...product, quantity }];
       }
 
-      return prev; // Prevent adding item with non-positive quantity
+      return prev;
     });
   }
 
@@ -141,6 +166,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   function clearCart() {
     setCartItems([]);
   }
+
+  if (!hydrated) return null;
 
   return (
     <CartContext.Provider
