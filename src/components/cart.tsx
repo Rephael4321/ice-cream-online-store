@@ -3,6 +3,7 @@
 import { useCart } from "@/context/cart-context";
 import { useState } from "react";
 import Cookies from "js-cookie";
+import Image from "next/image";
 
 export default function Cart() {
   const {
@@ -192,9 +193,18 @@ export default function Cart() {
                 return (
                   <li
                     key={item.id}
-                    className="flex justify-between items-start border-b pb-2 text-sm sm:text-base"
+                    className="flex gap-3 items-start border-b pb-2 text-sm sm:text-base"
                   >
-                    <div>
+                    <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden border border-gray-200">
+                      <Image
+                        src={item.productImage || "/placeholder.png"}
+                        alt={item.productName}
+                        fill
+                        className="object-contain bg-white"
+                        sizes="64px"
+                      />
+                    </div>
+                    <div className="flex-1">
                       <p className="font-semibold">{item.productName}</p>
                       <p>כמות: {item.quantity}</p>
                       <p>מחיר: {finalPrice.toFixed(2)} ש״ח</p>
