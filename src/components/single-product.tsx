@@ -52,87 +52,87 @@ export default function SingleProduct({
     if (quantity <= 1) {
       removeFromCart(id);
     } else {
-      addToCart(
-        { id, productImage, productName, productPrice, sale },
-        -1 // decreasing by one
-      );
+      addToCart({ id, productImage, productName, productPrice, sale }, -1);
     }
   };
 
   return (
-    <div className="shadow-md p-4 w-full sm:w-[300px] flex flex-col items-center space-y-4 relative">
-      <div className="w-[120px] h-[120px] relative rounded-md bg-white">
-        <Image
-          src={productImage}
-          alt={productName}
-          fill
-          className="object-contain"
-        />
-      </div>
-
-      {sale && (
-        <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-          מבצע!
+    <div className="w-full bg-white rounded-xl shadow-md p-4">
+      {/* Mobile/tablet: horizontal row | Desktop: vertical card */}
+      <div className="flex flex-row sm:flex-row lg:flex-col items-center gap-4">
+        {/* Image */}
+        <div className="relative w-20 h-20 flex-shrink-0">
+          <Image
+            src={productImage}
+            alt={productName}
+            fill
+            className="object-contain rounded-md"
+          />
+          {sale && (
+            <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-1 py-0.5 rounded-bl-md shadow">
+              מבצע!
+            </div>
+          )}
         </div>
-      )}
 
-      <div className="space-y-1 bg-[#ff4090] p-3 rounded-lg shadow-md text-center w-full min-h-[112px] flex flex-col justify-center">
-        <p className="font-semibold text-lg sm:text-xl text-white">
-          {productName}
-        </p>
-        <p
-          className={`text-base sm:text-lg text-white ${
-            sale ? "line-through opacity-70" : ""
-          }`}
-        >
-          {productPrice} ש״ח
-        </p>
+        {/* Info + buttons */}
+        <div className="flex flex-1 flex-col lg:items-center lg:text-center sm:text-right text-sm">
+          <div className="font-bold text-base text-gray-800">{productName}</div>
 
-        {sale ? (
-          <>
-            <p className="text-lg sm:text-xl font-bold text-green-300">
-              {sale.amount} ב- {sale.price} ש״ח
-            </p>
-
-            {sale.fromCategory && sale.category && !alreadyInCategoryPage && (
-              <p className="text-sm text-yellow-200 italic">
-                <button
-                  onClick={() =>
-                    router.push(`/category-products/${currentCategorySlug}`)
-                  }
-                  className="underline hover:text-yellow-100 font-bold"
-                >
-                  גלו עוד מוצרים במבצע
-                </button>
-              </p>
+          <div className="text-gray-600">
+            {sale ? (
+              <>
+                <div className="line-through text-red-500">
+                  {productPrice} ש״ח
+                </div>
+                <div className="text-green-600 font-bold">
+                  {sale.amount} ב- {sale.price} ש״ח
+                </div>
+              </>
+            ) : (
+              <div>{productPrice} ש״ח</div>
             )}
-          </>
-        ) : (
-          <p className="text-lg sm:text-xl font-bold opacity-0 select-none">
-            0 ב- 0 ש״ח
-          </p>
-        )}
-      </div>
+          </div>
 
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleAdd}
-          className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 cursor-pointer"
-        >
-          +
-        </button>
+          {sale?.fromCategory && sale.category && !alreadyInCategoryPage && (
+            <div className="mt-1 text-yellow-600">
+              <button
+                onClick={() =>
+                  router.push(`/category-products/${currentCategorySlug}`)
+                }
+                className="underline hover:text-yellow-500 text-xs"
+              >
+                גלו עוד מוצרים במבצע
+              </button>
+            </div>
+          )}
 
-        <p className="w-6 text-center text-lg font-bold">{quantity}</p>
+          {/* Controls */}
+          <div className="flex items-center gap-2 mt-2 lg:justify-center">
+            <button
+              onClick={handleAdd}
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-lg hover:border-gray-500"
+            >
+              +
+            </button>
 
-        <button
-          onClick={handleRemove}
-          className={`w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-xl hover:border-gray-500 ${
-            quantity === 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-          }`}
-          disabled={quantity === 0}
-        >
-          –
-        </button>
+            <span className="w-5 text-center text-base font-bold">
+              {quantity}
+            </span>
+
+            <button
+              onClick={handleRemove}
+              disabled={quantity === 0}
+              className={`w-8 h-8 flex items-center justify-center rounded-full border text-gray-700 text-lg ${
+                quantity === 0
+                  ? "border-gray-200 opacity-40 cursor-not-allowed"
+                  : "border-gray-300 hover:border-gray-500"
+              }`}
+            >
+              –
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
