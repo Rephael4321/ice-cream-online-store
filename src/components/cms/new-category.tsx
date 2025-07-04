@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import {
   Select,
   SelectTrigger,
@@ -150,7 +151,7 @@ export default function NewCategory() {
         onSubmit={handleSubmit}
         className="flex flex-col md:flex-row gap-6 items-start"
       >
-        {/* Left Column: Form */}
+        {/* Left Column */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             value={category.image}
@@ -181,7 +182,7 @@ export default function NewCategory() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="whitespace-nowrap px-2"
+                  className="whitespace-nowrap px-2 cursor-pointer"
                   onClick={clearName}
                 >
                   נקה
@@ -193,7 +194,7 @@ export default function NewCategory() {
           <div>
             <Label>סוג קטגוריה:</Label>
             <Select value={category.type} onValueChange={handleTypeChange}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full cursor-pointer">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -237,23 +238,26 @@ export default function NewCategory() {
                   type="checkbox"
                   checked={category.showInMenu}
                   onChange={toggleShowInMenu}
+                  className="cursor-pointer"
                 />
                 <Label htmlFor="showInMenu">הצג בתפריט כמו אוסף</Label>
               </div>
             </div>
           )}
 
-          <Button type="submit" className="w-full mt-4 md:mt-6">
+          <Button type="submit" className="w-full mt-4 md:mt-6 cursor-pointer">
             צור קטגוריה
           </Button>
         </div>
 
-        {/* Right Column: Image Preview */}
+        {/* Right Column: Preview */}
         <div className="w-full md:w-1/2">
           {previewSrc && (
-            <img
+            <Image
               src={previewSrc}
-              alt="Preview"
+              alt="תצוגה מקדימה"
+              width={500}
+              height={300}
               className="w-full max-h-96 object-contain border rounded-md"
             />
           )}

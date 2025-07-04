@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -45,8 +46,7 @@ export default function NewProduct() {
   };
 
   const getDisplayName = (path: string): string => {
-    const parts = path.split("/");
-    const file = parts[parts.length - 1];
+    const file = path.split("/").pop() || "";
     return file.split(".")[0];
   };
 
@@ -86,7 +86,7 @@ export default function NewProduct() {
 
       if (!response.ok) throw new Error("Failed to save product");
       const result = await response.json();
-      alert("Saved with ID: " + result.productId);
+      alert("נשמר בהצלחה עם מזהה: " + result.productId);
 
       setProduct({
         name: "",
@@ -97,7 +97,7 @@ export default function NewProduct() {
       });
     } catch (err) {
       console.error(err);
-      alert("Error saving product");
+      alert("שגיאה בשמירת המוצר");
     }
   };
 
@@ -116,7 +116,7 @@ export default function NewProduct() {
         onSubmit={handleSubmit}
         className="flex flex-col md:flex-row gap-6 items-start"
       >
-        {/* Left Column: Form */}
+        {/* Left Column */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             value={product.image}
@@ -130,7 +130,6 @@ export default function NewProduct() {
             }}
           />
 
-          {/* Product Name */}
           <div>
             <Label htmlFor="name">שם:</Label>
             <div className="flex gap-2">
@@ -146,7 +145,7 @@ export default function NewProduct() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="whitespace-nowrap px-2"
+                  className="px-2 cursor-pointer"
                   onClick={clearName}
                 >
                   נקה
@@ -155,7 +154,6 @@ export default function NewProduct() {
             </div>
           </div>
 
-          {/* Price */}
           <div>
             <Label htmlFor="price">מחיר:</Label>
             <Input
@@ -171,9 +169,8 @@ export default function NewProduct() {
             />
           </div>
 
-          {/* Sale */}
           <div>
-            <Label>מבצע (למשל 3 ב- 30)</Label>
+            <Label>מבצע (למשל 3 ב־30)</Label>
             <div className="flex items-center gap-2">
               <Input
                 name="saleQuantity"
@@ -184,7 +181,7 @@ export default function NewProduct() {
                 placeholder="כמות"
                 className="w-1/2"
               />
-              <span className="text-sm">ב&nbsp;-</span>
+              <span className="text-sm">ב־</span>
               <Input
                 name="salePrice"
                 type="number"
@@ -198,17 +195,19 @@ export default function NewProduct() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full mt-4 md:mt-6">
+          <Button type="submit" className="w-full mt-4 md:mt-6 cursor-pointer">
             צור מוצר
           </Button>
         </div>
 
-        {/* Right Column: Image Preview */}
+        {/* Right Column: Preview */}
         <div className="w-full md:w-1/2">
           {previewSrc && (
-            <img
+            <Image
               src={previewSrc}
-              alt="Preview"
+              alt="תצוגה מקדימה"
+              width={500}
+              height={300}
               className="w-full max-h-96 object-contain border rounded-md"
             />
           )}
@@ -235,9 +234,11 @@ export default function NewProduct() {
                     setShowGallery(false);
                   }}
                 >
-                  <img
+                  <Image
                     src={img}
-                    alt=""
+                    alt={getDisplayName(img)}
+                    width={200}
+                    height={200}
                     className="w-full h-32 object-contain rounded border bg-white"
                   />
                   <p className="text-center text-xs mt-1">

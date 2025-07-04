@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ categories: result.rows });
   } catch (err: unknown) {
-    console.error("GET /categories error:", err); // ✅ log actual error
+    console.error("GET /categories error:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
     return NextResponse.json({ error }, { status: 500 });

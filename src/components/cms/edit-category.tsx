@@ -13,6 +13,7 @@ import {
   SelectItem,
 } from "./ui/select";
 import { images } from "@/data/images";
+import Image from "next/image";
 
 type CategoryType = "collection" | "sale";
 
@@ -50,7 +51,7 @@ export default function EditCategory({ id }: Props) {
     async function load() {
       try {
         const res = await fetch(`/api/categories/${id}`);
-        if (!res.ok) throw new Error("Failed to load category");
+        if (!res.ok) throw new Error("שגיאה בטעינת קטגוריה");
         const data: { category: Category } = await res.json();
         setCategory(data.category);
       } catch {
@@ -59,7 +60,6 @@ export default function EditCategory({ id }: Props) {
         setLoading(false);
       }
     }
-
     load();
   }, [id]);
 
@@ -137,7 +137,7 @@ export default function EditCategory({ id }: Props) {
         onSubmit={handleSubmit}
         className="flex flex-col md:flex-row gap-6 items-start"
       >
-        {/* Form Section */}
+        {/* טופס */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             value={category.image}
@@ -147,12 +147,12 @@ export default function EditCategory({ id }: Props) {
               );
               setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
             }}
-            placeholder="שם תמונה"
-            label="שם תמונה"
+            placeholder="בחר תמונה"
+            label="תמונה"
           />
 
           <div>
-            <Label>שם:</Label>
+            <Label>שם הקטגוריה:</Label>
             <Input name="name" value={category.name} onChange={handleChange} />
           </div>
 
@@ -166,10 +166,10 @@ export default function EditCategory({ id }: Props) {
           </div>
 
           <div>
-            <Label>סוג:</Label>
+            <Label>סוג הקטגוריה:</Label>
             <Select value={category.type} onValueChange={handleTypeChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
+              <SelectTrigger className="w-full cursor-pointer">
+                <SelectValue placeholder="בחר סוג" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="collection">אוסף</SelectItem>
@@ -180,7 +180,7 @@ export default function EditCategory({ id }: Props) {
 
           {category.type === "sale" && (
             <div>
-              <Label>מבצע:</Label>
+              <Label>פרטי מבצע:</Label>
               <div className="flex gap-2 items-center">
                 <Input
                   name="saleQuantity"
@@ -203,18 +203,20 @@ export default function EditCategory({ id }: Props) {
             </div>
           )}
 
-          <Button type="submit" className="w-full mt-4">
+          <Button type="submit" className="w-full mt-4 cursor-pointer">
             שמור שינויים
           </Button>
         </div>
 
-        {/* Preview */}
+        {/* תצוגה מקדימה */}
         <div className="w-full md:w-1/2">
           {previewSrc && (
-            <img
+            <Image
               src={previewSrc}
-              alt="Preview"
-              className="w-full max-h-96 object-contain border rounded-md"
+              alt="תצוגה מקדימה"
+              width={500}
+              height={500}
+              className="w-full h-auto max-h-96 object-contain border rounded-md"
             />
           )}
         </div>

@@ -250,7 +250,6 @@ export default function Cart() {
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value)}
               className="w-full border px-3 py-2 mb-4 rounded text-right"
-              dir="rtl"
             />
             <div className="flex justify-between gap-4">
               <button

@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import SingleProduct from "@/components/single-product";
 
 interface CategoryRef {
@@ -24,50 +21,35 @@ interface Product {
 }
 
 interface Props {
-  params: Promise<{ category: string }>;
+  params: { category: string };
 }
 
-export default function ProductsByCategory({ params }: Props) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [categorySlug, setCategorySlug] = useState("");
+export default async function ProductsByCategory({ params }: Props) {
+  const slug = params.category;
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const { category } = await params;
-        setCategorySlug(category);
-
-        const res = await fetch(`/api/categories/name/${category}/products`);
-        if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצרים");
-
-        const data = await res.json();
-        setProducts(data.products || []);
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("קרתה תקלה");
-        }
-      } finally {
-        setLoading(false);
-      }
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
+    {
+      next: { revalidate: 3600 }, // ISR support
     }
+  );
 
-    fetchProducts();
-  }, [params]);
+  if (!res.ok) {
+    return <div className="p-4 text-red-600">שגיאה בטעינת מוצרים</div>;
+  }
 
-  if (loading) return <div className="p-4">Loading...</div>;
-  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
-  if (products.length === 0)
-    return <div className="p-4">No products found.</div>;
+  const data = await res.json();
+  const products: Product[] = data.products || [];
+
+  if (products.length === 0) {
+    return <div className="p-4">לא נמצאו מוצרים בקטגוריה.</div>;
+  }
 
   return (
     <>
       <div className="flex justify-center mt-10">
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-pink-700">
-          {decodeURIComponent(categorySlug.replace(/-/g, " "))}
+          {decodeURIComponent(slug.replace(/-/g, " "))}
         </h1>
       </div>
 
@@ -76,7 +58,7 @@ export default function ProductsByCategory({ params }: Props) {
           <SingleProduct
             key={product.id}
             id={product.id}
-            productImage={product.image || ""}
+            productImage={product.image || "/ice-scream.png"}
             productName={product.name}
             productPrice={product.price}
             sale={product.sale}

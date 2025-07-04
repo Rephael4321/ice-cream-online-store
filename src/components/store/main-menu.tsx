@@ -1,14 +1,12 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Metadata } from "next";
 
 interface Category {
   id: number;
   name: string;
   type: "brand" | "collection" | "sale";
-  image?: string;
+  image?: string | null;
 }
 
 const fallbackImageMap: Record<string, string> = {
@@ -23,57 +21,68 @@ const colorMap: Record<string, string> = {
   sale: "text-green-600",
 };
 
-export default function MainMenu() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const router = useRouter();
+export const metadata: Metadata = {
+  title: "קטגוריות | המפנק",
+  description: "בחרו קטגוריה מהמגוון שלנו",
+};
 
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await fetch("/api/categories");
-        if (!res.ok) throw new Error("ארעה תקלה בטעינת קטגוריות");
-        const data = await res.json();
-        setCategories(data.categories || []);
-      } catch (err) {
-        console.error("תקלה בטעינת קטגוריות:", err);
-      }
+export default async function MainMenu() {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories`,
+    {
+      next: { revalidate: 3600 },
     }
+  );
 
-    fetchCategories();
-  }, []);
-
-  const handleClick = (name: string) => {
-    const slug = name.replace(/\s+/g, "-").toLowerCase();
-    router.push(`/category-products/${slug}`);
-  };
+  const data = await res.json();
+  const categories: Category[] = data.categories || [];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 px-4 py-12">
-      {categories.map((cat) => (
-        <div
-          key={cat.id}
-          onClick={() => handleClick(cat.name)}
-          className="cursor-pointer text-center hover:scale-105 transition-transform duration-200"
-        >
-          <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
-            <div className="w-[120px] h-[120px] relative rounded-md bg-white">
-              <Image
-                src={cat.image || fallbackImageMap[cat.type] || "/default.png"}
-                alt={cat.name}
-                fill
-                className="object-contain"
-              />
-            </div>
-            <h2
-              className={`text-lg font-semibold ${
-                colorMap[cat.type] || "text-gray-700"
-              }`}
+      {(categories.length === 0 ? Array(6).fill(null) : categories).map(
+        (cat, i) => {
+          const slug = cat?.name?.replace(/\s+/g, "-").toLowerCase();
+
+          return cat ? (
+            <Link
+              key={cat.id}
+              href={`/category-products/${slug}`}
+              className="hover:scale-105 transition-transform duration-200 text-center"
             >
-              {cat.name}
-            </h2>
-          </div>
-        </div>
-      ))}
+              <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
+                <div className="w-[120px] h-[120px] relative rounded-md bg-gray-100">
+                  <Image
+                    src={
+                      cat.image || fallbackImageMap[cat.type] || "/default.png"
+                    }
+                    alt={cat.name}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100px, 120px"
+                  />
+                </div>
+                <h2
+                  className={`text-lg font-semibold ${
+                    colorMap[cat.type] || "text-gray-700"
+                  }`}
+                >
+                  {cat.name}
+                </h2>
+              </div>
+            </Link>
+          ) : (
+            <div
+              key={i}
+              className="animate-pulse text-center transition-transform duration-200"
+            >
+              <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
+                <div className="w-[120px] h-[120px] bg-gray-200 rounded-md" />
+                <div className="bg-gray-300 w-1/2 h-4 rounded"></div>
+              </div>
+            </div>
+          );
+        }
+      )}
     </div>
   );
 }

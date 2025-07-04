@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 type Product = {
   id: number;
@@ -26,7 +27,6 @@ export default function SaleGroupsPage() {
       const filtered = onlyWithCategory
         ? products.filter((p) => p.has_category)
         : products;
-
       if (filtered.length > 0) acc[label] = filtered;
       return acc;
     },
@@ -34,7 +34,7 @@ export default function SaleGroupsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-6 space-y-6">
       <div className="flex justify-end gap-4 mb-4">
         <button
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -69,13 +69,20 @@ export default function SaleGroupsPage() {
                   compactMode ? "p-1" : "p-2"
                 }`}
               >
-                <img
-                  src={p.image}
-                  alt={p.name}
-                  className={`object-cover rounded ${
-                    compactMode ? "h-16 w-full" : "h-24 w-full"
+                <div
+                  className={`w-full relative rounded overflow-hidden ${
+                    compactMode ? "h-16" : "h-24"
                   }`}
-                />
+                >
+                  <Image
+                    src={p.image}
+                    alt={p.name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+
                 <p
                   className={`text-center mt-1 font-medium ${
                     compactMode ? "text-xs" : "text-sm"
@@ -83,6 +90,7 @@ export default function SaleGroupsPage() {
                 >
                   {p.name}
                 </p>
+
                 {p.categories.length > 0 && (
                   <ul
                     className={`text-gray-600 mt-1 text-center ${

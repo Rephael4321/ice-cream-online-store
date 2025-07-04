@@ -85,7 +85,7 @@ export default function LinkProductToCategory() {
   };
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6" dir="rtl">
+    <div className="max-w-xl mx-auto p-6 space-y-6">
       <h1 className="text-2xl font-bold text-center">קישור מוצר לקטגוריה</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

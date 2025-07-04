@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 import ImageSelector from "./ui/image-selector";
 import { images } from "@/data/images";
+import Image from "next/image";
 
 interface ProductDetail {
   id: string;
@@ -276,11 +277,15 @@ export default function Product({ params }: ParamsProps) {
 
         <div className="w-full md:w-1/2">
           {previewSrc && (
-            <img
-              src={previewSrc}
-              alt={product.name}
-              className="w-full max-h-96 object-contain border rounded-md"
-            />
+            <div className="relative w-full h-96 border rounded-md">
+              <Image
+                src={previewSrc}
+                alt={product.name}
+                fill
+                className="object-contain rounded-md"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+            </div>
           )}
         </div>
       </form>

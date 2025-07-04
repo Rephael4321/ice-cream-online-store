@@ -5,5 +5,5 @@ interface CategoryPageProps {
 }
 
 export default function ProductsByCategoryPage({ params }: CategoryPageProps) {
-  return <ProductsByCategory params={Promise.resolve(params)} />;
+  return <ProductsByCategory params={params} />;
 }

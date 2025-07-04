@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Input } from "./input";
 import { Label } from "./label";
 import { images } from "@/data/images";
+import Image from "next/image";
 
 interface ImageSelectorProps {
   value: string;
@@ -57,6 +58,7 @@ export default function ImageSelector({
         onFocus={() => setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 100)}
       />
+
       {focused && filteredImages.length > 0 && (
         <ul className="absolute z-10 w-full max-h-60 overflow-y-auto bg-white border rounded-md shadow top-full mt-1">
           {filteredImages.map((img, idx) => (
@@ -65,11 +67,15 @@ export default function ImageSelector({
               className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
               onMouseDown={() => handleSuggestionClick(img)}
             >
-              <img
-                src={img}
-                alt=""
-                className="w-8 h-8 object-cover rounded border"
-              />
+              <div className="relative w-8 h-8">
+                <Image
+                  src={img}
+                  alt=""
+                  fill
+                  className="object-cover rounded border"
+                  unoptimized
+                />
+              </div>
               <span>{getDisplayName(img)}</span>
             </li>
           ))}
@@ -105,11 +111,15 @@ export default function ImageSelector({
                     setShowGallery(false);
                   }}
                 >
-                  <img
-                    src={img}
-                    alt=""
-                    className="w-full h-32 object-contain rounded border bg-white"
-                  />
+                  <div className="relative w-full h-32 border rounded bg-white">
+                    <Image
+                      src={img}
+                      alt=""
+                      fill
+                      className="object-contain rounded"
+                      unoptimized
+                    />
+                  </div>
                   <p className="text-center text-xs mt-1">
                     {getDisplayName(img)}
                   </p>

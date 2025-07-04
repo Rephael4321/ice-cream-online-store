@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface Product {
   id: string;
@@ -55,11 +56,16 @@ export default function Products() {
                 className="flex items-center gap-4 w-full cursor-pointer"
               >
                 {image && (
-                  <img
-                    src={image}
-                    alt={name}
-                    className="w-20 h-20 object-contain rounded"
-                  />
+                  <div className="w-20 h-20 relative shrink-0">
+                    <Image
+                      src={image}
+                      alt={name}
+                      fill
+                      className="object-contain rounded"
+                      sizes="80px"
+                      unoptimized // Remove if using external loader or domains
+                    />
+                  </div>
                 )}
                 <div>
                   <h2 className="text-lg font-semibold">{name}</h2>

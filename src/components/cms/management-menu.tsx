@@ -38,6 +38,11 @@ const services = [
     description: "צפה במוצרים לפי הצעת מכירה.",
     slug: "sale-groups",
   },
+  {
+    name: "תמונות בשימוש",
+    description: "סקירה של כל התמונות המנוהלות במערכת.",
+    slug: "image-usage", // This assumes your page is at /cms/image-usage
+  },
 ];
 
 export default function ManagementMenu() {

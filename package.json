@@ -12,6 +12,7 @@
     "@radix-ui/react-select": "^2.2.5",
     "clsx": "^2.1.1",
     "cookie": "^1.0.2",
+    "image-size": "^2.0.2",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
