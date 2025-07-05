@@ -1,7 +1,5 @@
 "use client";
 
-// TODO: MAKE SURE PRODUCT ON SALE CATEGORY, SALE TAKES
-
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -11,6 +9,8 @@ type Order = {
   orderId: number;
   phone: string;
   createdAt: string;
+  isPaid: boolean;
+  isDelivered: boolean;
 };
 
 type Item = {
@@ -53,6 +53,21 @@ export default function OrderDetails() {
       })
       .catch(() => setLoading(false));
   }, [id]);
+
+  const toggleStatus = async (field: "isPaid" | "isDelivered") => {
+    if (!order) return;
+
+    const updated = await fetch(`/api/orders/${order.orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        [field]: !order[field],
+      }),
+    });
+
+    const data = await updated.json();
+    setOrder((prev) => prev && { ...prev, ...data });
+  };
 
   if (loading) return <p className="p-6">טוען...</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
@@ -137,6 +152,28 @@ export default function OrderDetails() {
             ? order.createdAt
             : new Date(order.createdAt).toLocaleString("he-IL")}
         </p>
+        <div className="mt-4 flex gap-4 flex-wrap">
+          <button
+            onClick={() => toggleStatus("isPaid")}
+            className={`px-3 py-1 rounded text-white cursor-pointer transition ${
+              order.isPaid
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-red-500 hover:bg-red-600"
+            }`}
+          >
+            {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
+          </button>
+          <button
+            onClick={() => toggleStatus("isDelivered")}
+            className={`px-3 py-1 rounded text-white cursor-pointer transition ${
+              order.isDelivered
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-red-500 hover:bg-red-600"
+            }`}
+          >
+            {order.isDelivered ? "נמסר 📦" : "לא נמסר ⛔"}
+          </button>
+        </div>
       </div>
 
       <div className="border p-4 rounded shadow">

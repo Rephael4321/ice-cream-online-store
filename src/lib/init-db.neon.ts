@@ -77,6 +77,8 @@ export async function initializeTables() {
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
         phone VARCHAR(20) NOT NULL,
+        is_paid BOOLEAN DEFAULT FALSE,
+        is_delivered BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem',
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem'
       );

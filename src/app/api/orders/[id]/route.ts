@@ -7,6 +7,8 @@ type OrderRow = {
   phone: string;
   createdAt: string;
   updatedAt: string;
+  isPaid: boolean;
+  isDelivered: boolean;
 };
 
 type OrderItemRow = {
@@ -36,8 +38,10 @@ export async function GET(
       `SELECT 
          id AS "orderId", 
          phone, 
-         created_at AS "createdAt", 
-         updated_at AS "updatedAt"
+         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt", 
+         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
+         is_paid AS "isPaid",
+         is_delivered AS "isDelivered"
        FROM orders
        WHERE id = $1`,
       [orderId]
@@ -58,8 +62,8 @@ export async function GET(
          sale_quantity  AS "saleQuantity",
          sale_price     AS "salePrice",
          product_image  AS "productImage",
-         created_at     AS "createdAt",
-         updated_at     AS "updatedAt"
+         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
+         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt"
        FROM order_items
        WHERE order_id = $1`,
       [orderId]
@@ -70,5 +74,37 @@ export async function GET(
     console.error("Error fetching order:", err);
     const error = err instanceof Error ? err.message : "Failed to fetch order";
     return NextResponse.json({ error }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const orderId = Number(params.id);
+  if (isNaN(orderId)) {
+    return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
+  }
+
+  const body = await req.json();
+  const { isPaid, isDelivered } = body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE orders
+       SET is_paid = COALESCE($1, is_paid),
+           is_delivered = COALESCE($2, is_delivered)
+       WHERE id = $3
+       RETURNING is_paid AS "isPaid", is_delivered AS "isDelivered"`,
+      [isPaid, isDelivered, orderId]
+    );
+
+    return NextResponse.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating status:", err);
+    return NextResponse.json(
+      { error: "Failed to update status" },
+      { status: 500 }
+    );
   }
 }
