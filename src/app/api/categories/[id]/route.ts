@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db.neon"; // ✅ Your Neon PostgreSQL pool
+import pool from "@/lib/db.neon";
 
+// DB types
 type Category = {
   id: number;
   name: string;
@@ -9,6 +10,8 @@ type Category = {
   image: string | null;
   parent_id: number | null;
   show_in_menu: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 type CategoryWithSale = Category & {
@@ -30,7 +33,18 @@ export async function GET(
 ) {
   try {
     const result = await pool.query<CategoryWithSale>(
-      `SELECT c.*, cs.quantity AS "saleQuantity", cs.sale_price AS "salePrice"
+      `SELECT 
+         c.id,
+         c.name,
+         c.type,
+         c.description,
+         c.image,
+         c.parent_id,
+         c.show_in_menu,
+         c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+         c.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+         cs.quantity AS "saleQuantity", 
+         cs.sale_price AS "salePrice"
        FROM categories c
        LEFT JOIN category_sales cs ON cs.category_id = c.id
        WHERE c.id = $1`,

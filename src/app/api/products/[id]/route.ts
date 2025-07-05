@@ -14,6 +14,8 @@ type ProductRow = {
   name: string;
   price: number;
   image: string;
+  created_at: string;
+  updated_at: string;
   productSaleQuantity: number | null;
   productSalePrice: number | null;
 };
@@ -54,6 +56,8 @@ export async function GET(
          p.name, 
          p.price, 
          p.image, 
+         p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at, 
+         p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
          s.quantity AS "productSaleQuantity", 
          s.sale_price AS "productSalePrice"
        FROM products p
@@ -111,6 +115,8 @@ export async function GET(
         name: product.name,
         price: product.price,
         image: product.image,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
         sale: effectiveSale,
       },
     });

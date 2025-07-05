@@ -5,7 +5,8 @@ import pool from "@/lib/db.neon";
 type OrderRow = {
   orderId: number;
   phone: string;
-  createdAt: string; // ISO format
+  createdAt: string;
+  updatedAt: string;
 };
 
 type OrderItemRow = {
@@ -16,6 +17,8 @@ type OrderItemRow = {
   saleQuantity: number | null;
   salePrice: number | null;
   productImage: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export async function GET(
@@ -30,7 +33,11 @@ export async function GET(
   try {
     // Get the order
     const orderResult = await pool.query<OrderRow>(
-      `SELECT id AS "orderId", phone, created_at AS "createdAt"
+      `SELECT 
+         id AS "orderId", 
+         phone, 
+         created_at AS "createdAt", 
+         updated_at AS "updatedAt"
        FROM orders
        WHERE id = $1`,
       [orderId]
@@ -50,7 +57,9 @@ export async function GET(
          unit_price     AS "unitPrice",
          sale_quantity  AS "saleQuantity",
          sale_price     AS "salePrice",
-         product_image  AS "productImage"
+         product_image  AS "productImage",
+         created_at     AS "createdAt",
+         updated_at     AS "updatedAt"
        FROM order_items
        WHERE order_id = $1`,
       [orderId]

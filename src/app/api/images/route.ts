@@ -9,20 +9,49 @@
 //   const connection = await pool.connect();
 
 //   try {
-//     const productResult = await connection.query(
-//       `SELECT image FROM products WHERE image IS NOT NULL`
-//     );
-//     const categoryResult = await connection.query(
-//       `SELECT image FROM categories WHERE image IS NOT NULL`
-//     );
+//     const productResult = await connection.query<{
+//       image: string | null;
+//       created_at: string;
+//       updated_at: string;
+//     }>(`
+//       SELECT 
+//         image, 
+//         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+//         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
+//       FROM products
+//       WHERE image IS NOT NULL
+//     `);
+
+//     const categoryResult = await connection.query<{
+//       image: string | null;
+//       created_at: string;
+//       updated_at: string;
+//     }>(`
+//       SELECT 
+//         image, 
+//         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+//         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
+//       FROM categories
+//       WHERE image IS NOT NULL
+//     `);
 
 //     const allImages = [...productResult.rows, ...categoryResult.rows];
 
 //     const usageCount: Record<string, number> = {};
-//     allImages.forEach(({ image }) => {
-//       if (image) {
-//         usageCount[image] = (usageCount[image] || 0) + 1;
+//     const usageTimestamps: Record<
+//       string,
+//       { created_at: string[]; updated_at: string[] }
+//     > = {};
+
+//     allImages.forEach(({ image, created_at, updated_at }) => {
+//       if (!image) return;
+//       usageCount[image] = (usageCount[image] || 0) + 1;
+
+//       if (!usageTimestamps[image]) {
+//         usageTimestamps[image] = { created_at: [], updated_at: [] };
 //       }
+//       usageTimestamps[image].created_at.push(created_at);
+//       usageTimestamps[image].updated_at.push(updated_at);
 //     });
 
 //     const results = images.map((imgPath) => {
@@ -48,10 +77,16 @@
 //         name: imgPath.split("/").pop() || "Unnamed",
 //         path: imgPath,
 //         size,
-//         used: usageCount[imgPath] > 0,
-//         usageCount: usageCount[imgPath] || 0,
 //         width,
 //         height,
+//         used: usageCount[imgPath] > 0,
+//         usageCount: usageCount[imgPath] || 0,
+//         usedIn: usageTimestamps[imgPath]?.created_at.length
+//           ? {
+//               createdAtSamples: usageTimestamps[imgPath].created_at.slice(0, 3),
+//               updatedAtSamples: usageTimestamps[imgPath].updated_at.slice(0, 3),
+//             }
+//           : undefined,
 //       };
 //     });
 

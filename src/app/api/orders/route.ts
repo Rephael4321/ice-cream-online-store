@@ -21,6 +21,7 @@ type OrderSummaryRow = {
   orderId: number;
   phone: string;
   createdAt: string;
+  updatedAt: string;
   itemCount: number;
 };
 
@@ -96,13 +97,14 @@ export async function GET() {
       SELECT
         o.id AS "orderId",
         o.phone,
-        o.created_at AS "createdAt",
+        o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
+        o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       GROUP BY o.id
       ORDER BY o.created_at DESC
-    `
+      `
     );
 
     return NextResponse.json({ orders: result.rows });

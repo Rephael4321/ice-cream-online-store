@@ -7,19 +7,13 @@ import { Label } from "./ui/label";
 interface Product {
   id: number;
   name: string;
+  createdAt?: string;
 }
 
 interface Category {
   id: number;
   name: string;
-}
-
-interface ProductResponse {
-  products: Product[];
-}
-
-interface CategoryResponse {
-  categories: Category[];
+  createdAt?: string;
 }
 
 export default function LinkProductToCategory() {
@@ -32,17 +26,34 @@ export default function LinkProductToCategory() {
     async function fetchProducts() {
       const res = await fetch("/api/products");
       if (!res.ok) throw new Error("שגיאה בטעינת מוצרים");
-      const data: ProductResponse | Product[] = await res.json();
+      const data = await res.json();
       const result = Array.isArray(data) ? data : data.products;
-      setProducts(result.reverse());
+
+      // Sort by createdAt descending if exists
+      const sorted = [...result].sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
+
+      setProducts(sorted);
     }
 
     async function fetchCategories() {
       const res = await fetch("/api/categories?full=true");
       if (!res.ok) throw new Error("שגיאה בטעינת קטגוריות");
-      const data: CategoryResponse | Category[] = await res.json();
+      const data = await res.json();
       const result = Array.isArray(data) ? data : data.categories;
-      setCategories(result.reverse());
+
+      const sorted = [...result].sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
+
+      setCategories(sorted);
     }
 
     fetchProducts().catch(console.error);
@@ -68,7 +79,7 @@ export default function LinkProductToCategory() {
       });
 
       if (!response.ok) {
-        const errData: { error?: string } = await response.json();
+        const errData = await response.json();
         throw new Error(errData.error || "שגיאה בקישור מוצר לקטגוריה");
       }
 
@@ -103,7 +114,17 @@ export default function LinkProductToCategory() {
           >
             <option value="">בחר מוצר</option>
             {products.map((p) => (
-              <option key={p.id} value={p.id}>
+              <option
+                key={p.id}
+                value={p.id}
+                title={
+                  p.createdAt
+                    ? `נוצר בתאריך: ${new Date(p.createdAt).toLocaleString(
+                        "he-IL"
+                      )}`
+                    : ""
+                }
+              >
                 {p.name}
               </option>
             ))}
@@ -125,7 +146,17 @@ export default function LinkProductToCategory() {
           >
             <option value="">בחר קטגוריה</option>
             {categories.map((c) => (
-              <option key={c.id} value={c.id}>
+              <option
+                key={c.id}
+                value={c.id}
+                title={
+                  c.createdAt
+                    ? `נוצר בתאריך: ${new Date(c.createdAt).toLocaleString(
+                        "he-IL"
+                      )}`
+                    : ""
+                }
+              >
                 {c.name}
               </option>
             ))}

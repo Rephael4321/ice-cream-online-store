@@ -33,27 +33,33 @@ export default function Orders() {
         <p>אין הזמנות עדיין.</p>
       ) : (
         <ul className="space-y-4">
-          {orders.map((order) => (
-            <li
-              key={order.orderId}
-              className="border rounded p-4 shadow flex justify-between items-center"
-            >
-              <div>
-                <p className="font-bold">הזמנה #{order.orderId}</p>
-                <p>טלפון: {order.phone}</p>
-                <p>
-                  תאריך: {new Date(order.createdAt).toLocaleString("he-IL")}
-                </p>
-                <p>כמות מוצרים: {order.itemCount}</p>
-              </div>
-              <Link
-                href={`/orders/${order.orderId}`}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          {orders.map((order) => {
+            const date = new Date(order.createdAt);
+            const formatted =
+              isNaN(date.getTime()) === false
+                ? date.toLocaleString("he-IL")
+                : order.createdAt;
+
+            return (
+              <li
+                key={order.orderId}
+                className="border rounded p-4 shadow flex justify-between items-center"
               >
-                צפייה
-              </Link>
-            </li>
-          ))}
+                <div>
+                  <p className="font-bold">הזמנה #{order.orderId}</p>
+                  <p>טלפון: {order.phone}</p>
+                  <p>תאריך: {formatted}</p>
+                  <p>כמות מוצרים: {order.itemCount}</p>
+                </div>
+                <Link
+                  href={`/orders/${order.orderId}`}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                >
+                  צפייה
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

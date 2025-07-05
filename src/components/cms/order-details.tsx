@@ -131,7 +131,12 @@ export default function OrderDetails() {
       <div className="border p-4 rounded shadow">
         <h1 className="text-xl font-bold mb-2">הזמנה #{order.orderId}</h1>
         <p>טלפון: {order.phone}</p>
-        <p>תאריך: {new Date(order.createdAt).toLocaleString("he-IL")}</p>
+        <p>
+          תאריך:{" "}
+          {isNaN(new Date(order.createdAt).getTime())
+            ? order.createdAt
+            : new Date(order.createdAt).toLocaleString("he-IL")}
+        </p>
       </div>
 
       <div className="border p-4 rounded shadow">

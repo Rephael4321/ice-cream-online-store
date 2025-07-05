@@ -6,8 +6,11 @@ type ProductRow = {
   name: string;
   price: number;
   image: string;
+  created_at: string;
+  updated_at: string;
   saleQuantity: number | null;
   salePrice: number | null;
+  saleUpdatedAt: string | null;
 };
 
 // GET /api/products
@@ -19,8 +22,11 @@ export async function GET() {
          p.name, 
          p.price, 
          p.image, 
+         p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+         p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
          s.quantity AS "saleQuantity", 
-         s.sale_price AS "salePrice"
+         s.sale_price AS "salePrice",
+         s.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "saleUpdatedAt"
        FROM products p
        LEFT JOIN sales s ON s.product_id = p.id`
     );

@@ -1,4 +1,3 @@
-// app/api/products/by-sale/route.ts
 import { NextResponse } from "next/server";
 import db from "@/lib/db.neon";
 
@@ -8,8 +7,16 @@ export async function GET() {
       p.id,
       p.name,
       p.image,
+      -- Convert product timestamps to Asia/Jerusalem
+      p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+      p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+
       s.quantity AS sale_quantity,
       s.sale_price,
+
+      -- Convert sale updated_at to Asia/Jerusalem
+      s.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS sale_updated_at,
+
       COALESCE(
         json_agg(c.name) FILTER (WHERE c.name IS NOT NULL),
         '[]'
@@ -18,7 +25,7 @@ export async function GET() {
     LEFT JOIN sales s ON s.product_id = p.id
     LEFT JOIN product_categories pc ON pc.product_id = p.id
     LEFT JOIN categories c ON c.id = pc.category_id
-    GROUP BY p.id, s.quantity, s.sale_price
+    GROUP BY p.id, s.quantity, s.sale_price, s.updated_at
     ORDER BY s.quantity NULLS LAST, s.sale_price NULLS LAST
   `);
 

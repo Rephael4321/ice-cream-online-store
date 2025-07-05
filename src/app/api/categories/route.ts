@@ -10,6 +10,8 @@ type Category = {
   image: string | null;
   parent_id: number | null;
   show_in_menu: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 // GET /api/categories
@@ -18,7 +20,16 @@ export async function GET(req: NextRequest) {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
 
     const result = await pool.query<Category>(
-      `SELECT id, name, type, description, image, parent_id, show_in_menu 
+      `SELECT 
+         id, 
+         name, 
+         type, 
+         description, 
+         image, 
+         parent_id, 
+         show_in_menu, 
+         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
        FROM categories
        ${fullView ? "" : "WHERE show_in_menu = true"}`
     );
