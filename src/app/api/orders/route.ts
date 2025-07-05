@@ -89,10 +89,26 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/orders
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const result = await pool.query<OrderSummaryRow>(
+    const from = req.nextUrl.searchParams.get("from");
+    const to = req.nextUrl.searchParams.get("to");
+
+    const values: any[] = [];
+    let whereClause = "";
+
+    if (from && to) {
+      // Convert local (Asia/Jerusalem) dates to UTC ranges
+      const fromUTC = new Date(`${from}T00:00:00+03:00`).toISOString(); // e.g., 2025-07-01T21:00:00Z
+      const toUTC = new Date(`${to}T00:00:00+03:00`);
+      toUTC.setDate(toUTC.getDate() + 1);
+      const toUTCString = toUTC.toISOString(); // e.g., 2025-07-02T21:00:00Z
+
+      whereClause = `WHERE o.created_at >= $1 AND o.created_at < $2`;
+      values.push(fromUTC, toUTCString);
+    }
+
+    const result = await pool.query(
       `
       SELECT
         o.id AS "orderId",
@@ -102,9 +118,11 @@ export async function GET() {
         COUNT(oi.id) AS "itemCount"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
+      ${whereClause}
       GROUP BY o.id
       ORDER BY o.created_at DESC
-      `
+      `,
+      values
     );
 
     return NextResponse.json({ orders: result.rows });
