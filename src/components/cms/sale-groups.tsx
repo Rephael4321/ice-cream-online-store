@@ -11,7 +11,7 @@ type Product = {
   categories: string[];
 };
 
-export default function SaleGroupsPage() {
+export default function SaleGroups() {
   const [groups, setGroups] = useState<Record<string, Product[]>>({});
   const [onlyWithCategory, setOnlyWithCategory] = useState(false);
   const [compactMode, setCompactMode] = useState(false);

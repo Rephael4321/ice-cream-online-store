@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db.neon";
+import pool from "@/lib/db";
 
 // DB types
 type Category = {
@@ -143,6 +143,39 @@ export async function PUT(
     return NextResponse.json({ message: "Category updated" });
   } catch (err: unknown) {
     console.error("PUT /categories/[id] error:", err);
+    const error =
+      err instanceof Error ? err.message : "Unexpected error occurred";
+    return NextResponse.json({ error }, { status: 500 });
+  }
+}
+
+// DELETE /api/categories/[id]
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const id = Number(params.id);
+
+  if (isNaN(id)) {
+    return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
+  }
+
+  try {
+    const result = await pool.query(
+      "DELETE FROM categories WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
+    }
+
+    return new NextResponse(null, { status: 204 });
+  } catch (err: unknown) {
+    console.error("DELETE /categories/[id] error:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
     return NextResponse.json({ error }, { status: 500 });

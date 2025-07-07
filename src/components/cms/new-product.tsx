@@ -34,7 +34,6 @@ export default function NewProduct() {
   });
 
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
-  const [showGallery, setShowGallery] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -50,15 +49,11 @@ export default function NewProduct() {
     return file.split(".")[0];
   };
 
-  const handleSuggestionClick = (fullPath: string) => {
-    const nameOnly = getDisplayName(fullPath);
-    setProduct({
-      ...product,
-      image: nameOnly,
-      name: nameOnly,
-    });
-    setImagePathMap((prev) => ({ ...prev, [nameOnly]: fullPath }));
-  };
+  const imageItems = images.map((path, index) => ({
+    id: index,
+    name: getDisplayName(path),
+    image: path,
+  }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,14 +114,24 @@ export default function NewProduct() {
         {/* Left Column */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
+            items={imageItems}
             value={product.image}
-            onChange={(imageName, fullPath) => {
+            onChange={(item) => {
+              if (!item) {
+                setProduct((prev) => ({ ...prev, image: "" }));
+                return;
+              }
+
               setProduct((prev) => ({
                 ...prev,
-                image: imageName,
-                name: imageName,
+                image: item.name,
+                name: item.name,
               }));
-              setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
+
+              setImagePathMap((prev) => ({
+                ...prev,
+                [item.name]: item.image || "",
+              }));
             }}
           />
 
@@ -213,43 +218,6 @@ export default function NewProduct() {
           )}
         </div>
       </form>
-
-      {showGallery && (
-        <div
-          className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center"
-          onClick={() => setShowGallery(false)}
-        >
-          <div
-            className="bg-white max-w-4xl w-full max-h-[80vh] overflow-y-auto p-4 rounded shadow-lg relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-bold mb-4">גלריית תמונות</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    handleSuggestionClick(img);
-                    setShowGallery(false);
-                  }}
-                >
-                  <Image
-                    src={img}
-                    alt={getDisplayName(img)}
-                    width={200}
-                    height={200}
-                    className="w-full h-32 object-contain rounded border bg-white"
-                  />
-                  <p className="text-center text-xs mt-1">
-                    {getDisplayName(img)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

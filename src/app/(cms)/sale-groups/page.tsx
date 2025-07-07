@@ -1,6 +1,6 @@
 // app/(cms)/sale-groups/page.tsx
-import SaleGroupsPage from "@/components/cms/sale-groups";
+import SaleGroups from "@/components/cms/sale-groups";
 
-export default function Page() {
-  return <SaleGroupsPage />;
+export default function SaleGroupsPage() {
+  return <SaleGroups />;
 }

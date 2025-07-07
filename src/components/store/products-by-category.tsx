@@ -1,8 +1,17 @@
-import SingleProduct from "@/components/single-product";
+import SingleProduct from "@/components/store/single-product";
+import Image from "next/image";
+import Link from "next/link";
 import { Metadata } from "next";
 
 export interface Props {
   params: { category: string };
+}
+
+interface Category {
+  id: number;
+  name: string;
+  image?: string;
+  description?: string;
 }
 
 interface CategoryRef {
@@ -46,8 +55,61 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductsByCategory({ params }: Props) {
-  const slug = params.category;
+  const slug = decodeURIComponent(params.category.replace(/-/g, " "));
 
+  // Step 1: Try to fetch subcategories
+  const childrenRes = await fetch(
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
+    {
+      next: { revalidate: 3600 },
+    }
+  );
+
+  const childrenData = await childrenRes.json();
+  const children: Category[] = childrenData.children || [];
+
+  if (children.length > 0) {
+    return (
+      <div className="p-4">
+        <h1 className="text-3xl sm:text-4xl font-bold text-pink-700 text-center mb-8">
+          {slug}
+        </h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          {children.map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/category-products/${cat.name
+                .replace(/\s+/g, "-")
+                .toLowerCase()}`}
+              className="hover:scale-105 transition-transform duration-200 text-center"
+            >
+              <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
+                <div className="w-[120px] h-[120px] relative rounded-md bg-gray-100">
+                  <Image
+                    src={cat.image || "/ice-scream.png"}
+                    alt={cat.name}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100px, 120px"
+                  />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-800">
+                  {cat.name}
+                </h2>
+                {cat.description && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    {cat.description}
+                  </p>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Fallback to products
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
     {
@@ -61,6 +123,8 @@ export default async function ProductsByCategory({ params }: Props) {
 
   const data = await res.json();
   const products: Product[] = data.products || [];
+  console.log("##########################");
+  console.log(products);
 
   if (products.length === 0) {
     return <div className="p-4">לא נמצאו מוצרים בקטגוריה.</div>;
@@ -70,7 +134,7 @@ export default async function ProductsByCategory({ params }: Props) {
     <>
       <div className="flex justify-center mt-10">
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-pink-700">
-          {decodeURIComponent(slug.replace(/-/g, " "))}
+          {slug}
         </h1>
       </div>
 

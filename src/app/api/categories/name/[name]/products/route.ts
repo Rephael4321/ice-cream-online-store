@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db.neon";
+import pool from "@/lib/db";
 
-// DB types
 type ProductRow = {
   id: number;
   name: string;
@@ -11,6 +10,7 @@ type ProductRow = {
   updated_at: string;
   productSaleQuantity: number | null;
   productSalePrice: number | null;
+  sort_order: number | null;
 };
 
 type CategorySaleRow = {
@@ -27,8 +27,24 @@ export async function GET(
 ) {
   try {
     const { name } = context.params;
+    const categorySlug = name.toLowerCase();
 
-    // 1. Fetch products in this category (with timezone conversion)
+    // Step 0: Get category ID from name
+    const categoryRes = await pool.query<{ id: number }>(
+      `SELECT id FROM categories WHERE LOWER(REPLACE(name, ' ', '-')) = LOWER($1)`,
+      [categorySlug]
+    );
+
+    if (categoryRes.rowCount === 0) {
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
+    }
+
+    const categoryId = categoryRes.rows[0].id;
+
+    // Step 1: Fetch products from that specific category only
     const result = await pool.query<ProductRow>(
       `SELECT 
          p.id, 
@@ -38,13 +54,14 @@ export async function GET(
          p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
          p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
          s.quantity AS "productSaleQuantity",
-         s.sale_price AS "productSalePrice"
+         s.sale_price AS "productSalePrice",
+         pc.sort_order
        FROM products p
        JOIN product_categories pc ON pc.product_id = p.id
-       JOIN categories c          ON c.id = pc.category_id
-       LEFT JOIN sales s          ON s.product_id = p.id
-       WHERE LOWER(REPLACE(c.name, ' ', '-')) = LOWER($1)`,
-      [name]
+       LEFT JOIN sales s ON s.product_id = p.id
+       WHERE pc.category_id = $1
+       ORDER BY pc.sort_order ASC NULLS LAST, p.name ASC`,
+      [categoryId]
     );
 
     const products = result.rows;
@@ -52,10 +69,9 @@ export async function GET(
       return NextResponse.json({ products: [] });
     }
 
-    // 2. Prepare category sales data
+    // Step 2: Fetch category-based sales
     const productIds = products.map((p) => p.id);
     const placeholders = productIds.map((_, i) => `$${i + 1}`).join(", ");
-    const queryParams = productIds;
 
     const categorySalesResult = await pool.query<CategorySaleRow>(
       `SELECT 
@@ -68,12 +84,12 @@ export async function GET(
        JOIN categories c ON c.id = pc.category_id
        JOIN category_sales cs ON cs.category_id = c.id
        WHERE c.type = 'sale' AND pc.product_id IN (${placeholders})`,
-      queryParams
+      productIds
     );
 
     const categorySales = categorySalesResult.rows;
 
-    // 3. Map sales per product
+    // Step 3: Map sales
     const saleMap = new Map<
       number,
       {
@@ -97,7 +113,7 @@ export async function GET(
       }
     }
 
-    // 4. Final product response
+    // Step 4: Build final product response
     const finalProducts = products.map((product) => {
       let sale;
 
@@ -128,11 +144,12 @@ export async function GET(
         created_at: product.created_at,
         updated_at: product.updated_at,
         sale,
+        sort_order: product.sort_order,
       };
     });
 
     return NextResponse.json({ products: finalProducts });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("Error in /api/categories/name/[name]/products:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";

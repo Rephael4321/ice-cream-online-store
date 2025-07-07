@@ -197,14 +197,22 @@ export default function Product({ params }: ParamsProps) {
       >
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
+            items={images.map((path, index) => ({
+              id: index,
+              name: getDisplayName(path),
+              image: path,
+            }))}
             value={product.image || ""}
-            onChange={(imageName, fullPath) => {
+            onChange={(item) => {
               setProduct((prev) =>
-                prev
-                  ? { ...prev, image: imageName, name: prev.name || imageName }
-                  : prev
+                prev ? { ...prev, image: item?.name || "" } : prev
               );
-              setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
+              if (item?.name && item.image) {
+                setImagePathMap((prev) => ({
+                  ...prev,
+                  [item.name]: item.image,
+                }));
+              }
             }}
           />
 

@@ -50,6 +50,12 @@ export default function NewCategory() {
     return file.split(".")[0];
   };
 
+  const imageItems = images.map((img, idx) => ({
+    id: idx,
+    name: getDisplayName(img),
+    image: img,
+  }));
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setCategory((prev) => ({ ...prev, [name]: value }));
@@ -154,16 +160,26 @@ export default function NewCategory() {
         {/* Left Column */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
+            items={imageItems}
             value={category.image}
-            onChange={(imageName, fullPath) => {
+            onChange={(item) => {
+              if (!item) {
+                setCategory((prev) => ({ ...prev, image: "" }));
+                return;
+              }
+
               setCategory((prev) => ({
                 ...prev,
-                image: imageName,
-                name: prev.name || imageName,
+                image: item.name,
+                name: prev.name || item.name,
               }));
-              setImagePathMap((prev) => ({ ...prev, [imageName]: fullPath }));
+
+              setImagePathMap((prev) => ({
+                ...prev,
+                [item.name]: item.image || "",
+              }));
             }}
-            placeholder="גלידה וניל"
+            placeholder="טיפוח"
             label="שם תמונה"
           />
 

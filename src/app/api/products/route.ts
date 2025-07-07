@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db.neon";
+import pool from "@/lib/db";
 
 type ProductRow = {
   id: number;

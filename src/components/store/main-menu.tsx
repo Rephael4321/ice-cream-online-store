@@ -7,6 +7,7 @@ interface Category {
   name: string;
   type: "brand" | "collection" | "sale";
   image?: string | null;
+  description?: string | null;
 }
 
 const fallbackImageMap: Record<string, string> = {
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
 
 export default async function MainMenu() {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories`,
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`, // ✅ fetch only root categories
     {
       next: { revalidate: 3600 },
     }
@@ -68,6 +69,11 @@ export default async function MainMenu() {
                 >
                   {cat.name}
                 </h2>
+                {cat.description && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    {cat.description}
+                  </p>
+                )}
               </div>
             </Link>
           ) : (

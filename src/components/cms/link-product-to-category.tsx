@@ -1,70 +1,98 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Button } from "./ui/button";
-import { Label } from "./ui/label";
+import ImageSelector, { BaseItem } from "./ui/image-selector";
 
 interface Product {
   id: number;
   name: string;
+  image?: string;
   createdAt?: string;
 }
 
 interface Category {
   id: number;
   name: string;
+  image?: string;
   createdAt?: string;
 }
+
+type CombinedItem = BaseItem;
 
 export default function LinkProductToCategory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState<number | "">("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | "">("");
+  const [selectedItem, setSelectedItem] = useState<CombinedItem | null>(null);
+  const [selectedCategoryImage, setSelectedCategoryImage] =
+    useState<string>("");
 
   useEffect(() => {
-    async function fetchProducts() {
-      const res = await fetch("/api/products");
-      if (!res.ok) throw new Error("שגיאה בטעינת מוצרים");
-      const data = await res.json();
-      const result = Array.isArray(data) ? data : data.products;
+    async function fetchData() {
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch("/api/products"),
+        fetch("/api/categories?full=true"),
+      ]);
 
-      // Sort by createdAt descending if exists
-      const sorted = [...result].sort((a, b) => {
-        if (!a.createdAt || !b.createdAt) return 0;
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      });
+      if (!productsRes.ok || !categoriesRes.ok) {
+        alert("שגיאה בטעינת מוצרים או קטגוריות");
+        return;
+      }
 
-      setProducts(sorted);
+      const productsData = await productsRes.json();
+      const categoriesData = await categoriesRes.json();
+
+      const productList: Product[] = Array.isArray(productsData)
+        ? productsData
+        : productsData.products;
+
+      const categoryList: Category[] = Array.isArray(categoriesData)
+        ? categoriesData
+        : categoriesData.categories;
+
+      setProducts(productList.reverse());
+      setCategories(categoryList.reverse());
     }
 
-    async function fetchCategories() {
-      const res = await fetch("/api/categories?full=true");
-      if (!res.ok) throw new Error("שגיאה בטעינת קטגוריות");
-      const data = await res.json();
-      const result = Array.isArray(data) ? data : data.categories;
-
-      const sorted = [...result].sort((a, b) => {
-        if (!a.createdAt || !b.createdAt) return 0;
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      });
-
-      setCategories(sorted);
-    }
-
-    fetchProducts().catch(console.error);
-    fetchCategories().catch(console.error);
+    fetchData().catch(console.error);
   }, []);
+
+  const combinedItems: CombinedItem[] = [
+    ...products.map((p) => ({
+      id: `product-${p.id}`,
+      name: p.name,
+      image: p.image,
+    })),
+    ...categories.map((c) => ({
+      id: `category-${c.id}`,
+      name: c.name,
+      image: c.image,
+    })),
+  ];
+
+  const extractId = (strId: string | number): number => {
+    if (typeof strId === "number") return strId;
+    const parts = strId.split("-");
+    return Number(parts[1]) || 0;
+  };
+
+  const categoryNameToImage = (name: string): string | undefined => {
+    const category = categories.find((c) => c.name === name);
+    return category?.image;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedProductId === "" || selectedCategoryId === "") {
-      alert("אנא בחר מוצר וקטגוריה");
+    if (!selectedItem?.id || !selectedCategoryImage) {
+      alert("אנא בחר מוצר או קטגוריה, וגם קטגוריה");
+      return;
+    }
+
+    const category = categories.find((c) => c.name === selectedCategoryImage);
+    if (!category) {
+      alert("שם קטגוריה שגוי");
       return;
     }
 
@@ -73,8 +101,8 @@ export default function LinkProductToCategory() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: selectedProductId,
-          categoryId: selectedCategoryId,
+          productId: extractId(selectedItem.id),
+          categoryId: category.id,
         }),
       });
 
@@ -84,86 +112,67 @@ export default function LinkProductToCategory() {
       }
 
       alert("המוצר קושר בהצלחה!");
-      setSelectedProductId("");
-      setSelectedCategoryId("");
+      setSelectedItem(null);
+      setSelectedCategoryImage("");
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        alert(err.message);
-      } else {
-        alert("אירעה שגיאה לא ידועה");
-      }
+      alert(err instanceof Error ? err.message : "אירעה שגיאה לא ידועה");
     }
   };
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
+    <div className="max-w-3xl mx-auto p-6 space-y-6">
       <h1 className="text-2xl font-bold text-center">קישור מוצר לקטגוריה</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="product">מוצר</Label>
-          <select
-            id="product"
-            value={selectedProductId}
-            onChange={(e) =>
-              setSelectedProductId(
-                e.target.value === "" ? "" : Number(e.target.value)
-              )
-            }
-            required
-            className="w-full border rounded p-2"
-          >
-            <option value="">בחר מוצר</option>
-            {products.map((p) => (
-              <option
-                key={p.id}
-                value={p.id}
-                title={
-                  p.createdAt
-                    ? `נוצר בתאריך: ${new Date(p.createdAt).toLocaleString(
-                        "he-IL"
-                      )}`
-                    : ""
-                }
-              >
-                {p.name}
-              </option>
-            ))}
-          </select>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Product or Category Selector */}
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <ImageSelector<CombinedItem>
+              items={combinedItems}
+              value={selectedItem?.name || ""}
+              onChange={(item) => setSelectedItem(item)}
+              placeholder="הקלד שם מוצר או קטגוריה"
+              label="מוצר או קטגוריה"
+            />
+          </div>
+          {selectedItem?.image && (
+            <Image
+              src={selectedItem.image}
+              alt="תצוגה"
+              width={120}
+              height={120}
+              className="rounded border object-contain max-h-28"
+            />
+          )}
         </div>
 
-        <div>
-          <Label htmlFor="category">קטגוריה</Label>
-          <select
-            id="category"
-            value={selectedCategoryId}
-            onChange={(e) =>
-              setSelectedCategoryId(
-                e.target.value === "" ? "" : Number(e.target.value)
-              )
-            }
-            required
-            className="w-full border rounded p-2"
-          >
-            <option value="">בחר קטגוריה</option>
-            {categories.map((c) => (
-              <option
-                key={c.id}
-                value={c.id}
-                title={
-                  c.createdAt
-                    ? `נוצר בתאריך: ${new Date(c.createdAt).toLocaleString(
-                        "he-IL"
-                      )}`
-                    : ""
-                }
-              >
-                {c.name}
-              </option>
-            ))}
-          </select>
+        {/* Category Selector */}
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <ImageSelector
+              items={categories.map((c) => ({
+                id: c.id,
+                name: c.name,
+                image: c.image,
+              }))}
+              value={selectedCategoryImage}
+              onChange={(item) => setSelectedCategoryImage(item?.name || "")}
+              placeholder="הקלד שם קטגוריה"
+              label="תמונה של קטגוריה"
+            />
+          </div>
+          {categoryNameToImage(selectedCategoryImage) && (
+            <Image
+              src={categoryNameToImage(selectedCategoryImage)!}
+              alt="תצוגת קטגוריה"
+              width={120}
+              height={120}
+              className="rounded border object-contain max-h-28"
+            />
+          )}
         </div>
 
-        <Button type="submit" className="w-full cursor-pointer">
+        <Button type="submit" className="w-full cursor-pointer mt-4">
           קשר מוצר לקטגוריה
         </Button>
       </form>

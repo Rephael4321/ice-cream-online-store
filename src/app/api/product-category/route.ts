@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db.neon";
+import pool from "@/lib/db";
 
 // Request body type
 type LinkProductToCategoryPayload = {
@@ -78,11 +78,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 4: Insert relation (avoid duplicates using ON CONFLICT)
+    // Step 4: Insert relation with dynamic sort_order
     await pool.query(
-      `INSERT INTO product_categories (product_id, category_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
+      `
+      INSERT INTO product_categories (product_id, category_id, sort_order)
+      SELECT $1, $2, COALESCE(MAX(sort_order), -1) + 1
+      FROM product_categories
+      WHERE category_id = $2
+      ON CONFLICT (product_id, category_id) DO NOTHING
+      `,
       [productId, categoryId]
     );
 
