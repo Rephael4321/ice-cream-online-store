@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
+// GET /api/categories/name/[name]/children
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { name: string } }
+  context: { params: { name: string } }
 ) {
-  const categoryName = decodeURIComponent(params.name);
-
   try {
-    // Step 1: Get category ID by name
+    const { name } = await context.params;
+    const slug = decodeURIComponent(name); // e.g. "ללא-גלוטן"
+
+    // Step 1: Get category ID by matching the slugified name
     const categoryRes = await pool.query<{ id: number }>(
-      "SELECT id FROM categories WHERE name = $1",
-      [categoryName]
+      `SELECT id FROM categories 
+       WHERE LOWER(REPLACE(name, ' ', '-')) = LOWER($1)`,
+      [slug]
     );
 
     if (categoryRes.rowCount === 0) {

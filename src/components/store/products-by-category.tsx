@@ -49,14 +49,14 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const name = decodeURIComponent(params.category.replace(/-/g, " "));
+  const name = decodeURIComponent(params.category);
   return {
     title: `מוצרים מתוך ${name}`,
   };
 }
 
 export default async function ProductsByCategory({ params }: Props) {
-  const slug = decodeURIComponent(params.category.replace(/-/g, " "));
+  const slug = decodeURIComponent(params.category);
 
   // Step 1: Try to fetch subcategories
   const childrenRes = await fetch(

@@ -26,13 +26,13 @@ export async function GET(
   context: { params: { name: string } }
 ) {
   try {
-    const { name } = context.params;
-    const categorySlug = name.toLowerCase();
+    const { name } = await context.params;
+    const slug = decodeURIComponent(name); // ex: 'חלב-מיוחדים'
 
-    // Step 0: Get category ID from name
+    // Step 0: Get category ID by exact match (since names are slugified in DB)
     const categoryRes = await pool.query<{ id: number }>(
-      `SELECT id FROM categories WHERE LOWER(REPLACE(name, ' ', '-')) = LOWER($1)`,
-      [categorySlug]
+      `SELECT id FROM categories WHERE name = $1`,
+      [slug]
     );
 
     if (categoryRes.rowCount === 0) {
@@ -44,7 +44,7 @@ export async function GET(
 
     const categoryId = categoryRes.rows[0].id;
 
-    // Step 1: Fetch products from that specific category only
+    // Step 1: Fetch products in the category
     const result = await pool.query<ProductRow>(
       `SELECT 
          p.id, 
@@ -69,7 +69,7 @@ export async function GET(
       return NextResponse.json({ products: [] });
     }
 
-    // Step 2: Fetch category-based sales
+    // Step 2: Fetch sale prices from all sale categories linked to these products
     const productIds = products.map((p) => p.id);
     const placeholders = productIds.map((_, i) => `$${i + 1}`).join(", ");
 
@@ -89,7 +89,7 @@ export async function GET(
 
     const categorySales = categorySalesResult.rows;
 
-    // Step 3: Map sales
+    // Step 3: Build a sale map (best sale per product)
     const saleMap = new Map<
       number,
       {
@@ -113,11 +113,11 @@ export async function GET(
       }
     }
 
-    // Step 4: Build final product response
+    // Step 4: Build response
     const finalProducts = products.map((product) => {
-      let sale;
-
       const categorySale = saleMap.get(product.id);
+      let sale = null;
+
       if (categorySale) {
         sale = {
           amount: categorySale.amount,
@@ -150,7 +150,7 @@ export async function GET(
 
     return NextResponse.json({ products: finalProducts });
   } catch (err) {
-    console.error("Error in /api/categories/name/[name]/products:", err);
+    console.error("❌ Error in /api/categories/name/[name]/products:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
     return NextResponse.json({ error }, { status: 500 });

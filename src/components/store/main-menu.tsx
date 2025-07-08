@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 export default async function MainMenu() {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`, // ✅ fetch only root categories
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`,
     {
       next: { revalidate: 3600 },
     }
