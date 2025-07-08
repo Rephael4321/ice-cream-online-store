@@ -37,9 +37,8 @@ export default function CategoryProducts({ id }: { id: string }) {
   useEffect(() => {
     if (!id) return;
     fetch(`/api/categories/${id}/products`, {
-      next: { revalidate: 3600 },
-      cache: "force-cache",
-    } as any)
+      cache: "no-store",
+    })
       .then((res) => res.json())
       .then((data) => setProducts(data.products))
       .finally(() => setLoading(false));

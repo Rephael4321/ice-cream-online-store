@@ -38,7 +38,8 @@ export const dynamicParams = true;
 
 export async function generateStaticParams() {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories?full=true`
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories?full=true`,
+    { cache: "no-store" }
   );
   const data = await res.json();
 
@@ -60,9 +61,7 @@ export default async function ProductsByCategory({ params }: Props) {
   // Step 1: Try to fetch subcategories
   const childrenRes = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
-    {
-      next: { revalidate: 3600 },
-    }
+    { cache: "no-store" }
   );
 
   const childrenData = await childrenRes.json();
@@ -112,9 +111,7 @@ export default async function ProductsByCategory({ params }: Props) {
   // Step 2: Fallback to products
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
-    {
-      next: { revalidate: 3600 },
-    }
+    { cache: "no-store" }
   );
 
   if (!res.ok) {
@@ -123,8 +120,6 @@ export default async function ProductsByCategory({ params }: Props) {
 
   const data = await res.json();
   const products: Product[] = data.products || [];
-  console.log("##########################");
-  console.log(products);
 
   if (products.length === 0) {
     return <div className="p-4">לא נמצאו מוצרים בקטגוריה.</div>;
