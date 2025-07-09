@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { toast } from "sonner";
 
 type Order = {
   orderId: number;
@@ -146,7 +147,17 @@ export default function OrderDetails() {
       <div className="border p-4 rounded shadow">
         <h1 className="text-xl font-bold mb-2">הזמנה #{order.orderId}</h1>
         <div className="flex items-center gap-4">
-          <p>טלפון: {order.phone}</p>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(order.phone);
+              toast.success("📋 מספר הטלפון הועתק");
+            }}
+            className="underline text-blue-700 hover:text-blue-900 cursor-pointer"
+            title="העתק מספר טלפון"
+          >
+            טלפון: {order.phone}
+          </button>
+
           <a
             href={`tel:${order.phone}`}
             className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
