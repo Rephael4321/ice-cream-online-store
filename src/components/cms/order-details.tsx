@@ -145,7 +145,27 @@ export default function OrderDetails() {
 
       <div className="border p-4 rounded shadow">
         <h1 className="text-xl font-bold mb-2">הזמנה #{order.orderId}</h1>
-        <p>טלפון: {order.phone}</p>
+        <div className="flex items-center gap-4">
+          <p>טלפון: {order.phone}</p>
+          <a
+            href={`tel:${order.phone}`}
+            className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
+          >
+            📞 התקשר
+          </a>
+          <a
+            href={`https://wa.me/${order.phone
+              .replace(/[^0-9]/g, "")
+              .replace(/^0/, "972")}?text=${encodeURIComponent(
+              "שלום, אני פונה אליך לגבי ההזמנה שביצעת אצלנו."
+            )}`}
+            rel="noopener noreferrer"
+            className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
+          >
+            💬 וואטסאפ
+          </a>
+        </div>
+
         <p>
           תאריך:{" "}
           {isNaN(new Date(order.createdAt).getTime())
