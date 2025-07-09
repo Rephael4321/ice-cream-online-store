@@ -6,6 +6,7 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
+  TouchSensor,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -44,7 +45,15 @@ export default function CategoryProducts({ id }: { id: string }) {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    })
+  );
 
   function handleDragEnd(event: any) {
     const { active, over } = event;
@@ -123,7 +132,7 @@ function SortableProduct({ product }: { product: Product }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="w-full border p-3 rounded shadow flex items-center gap-4 bg-white cursor-move"
+      className="w-full border p-3 rounded shadow flex items-center gap-4 bg-white cursor-move touch-none"
     >
       <Image
         src={product.image}
