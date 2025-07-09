@@ -5,19 +5,17 @@ import { Metadata } from "next";
 interface Category {
   id: number;
   name: string;
-  type: "brand" | "collection" | "sale";
+  type: "collection" | "sale"; // Only valid types per schema
   image?: string | null;
   description?: string | null;
 }
 
 const fallbackImageMap: Record<string, string> = {
-  brand: "/ice-scream.png",
   collection: "/popsicle.png",
   sale: "/sale.png",
 };
 
 const colorMap: Record<string, string> = {
-  brand: "text-pink-700",
   collection: "text-blue-600",
   sale: "text-green-600",
 };
@@ -28,15 +26,47 @@ export const metadata: Metadata = {
 };
 
 export default async function MainMenu() {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`,
-    {
-      next: { revalidate: 3600 },
-    }
-  );
+  let categories: Category[] = [];
 
-  const data = await res.json();
-  const categories: Category[] = data.categories || [];
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`,
+      {
+        next: { revalidate: 3600 },
+      }
+    );
+
+    const contentType = res.headers.get("content-type") || "";
+
+    if (!res.ok || !contentType.includes("application/json")) {
+      const raw = await res.text();
+      console.warn("⚠️ Non-JSON response received:", raw.slice(0, 200));
+      throw new Error("Invalid API response");
+    }
+
+    const data = await res.json();
+    categories = data.categories || [];
+  } catch (err) {
+    console.error("❌ Failed to load categories, using fallback:", err);
+
+    // Provide a dummy fallback so build doesn't fail
+    categories = [
+      {
+        id: 0,
+        name: "מבצעי קיץ",
+        type: "sale",
+        image: null,
+        description: "הנחות מיוחדות למוצרים נבחרים",
+      },
+      {
+        id: 1,
+        name: "קטלוג כללי",
+        type: "collection",
+        image: null,
+        description: "מבחר מוצרים קבוע",
+      },
+    ];
+  }
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 px-4 py-12">
