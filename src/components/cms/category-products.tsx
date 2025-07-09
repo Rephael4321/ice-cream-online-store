@@ -130,12 +130,13 @@ function SortableProduct({ product }: { product: Product }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="w-full border p-2 rounded shadow flex items-center gap-2 bg-white touch-none"
+      className="w-full border p-2 rounded shadow flex items-center gap-2 bg-white"
     >
+      {/* Drag handle only */}
       <div
         {...attributes}
         {...listeners}
-        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 cursor-grab active:cursor-grabbing"
+        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 cursor-grab active:cursor-grabbing touch-none"
         title="גרור להזזה"
       >
         ≡
