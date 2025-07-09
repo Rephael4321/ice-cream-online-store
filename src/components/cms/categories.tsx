@@ -85,12 +85,12 @@ export default function Categories() {
           <thead className="bg-gray-100 text-gray-700">
             <tr>
               <th className="px-4 py-2 border-b">תמונה</th>
+              <th className="px-4 py-2 border-b">מוצרים</th>
               <th className="px-4 py-2 border-b">שם</th>
               <th className="px-4 py-2 border-b">סוג</th>
               <th className="px-4 py-2 border-b">תיאור</th>
               <th className="px-4 py-2 border-b">אב</th>
               <th className="px-4 py-2 border-b">בתפריט?</th>
-              <th className="px-4 py-2 border-b">מוצרים</th>
             </tr>
           </thead>
           <tbody>
@@ -111,6 +111,18 @@ export default function Categories() {
                     />
                   )}
                 </td>
+                <td className="px-4 py-2 border-t text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/categories/${cat.id}/products`);
+                    }}
+                  >
+                    הצג מוצרים
+                  </Button>
+                </td>
                 <td className="px-4 py-2 border-t">{cat.name}</td>
                 <td className="px-4 py-2 border-t">
                   {cat.type === "sale" ? "מבצע" : "אוסף"}
@@ -127,18 +139,6 @@ export default function Categories() {
                   ) : (
                     <span className="text-red-500 font-bold">✗</span>
                   )}
-                </td>
-                <td className="px-4 py-2 border-t text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/categories/${cat.id}/products`);
-                    }}
-                  >
-                    הצג מוצרים
-                  </Button>
                 </td>
               </tr>
             ))}

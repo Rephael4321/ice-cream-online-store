@@ -130,23 +130,31 @@ function SortableProduct({ product }: { product: Product }) {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className="w-full border p-3 rounded shadow flex items-center gap-4 bg-white cursor-move touch-none"
+      className="w-full border p-2 rounded shadow flex items-center gap-2 bg-white touch-none"
     >
+      <div
+        {...attributes}
+        {...listeners}
+        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 cursor-grab active:cursor-grabbing"
+        title="גרור להזזה"
+      >
+        ≡
+      </div>
+
       <Image
         src={product.image}
         alt={product.name}
-        width={60}
-        height={60}
-        className="rounded object-contain w-16 h-16"
+        width={32}
+        height={32}
+        className="rounded object-contain w-8 h-8"
       />
+
       <div className="flex-1">
-        <div className="font-semibold">{product.name}</div>
-        <div className="text-sm text-gray-600">
+        <div className="font-medium text-sm">{product.name}</div>
+        <div className="text-xs text-gray-600">
           ₪{Number(product.price).toFixed(2)}
           {product.sale_price !== null && (
-            <span className="ml-2 text-green-600 font-bold">
+            <span className="ml-2 text-green-600 font-semibold">
               מבצע: ₪{Number(product.sale_price).toFixed(2)} (
               {product.sale_quantity} יח')
             </span>
