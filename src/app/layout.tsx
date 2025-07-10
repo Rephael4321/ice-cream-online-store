@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "המפנק",
+  title: "המפנק - גלידות עד הבית",
   description: "גלידות, ארטיקים, מאגדות, קאסטות ועד במחירים אטרקטיביים",
   icons: {
     icon: "/favicon.ico",
