@@ -1,35 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-// Order payload types
-type OrderItemInput = {
-  productId: number | null;
-  productName: string;
-  productImage?: string | null;
-  quantity: number;
-  unitPrice: number;
-  saleQuantity?: number | null;
-  salePrice?: number | null;
-};
-
-type OrderInput = {
-  phone: string;
-  items: OrderItemInput[];
-};
-
-type OrderSummaryRow = {
-  orderId: number;
-  phone: string;
-  createdAt: string;
-  updatedAt: string;
-  itemCount: number;
-};
-
-// POST /api/orders
 export async function POST(req: NextRequest) {
   const client = await pool.connect();
   try {
-    const body: OrderInput = await req.json();
+    const body = await req.json();
     const { phone, items } = body;
 
     if (!phone || !Array.isArray(items) || items.length === 0) {
@@ -41,14 +16,14 @@ export async function POST(req: NextRequest) {
 
     await client.query("BEGIN");
 
-    // 1. Insert order
+    // 1. Insert order (temporary – phone kept until client linking is done)
     const orderResult = await client.query<{ id: number }>(
       "INSERT INTO orders (phone) VALUES ($1) RETURNING id",
       [phone]
     );
     const orderId = orderResult.rows[0].id;
 
-    // 2. Insert order items
+    // 2. Insert items
     for (const item of items) {
       const {
         productId,
@@ -98,11 +73,10 @@ export async function GET(req: NextRequest) {
     let whereClause = "";
 
     if (from && to) {
-      // Convert local (Asia/Jerusalem) dates to UTC ranges
-      const fromUTC = new Date(`${from}T00:00:00+03:00`).toISOString(); // e.g., 2025-07-01T21:00:00Z
+      const fromUTC = new Date(`${from}T00:00:00+03:00`).toISOString();
       const toUTC = new Date(`${to}T00:00:00+03:00`);
       toUTC.setDate(toUTC.getDate() + 1);
-      const toUTCString = toUTC.toISOString(); // e.g., 2025-07-02T21:00:00Z
+      const toUTCString = toUTC.toISOString();
 
       whereClause = `WHERE o.created_at >= $1 AND o.created_at < $2`;
       values.push(fromUTC, toUTCString);
@@ -112,16 +86,19 @@ export async function GET(req: NextRequest) {
       `
       SELECT
         o.id AS "orderId",
-        o.phone,
         o.is_paid AS "isPaid",
         o.is_ready AS "isReady",
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
-        COUNT(oi.id) AS "itemCount"
+        COUNT(oi.id) AS "itemCount",
+        c.name AS "clientName",
+        c.address AS "clientAddress",
+        c.phone AS "clientPhone"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN clients c ON c.id = o.client_id
       ${whereClause}
-      GROUP BY o.id
+      GROUP BY o.id, c.id
       ORDER BY o.created_at DESC
       `,
       values

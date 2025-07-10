@@ -9,6 +9,8 @@ import { toast } from "sonner";
 type Order = {
   orderId: number;
   phone: string;
+  name: string;
+  address: string;
   createdAt: string;
   isPaid: boolean;
   isReady: boolean;
@@ -31,6 +33,10 @@ export default function OrderDetails() {
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newAddress, setNewAddress] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -70,6 +76,22 @@ export default function OrderDetails() {
     setOrder((prev) => prev && { ...prev, ...data });
   };
 
+  const handleUpdateClient = async () => {
+    if (!order) return;
+
+    const updated = await fetch(`/api/orders/${order.orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName, address: newAddress }),
+    });
+
+    const data = await updated.json();
+    setOrder((prev) => prev && { ...prev, ...data });
+
+    toast.success("📝 הפרטים עודכנו בהצלחה");
+    setEditOpen(false);
+  };
+
   if (loading) return <p className="p-6">טוען...</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
@@ -88,12 +110,9 @@ export default function OrderDetails() {
       item.salePrice !== null &&
       item.quantity >= item.saleQuantity
     ) {
-      const saleQuantity = item.saleQuantity;
-      const salePrice = item.salePrice;
-
-      const bundles = Math.floor(item.quantity / saleQuantity);
-      const remainder = item.quantity % saleQuantity;
-      finalTotal = bundles * salePrice + remainder * item.unitPrice;
+      const bundles = Math.floor(item.quantity / item.saleQuantity);
+      const remainder = item.quantity % item.saleQuantity;
+      finalTotal = bundles * item.salePrice + remainder * item.unitPrice;
       discount = baseTotal - finalTotal;
     }
 
@@ -110,12 +129,10 @@ export default function OrderDetails() {
             className="rounded border"
           />
         )}
-
         <div>
           <p className="font-semibold">{item.productName}</p>
           <p>כמות: {item.quantity}</p>
           <p>מחיר רגיל: {item.unitPrice.toFixed(2)} ש״ח</p>
-
           {item.salePrice !== null &&
             item.saleQuantity !== null &&
             item.quantity >= item.saleQuantity && (
@@ -129,7 +146,6 @@ export default function OrderDetails() {
                 </p>
               </>
             )}
-
           <p className="font-bold">סה״כ למוצר: {finalTotal.toFixed(2)} ש״ח</p>
         </div>
       </li>
@@ -146,7 +162,11 @@ export default function OrderDetails() {
 
       <div className="border p-4 rounded shadow">
         <h1 className="text-xl font-bold mb-2">הזמנה #{order.orderId}</h1>
-        <div className="flex items-center gap-4">
+
+        <p>שם: {order.name}</p>
+        <p>כתובת: {order.address}</p>
+        <p>
+          טלפון:&nbsp;
           <button
             onClick={() => {
               navigator.clipboard.writeText(order.phone);
@@ -155,34 +175,50 @@ export default function OrderDetails() {
             className="underline text-blue-700 hover:text-blue-900 cursor-pointer"
             title="העתק מספר טלפון"
           >
-            טלפון: {order.phone}
+            {order.phone}
           </button>
+        </p>
 
-          <a
-            href={`tel:${order.phone}`}
-            className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
+        {order.phone && (
+          <div className="flex items-center gap-4 mt-2">
+            <a
+              href={`tel:${order.phone}`}
+              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
+            >
+              📞 התקשר
+            </a>
+            <a
+              href={`https://wa.me/${order.phone
+                .replace(/[^0-9]/g, "")
+                .replace(/^0/, "972")}?text=${encodeURIComponent("")}`}
+              rel="noopener noreferrer"
+              className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
+            >
+              💬 וואטסאפ
+            </a>
+          </div>
+        )}
+
+        <div className="mt-2">
+          <button
+            onClick={() => {
+              setNewName(order.name ?? "");
+              setNewAddress(order.address ?? "");
+              setEditOpen(true);
+            }}
+            className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
           >
-            📞 התקשר
-          </a>
-          <a
-            href={`https://wa.me/${order.phone
-              .replace(/[^0-9]/g, "")
-              .replace(/^0/, "972")}?text=${encodeURIComponent(
-              "שלום, אני פונה אליך לגבי ההזמנה שביצעת אצלנו."
-            )}`}
-            rel="noopener noreferrer"
-            className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
-          >
-            💬 וואטסאפ
-          </a>
+            ✏️ ערוך פרטי לקוח
+          </button>
         </div>
 
-        <p>
+        <p className="mt-2">
           תאריך:{" "}
           {isNaN(new Date(order.createdAt).getTime())
             ? order.createdAt
             : new Date(order.createdAt).toLocaleString("he-IL")}
         </p>
+
         <div className="mt-4 flex gap-4 flex-wrap">
           <button
             onClick={() => toggleStatus("isPaid")}
@@ -223,6 +259,55 @@ export default function OrderDetails() {
           </p>
         </div>
       </div>
+
+      {editOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setEditOpen(false)} // Close on backdrop click
+        >
+          <div
+            className="bg-white p-6 rounded shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()} // Prevent modal itself from closing
+          >
+            <h2 className="text-lg font-bold mb-4">עריכת פרטי לקוח</h2>
+
+            <label className="block mb-2">
+              שם:
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="mt-1 w-full border p-2 rounded"
+              />
+            </label>
+
+            <label className="block mb-4">
+              כתובת:
+              <input
+                type="text"
+                value={newAddress}
+                onChange={(e) => setNewAddress(e.target.value)}
+                className="mt-1 w-full border p-2 rounded"
+              />
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setEditOpen(false)}
+                className="px-3 py-1 rounded bg-gray-300 hover:bg-gray-400"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleUpdateClient}
+                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                שמור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

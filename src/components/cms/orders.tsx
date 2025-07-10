@@ -7,11 +7,13 @@ import "react-datepicker/dist/react-datepicker.css";
 
 type Order = {
   orderId: number;
-  phone: string;
   createdAt: string;
   itemCount: number;
   isPaid: boolean;
   isReady: boolean;
+  clientName: string | null;
+  clientAddress: string | null;
+  clientPhone: string | null;
 };
 
 export default function Orders() {
@@ -19,10 +21,8 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Get Sunday–Saturday for current week
   const getCurrentWeekRange = () => {
     const now = new Date();
-
     const sunday = new Date(now);
     sunday.setDate(now.getDate() - now.getDay());
 
@@ -52,13 +52,11 @@ export default function Orders() {
     setLoading(false);
   };
 
-  // Fetch current week on mount
   useEffect(() => {
     const { from, to } = getCurrentWeekRange();
     fetchOrders(from, to);
   }, []);
 
-  // Fetch specific day when date selected
   useEffect(() => {
     if (selectedDate === null) {
       const { from, to } = getCurrentWeekRange();
@@ -73,7 +71,6 @@ export default function Orders() {
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">📦 הזמנות</h1>
 
-      {/* Calendar Filter */}
       <div className="mb-6 flex items-center gap-4">
         <label className="font-semibold">סנן לפי תאריך:</label>
         <DatePicker
@@ -105,7 +102,9 @@ export default function Orders() {
               >
                 <div>
                   <p className="font-bold">הזמנה #{order.orderId}</p>
-                  <p>טלפון: {order.phone}</p>
+                  <p>לקוח: {order.clientName}</p>
+                  <p>כתובת: {order.clientAddress}</p>
+                  <p>טלפון: {order.clientPhone || "—"}</p>
                   <p>תאריך: {formatted}</p>
                   <p>כמות מוצרים: {order.itemCount}</p>
                   <p>שולם: {order.isPaid ? "✔️" : "❌"}</p>

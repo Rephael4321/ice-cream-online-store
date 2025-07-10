@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-// DB types based on schema
 type OrderRow = {
   orderId: number;
-  phone: string;
+  clientPhone: string;
+  clientName: string;
+  clientAddress: string;
   createdAt: string;
   updatedAt: string;
   isPaid: boolean;
@@ -33,17 +34,19 @@ export async function GET(
   }
 
   try {
-    // Get the order
     const orderResult = await pool.query<OrderRow>(
       `SELECT 
-         id AS "orderId", 
-         phone, 
-         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt", 
-         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
-         is_paid AS "isPaid",
-         is_ready AS "isReady"
-       FROM orders
-       WHERE id = $1`,
+         o.id AS "orderId",
+         c.phone AS "clientPhone",
+         c.name AS "clientName",
+         c.address AS "clientAddress",
+         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
+         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
+         o.is_paid AS "isPaid",
+         o.is_ready AS "isReady"
+       FROM orders o
+       LEFT JOIN clients c ON o.client_id = c.id
+       WHERE o.id = $1`,
       [orderId]
     );
 
@@ -52,7 +55,6 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Get the items
     const itemsResult = await pool.query<OrderItemRow>(
       `SELECT
          product_id     AS "productId",
@@ -69,7 +71,19 @@ export async function GET(
       [orderId]
     );
 
-    return NextResponse.json({ order, items: itemsResult.rows });
+    return NextResponse.json({
+      order: {
+        orderId: order.orderId,
+        phone: order.clientPhone,
+        name: order.clientName,
+        address: order.clientAddress,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        isPaid: order.isPaid,
+        isReady: order.isReady,
+      },
+      items: itemsResult.rows,
+    });
   } catch (err: unknown) {
     console.error("Error fetching order:", err);
     const error = err instanceof Error ? err.message : "Failed to fetch order";
@@ -87,23 +101,54 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const { isPaid, isReady } = body;
+  const { isPaid, isReady, name, address } = body;
 
   try {
-    const result = await pool.query(
+    const orderResult = await pool.query(
       `UPDATE orders
        SET is_paid = COALESCE($1, is_paid),
            is_ready = COALESCE($2, is_ready)
        WHERE id = $3
-       RETURNING is_paid AS "isPaid", is_ready AS "isReady"`,
+       RETURNING id, client_id, is_paid AS "isPaid", is_ready AS "isReady"`,
       [isPaid, isReady, orderId]
     );
 
-    return NextResponse.json(result.rows[0]);
+    if (orderResult.rowCount === 0) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const {
+      client_id,
+      isPaid: updatedIsPaid,
+      isReady: updatedIsReady,
+    } = orderResult.rows[0];
+
+    if (name || address) {
+      await pool.query(
+        `UPDATE clients
+         SET name = COALESCE($1, name),
+             address = COALESCE($2, address)
+         WHERE id = $3`,
+        [name, address, client_id]
+      );
+    }
+
+    const clientResult = await pool.query(
+      `SELECT name, address, phone FROM clients WHERE id = $1`,
+      [client_id]
+    );
+
+    return NextResponse.json({
+      isPaid: updatedIsPaid,
+      isReady: updatedIsReady,
+      name: clientResult.rows[0].name,
+      address: clientResult.rows[0].address,
+      phone: clientResult.rows[0].phone,
+    });
   } catch (err) {
-    console.error("Error updating status:", err);
+    console.error("Error updating order:", err);
     return NextResponse.json(
-      { error: "Failed to update status" },
+      { error: "Failed to update order" },
       { status: 500 }
     );
   }

@@ -75,9 +75,20 @@ export async function initializeTables() {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address TEXT,
+        phone VARCHAR(20),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem',
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem'
+      );
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
-        phone VARCHAR(20) NOT NULL,
+        client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
         is_paid BOOLEAN DEFAULT FALSE,
         is_ready BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem',
@@ -110,6 +121,7 @@ export async function initializeTables() {
       "product_categories",
       "orders",
       "order_items",
+      "clients",
     ];
 
     for (const table of tables) {
@@ -132,11 +144,15 @@ export async function initializeTables() {
     await connection.query(`
       CREATE OR REPLACE VIEW orders_local AS
       SELECT
-        id,
-        phone,
-        created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-        updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
-      FROM orders;
+        o.id,
+        o.client_id,
+        c.name AS client_name,
+        c.phone AS client_phone,
+        c.address AS client_address,
+        o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+        o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
+      FROM orders o
+      LEFT JOIN clients c ON o.client_id = c.id;
 
       CREATE OR REPLACE VIEW products_local AS
       SELECT
@@ -146,6 +162,7 @@ export async function initializeTables() {
       FROM products;
     `);
 
+    // === Sync sequences ===
     await connection.query(`
       DO $$
       DECLARE
@@ -166,12 +183,12 @@ export async function initializeTables() {
             pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
           WHERE 
             c.relkind = 'S'
-      LOOP
-        EXECUTE format(
-          'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I), 0))',
-          rec.seqname, rec.columnname, rec.tablename
-        );
-      END LOOP;
+        LOOP
+          EXECUTE format(
+            'SELECT setval(%L, COALESCE((SELECT MAX(%I) FROM %I), 0))',
+            rec.seqname, rec.columnname, rec.tablename
+          );
+        END LOOP;
       END$$;
     `);
 
