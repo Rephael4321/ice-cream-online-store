@@ -12,12 +12,12 @@ export default function CmsNavbar() {
       >
         <Image
           src="/favicon_io/android-chrome-192x192.png"
-          alt="מוצרי שיער"
+          alt="המפנק"
           width={32}
           height={32}
           sizes="(max-width: 640px) 32px, (max-width: 1024px) 64px, 128px"
         />
-        מוצרי שיער
+        המפנק
       </Link>
 
       {/* Nav Links */}

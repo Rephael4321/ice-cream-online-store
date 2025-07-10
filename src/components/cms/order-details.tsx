@@ -11,7 +11,7 @@ type Order = {
   phone: string;
   createdAt: string;
   isPaid: boolean;
-  isDelivered: boolean;
+  isReady: boolean;
 };
 
 type Item = {
@@ -55,7 +55,7 @@ export default function OrderDetails() {
       .catch(() => setLoading(false));
   }, [id]);
 
-  const toggleStatus = async (field: "isPaid" | "isDelivered") => {
+  const toggleStatus = async (field: "isPaid" | "isReady") => {
     if (!order) return;
 
     const updated = await fetch(`/api/orders/${order.orderId}`, {
@@ -195,14 +195,14 @@ export default function OrderDetails() {
             {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
           </button>
           <button
-            onClick={() => toggleStatus("isDelivered")}
+            onClick={() => toggleStatus("isReady")}
             className={`px-3 py-1 rounded text-white cursor-pointer transition ${
-              order.isDelivered
+              order.isReady
                 ? "bg-green-600 hover:bg-green-700"
                 : "bg-red-500 hover:bg-red-600"
             }`}
           >
-            {order.isDelivered ? "נמסר 📦" : "לא נמסר ⛔"}
+            {order.isReady ? "הזמנה מוכנה ✅" : "הזמנה חדשה 🆕"}
           </button>
         </div>
       </div>

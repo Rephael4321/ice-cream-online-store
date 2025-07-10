@@ -11,7 +11,7 @@ type Order = {
   createdAt: string;
   itemCount: number;
   isPaid: boolean;
-  isDelivered: boolean;
+  isReady: boolean;
 };
 
 export default function Orders() {
@@ -109,7 +109,7 @@ export default function Orders() {
                   <p>תאריך: {formatted}</p>
                   <p>כמות מוצרים: {order.itemCount}</p>
                   <p>שולם: {order.isPaid ? "✔️" : "❌"}</p>
-                  <p>נמסר: {order.isDelivered ? "✔️" : "❌"}</p>
+                  <p>מוכן: {order.isReady ? "✔️" : "❌"}</p>
                 </div>
                 <Link
                   href={`/orders/${order.orderId}`}

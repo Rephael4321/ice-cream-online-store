@@ -8,7 +8,7 @@ type OrderRow = {
   createdAt: string;
   updatedAt: string;
   isPaid: boolean;
-  isDelivered: boolean;
+  isReady: boolean;
 };
 
 type OrderItemRow = {
@@ -41,7 +41,7 @@ export async function GET(
          created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt", 
          updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
          is_paid AS "isPaid",
-         is_delivered AS "isDelivered"
+         is_ready AS "isReady"
        FROM orders
        WHERE id = $1`,
       [orderId]
@@ -87,16 +87,16 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const { isPaid, isDelivered } = body;
+  const { isPaid, isReady } = body;
 
   try {
     const result = await pool.query(
       `UPDATE orders
        SET is_paid = COALESCE($1, is_paid),
-           is_delivered = COALESCE($2, is_delivered)
+           is_ready = COALESCE($2, is_ready)
        WHERE id = $3
-       RETURNING is_paid AS "isPaid", is_delivered AS "isDelivered"`,
-      [isPaid, isDelivered, orderId]
+       RETURNING is_paid AS "isPaid", is_ready AS "isReady"`,
+      [isPaid, isReady, orderId]
     );
 
     return NextResponse.json(result.rows[0]);
