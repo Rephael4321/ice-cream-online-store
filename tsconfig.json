@@ -18,10 +18,19 @@
         "name": "next"
       }
     ],
+    "types": ["vitest/globals"],
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/(store)/main-menu", "src/scripts/generate-token.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/app/(store)/main-menu",
+    "src/scripts/generate-token.ts",
+    "tests"
+  ],
   "exclude": ["node_modules"]
 }

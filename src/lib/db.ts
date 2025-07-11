@@ -1,15 +1,32 @@
-// lib/pg-db.neon.ts
+// lib/db.ts
 import { Pool } from "pg";
 
-const shouldUseSSL = process.env.PG_USE_SSL === "true";
+// Fallbacks to avoid crashing if values are missing
+const {
+  PG_HOST = "localhost",
+  PG_PORT = "5432",
+  PG_USER = "postgres",
+  PG_PASSWORD = "",
+  PG_DATABASE = "postgres",
+  PG_USE_SSL = "false",
+} = process.env;
+
+const shouldUseSSL = PG_USE_SSL === "true";
 
 const pgPool = new Pool({
-  host: process.env.PG_HOST,
-  port: Number(process.env.PG_PORT),
-  user: process.env.PG_USER,
-  password: process.env.PG_PASSWORD,
-  database: process.env.PG_DATABASE,
+  host: PG_HOST,
+  port: Number(PG_PORT),
+  user: PG_USER,
+  password: PG_PASSWORD,
+  database: PG_DATABASE,
   ssl: shouldUseSSL ? { rejectUnauthorized: false } : false,
 });
+
+// 🛡 SAFETY GUARD — throws if test is connected to dev DB
+if (process.env.NODE_ENV === "test" && PG_DATABASE === "neondb") {
+  throw new Error(
+    "❌ Test environment is connected to the DEV database! Aborting."
+  );
+}
 
 export default pgPool;
