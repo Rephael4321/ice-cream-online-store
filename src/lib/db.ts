@@ -19,12 +19,13 @@ if (!PG_HOST || !PG_PORT || !PG_USER || !PG_PASSWORD || !PG_DATABASE) {
 
 const shouldUseSSL = PG_USE_SSL === "true";
 
-console.log("🔐 Connecting to PostgreSQL with:");
-console.log(`   Host:     ${PG_HOST}`);
-console.log(`   Port:     ${PG_PORT}`);
-console.log(`   User:     ${PG_USER}`);
-console.log(`   Database: ${PG_DATABASE}`);
-console.log(`   SSL:      ${shouldUseSSL}`);
+// === Use for debugging purposes
+// console.log("🔐 Connecting to PostgreSQL with:");
+// console.log(`   Host:     ${PG_HOST}`);
+// console.log(`   Port:     ${PG_PORT}`);
+// console.log(`   User:     ${PG_USER}`);
+// console.log(`   Database: ${PG_DATABASE}`);
+// console.log(`   SSL:      ${shouldUseSSL}`);
 
 if (NODE_ENV === "test" && PG_DATABASE === "neondb") {
   throw new Error(

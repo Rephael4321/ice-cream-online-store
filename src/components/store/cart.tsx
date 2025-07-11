@@ -12,6 +12,8 @@ export default function Cart() {
     removeGroupedCategory,
     clearCart,
     getGroupedCart,
+    increaseQuantity,
+    decreaseQuantity,
   } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -206,7 +208,21 @@ export default function Cart() {
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold">{item.productName}</p>
-                      <p>כמות: {item.quantity}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          onClick={() => decreaseQuantity(item.id)}
+                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                        >
+                          −
+                        </button>
+                        <span className="w-6 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => increaseQuantity(item.id)}
+                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
                       <p>מחיר: {finalPrice.toFixed(2)} ש״ח</p>
                       {discount > 0 && (
                         <p className="text-green-600 text-xs">

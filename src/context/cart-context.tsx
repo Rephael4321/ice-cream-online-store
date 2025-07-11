@@ -49,6 +49,8 @@ type CartContextType = {
   clearCart: () => void;
   removeGroupedCategory: (categoryId: number) => void;
   getGroupedCart: () => GroupedCartItem[];
+  increaseQuantity: (productId: number) => void;
+  decreaseQuantity: (productId: number) => void;
 };
 
 // === Context Setup ===
@@ -167,6 +169,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCartItems([]);
   }
 
+  function increaseQuantity(productId: number) {
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
+      )
+    );
+  }
+
+  function decreaseQuantity(productId: number) {
+    setCartItems(
+      (prev) =>
+        prev
+          .map((item) =>
+            item.id === productId && item.quantity > 1
+              ? { ...item, quantity: item.quantity - 1 }
+              : item
+          )
+          .filter((item) => item.quantity > 0) // remove if quantity reaches 0
+    );
+  }
+
   if (!hydrated) return null;
 
   return (
@@ -178,6 +201,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         removeGroupedCategory,
         getGroupedCart: () => groupCartItems(cartItems),
+        increaseQuantity,
+        decreaseQuantity,
       }}
     >
       {children}
