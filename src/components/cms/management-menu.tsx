@@ -38,6 +38,11 @@ const services = [
     description: "צפה במוצרים לפי הצעת מכירה.",
     slug: "sale-groups",
   },
+  {
+    name: "לקוחות",
+    description: "ממשק צפייה וניהול לקוחות.",
+    slug: "clients",
+  },
   // {
   //   name: "תמונות בשימוש",
   //   description: "סקירה של כל התמונות המנוהלות במערכת.",
