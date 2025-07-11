@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,6 +14,7 @@ type Order = {
   createdAt: string;
   isPaid: boolean;
   isReady: boolean;
+  isTest?: boolean;
 };
 
 type Item = {
@@ -38,14 +39,39 @@ export default function OrderDetails() {
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
 
+  const [clickCount, setClickCount] = useState(0);
+  const clickTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const markAsTest = async (flag: boolean) => {
+    if (!order) return;
+    const res = await fetch(`/api/orders/${order.orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isTest: flag }),
+    });
+
+    const data = await res.json();
+    setOrder((prev) => prev && { ...prev, ...data });
+
+    toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
+  };
+
+  const handleTitleClick = () => {
+    setClickCount((prev) => prev + 1);
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => setClickCount(0), 1000);
+    if (clickCount + 1 >= 5) {
+      setClickCount(0);
+      markAsTest(true);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
-
     fetch(`/api/orders/${id}`)
       .then((res) => res.json())
       .then((data: { order: Order; items: Item[] }) => {
         setOrder(data.order);
-
         const parsedItems = data.items.map((item) => ({
           ...item,
           unitPrice: parseFloat(item.unitPrice as unknown as string),
@@ -54,7 +80,6 @@ export default function OrderDetails() {
               ? parseFloat(item.salePrice as unknown as string)
               : null,
         }));
-
         setItems(parsedItems);
         setLoading(false);
       })
@@ -63,33 +88,43 @@ export default function OrderDetails() {
 
   const toggleStatus = async (field: "isPaid" | "isReady") => {
     if (!order) return;
-
     const updated = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        [field]: !order[field],
-      }),
+      body: JSON.stringify({ [field]: !order[field] }),
     });
-
     const data = await updated.json();
     setOrder((prev) => prev && { ...prev, ...data });
   };
 
   const handleUpdateClient = async () => {
     if (!order) return;
-
     const updated = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName, address: newAddress }),
     });
-
     const data = await updated.json();
     setOrder((prev) => prev && { ...prev, ...data });
-
     toast.success("📝 הפרטים עודכנו בהצלחה");
     setEditOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!order) return;
+    const confirmDelete = confirm("האם אתה בטוח שברצונך למחוק את ההזמנה?");
+    if (!confirmDelete) return;
+
+    const res = await fetch(`/api/orders/${order.orderId}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      toast.success("🗑️ ההזמנה נמחקה בהצלחה");
+      window.location.href = "/orders";
+    } else {
+      toast.error("❌ שגיאה במחיקת ההזמנה");
+    }
   };
 
   if (loading) return <p className="p-6">טוען...</p>;
@@ -153,6 +188,7 @@ export default function OrderDetails() {
   });
 
   const totalDiscount = totalWithoutDiscount - totalWithDiscount;
+  const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -160,8 +196,36 @@ export default function OrderDetails() {
         ← חזרה לרשימת הזמנות
       </Link>
 
-      <div className="border p-4 rounded shadow">
-        <h1 className="text-xl font-bold mb-2">הזמנה #{order.orderId}</h1>
+      {/* Order Info */}
+      <div className={`border p-4 rounded shadow ${testStyle}`}>
+        <div className="flex items-start justify-between">
+          <h1
+            onClick={handleTitleClick}
+            title="לחץ 5 פעמים לסימון כבדיקה"
+            className={`text-xl font-bold mb-2 select-none ${
+              order.isTest ? "text-orange-600" : ""
+            }`}
+          >
+            הזמנה #{order.orderId}
+          </h1>
+
+          <div className="flex gap-2">
+            {order.isTest && (
+              <button
+                onClick={() => markAsTest(false)}
+                className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded"
+              >
+                הסר בדיקה
+              </button>
+            )}
+            <button
+              onClick={handleDelete}
+              className="text-sm bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded"
+            >
+              🗑️ מחק הזמנה
+            </button>
+          </div>
+        </div>
 
         <p>שם: {order.name}</p>
         <p>כתובת: {order.address}</p>
@@ -172,8 +236,7 @@ export default function OrderDetails() {
               navigator.clipboard.writeText(order.phone);
               toast.success("📋 מספר הטלפון הועתק");
             }}
-            className="underline text-blue-700 hover:text-blue-900 cursor-pointer"
-            title="העתק מספר טלפון"
+            className="underline text-blue-700 hover:text-blue-900"
           >
             {order.phone}
           </button>
@@ -230,6 +293,7 @@ export default function OrderDetails() {
           >
             {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
           </button>
+
           <button
             onClick={() => toggleStatus("isReady")}
             className={`px-3 py-1 rounded text-white cursor-pointer transition ${
@@ -243,7 +307,8 @@ export default function OrderDetails() {
         </div>
       </div>
 
-      <div className="border p-4 rounded shadow">
+      {/* Items */}
+      <div className={`border p-4 rounded shadow ${testStyle}`}>
         <h2 className="text-lg font-bold mb-4">פרטי מוצרים</h2>
         <ul className="space-y-4">{renderedItems}</ul>
 
@@ -260,14 +325,15 @@ export default function OrderDetails() {
         </div>
       </div>
 
+      {/* Edit Modal */}
       {editOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setEditOpen(false)} // Close on backdrop click
+          onClick={() => setEditOpen(false)}
         >
           <div
             className="bg-white p-6 rounded shadow-lg w-full max-w-md"
-            onClick={(e) => e.stopPropagation()} // Prevent modal itself from closing
+            onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-bold mb-4">עריכת פרטי לקוח</h2>
 

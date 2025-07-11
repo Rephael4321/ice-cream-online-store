@@ -10,6 +10,7 @@ type OrderRow = {
   updatedAt: string;
   isPaid: boolean;
   isReady: boolean;
+  isTest: boolean;
 };
 
 type OrderItemRow = {
@@ -24,6 +25,7 @@ type OrderItemRow = {
   updatedAt: string;
 };
 
+// === GET single order ===
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -43,7 +45,8 @@ export async function GET(
          o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
          o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
          o.is_paid AS "isPaid",
-         o.is_ready AS "isReady"
+         o.is_ready AS "isReady",
+         o.is_test AS "isTest"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
        WHERE o.id = $1`,
@@ -81,6 +84,7 @@ export async function GET(
         updatedAt: order.updatedAt,
         isPaid: order.isPaid,
         isReady: order.isReady,
+        isTest: order.isTest, // ✅ added
       },
       items: itemsResult.rows,
     });
@@ -91,6 +95,7 @@ export async function GET(
   }
 }
 
+// === PATCH: update status, client, or mark as test ===
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -101,9 +106,20 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const { isPaid, isReady, name, address } = body;
+  const { isPaid, isReady, isTest, name, address } = body;
 
   try {
+    if (typeof isTest === "boolean") {
+      const testResult = await pool.query(
+        `UPDATE orders SET is_test = $1 WHERE id = $2 RETURNING is_test AS "isTest"`,
+        [isTest, orderId]
+      );
+
+      return NextResponse.json({
+        isTest: testResult.rows[0]?.isTest ?? false,
+      });
+    }
+
     const orderResult = await pool.query(
       `UPDATE orders
        SET is_paid = COALESCE($1, is_paid),
@@ -149,6 +165,28 @@ export async function PATCH(
     console.error("Error updating order:", err);
     return NextResponse.json(
       { error: "Failed to update order" },
+      { status: 500 }
+    );
+  }
+}
+
+// === DELETE order ===
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const orderId = Number(params.id);
+  if (isNaN(orderId)) {
+    return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
+  }
+
+  try {
+    await pool.query(`DELETE FROM orders WHERE id = $1`, [orderId]);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting order:", err);
+    return NextResponse.json(
+      { error: "Failed to delete order" },
       { status: 500 }
     );
   }

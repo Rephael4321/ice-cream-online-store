@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
         o.id AS "orderId",
         o.is_paid AS "isPaid",
         o.is_ready AS "isReady",
+        o.is_test AS "isTest",
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount",

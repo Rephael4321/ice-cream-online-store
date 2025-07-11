@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { toast } from "sonner";
+import { Button } from "@/components/cms/ui/button";
 
 type Order = {
   orderId: number;
@@ -11,6 +13,7 @@ type Order = {
   itemCount: number;
   isPaid: boolean;
   isReady: boolean;
+  isTest?: boolean;
   clientName: string | null;
   clientAddress: string | null;
   clientPhone: string | null;
@@ -42,26 +45,19 @@ export default function Orders() {
 
   const fetchOrders = async (from?: string, to?: string) => {
     setLoading(true);
-
     let query = "";
-    if (from && to) {
-      query = `?from=${from}&to=${to}`;
-    }
-
+    if (from && to) query = `?from=${from}&to=${to}`;
     const res = await fetch(`/api/orders${query}`);
     const data = await res.json();
-
     setOrders(data.orders || []);
     setLoading(false);
   };
 
-  // Load orders on mount
   useEffect(() => {
     const { from, to } = getCurrentWeekRange();
     fetchOrders(from, to);
   }, []);
 
-  // Handle filtering
   useEffect(() => {
     if (selectedDate === null) {
       const { from, to } = getCurrentWeekRange();
@@ -72,7 +68,6 @@ export default function Orders() {
     }
   }, [selectedDate]);
 
-  // Scroll to saved order if recent
   useEffect(() => {
     const raw = localStorage.getItem(SCROLL_KEY);
     if (!raw) return;
@@ -80,7 +75,6 @@ export default function Orders() {
     try {
       const { orderId, timestamp } = JSON.parse(raw);
       const now = Date.now();
-
       const FOUR_HOURS = 4 * 60 * 60 * 1000;
       if (now - timestamp > FOUR_HOURS) {
         localStorage.removeItem(SCROLL_KEY);
@@ -92,10 +86,22 @@ export default function Orders() {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         localStorage.removeItem(SCROLL_KEY);
       }
-    } catch (err) {
+    } catch {
       localStorage.removeItem(SCROLL_KEY);
     }
   }, [orders]);
+
+  const handleDelete = async (orderId: number) => {
+    if (!confirm("האם למחוק את ההזמנה?")) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("🗑️ ההזמנה נמחקה");
+      setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+    } catch {
+      toast.error("❌ תקלה במחיקה");
+    }
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -125,14 +131,23 @@ export default function Orders() {
               ? date.toLocaleString("he-IL")
               : order.createdAt;
 
+            const testStyle = order.isTest
+              ? "bg-yellow-100 border-yellow-400"
+              : "";
+
             return (
               <li
                 key={order.orderId}
                 data-order-id={order.orderId}
-                className="border rounded p-4 shadow flex justify-between items-center"
+                className={`border rounded p-4 shadow flex justify-between items-center ${testStyle}`}
               >
                 <div>
-                  <p className="font-bold">הזמנה #{order.orderId}</p>
+                  <p className="font-bold">
+                    הזמנה #{order.orderId}{" "}
+                    {order.isTest && (
+                      <span className="text-yellow-700 text-sm">🧪 בדיקה</span>
+                    )}
+                  </p>
                   <p>לקוח: {order.clientName}</p>
                   <p>כתובת: {order.clientAddress}</p>
                   <p>טלפון: {order.clientPhone || "—"}</p>
@@ -141,21 +156,31 @@ export default function Orders() {
                   <p>שולם: {order.isPaid ? "✔️" : "❌"}</p>
                   <p>מוכן: {order.isReady ? "✔️" : "❌"}</p>
                 </div>
-                <Link
-                  href={`/orders/${order.orderId}`}
-                  onClick={() =>
-                    localStorage.setItem(
-                      SCROLL_KEY,
-                      JSON.stringify({
-                        orderId: order.orderId,
-                        timestamp: Date.now(),
-                      })
-                    )
-                  }
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  צפייה
-                </Link>
+
+                <div className="flex flex-col gap-2 items-end">
+                  <Link
+                    href={`/orders/${order.orderId}`}
+                    onClick={() =>
+                      localStorage.setItem(
+                        SCROLL_KEY,
+                        JSON.stringify({
+                          orderId: order.orderId,
+                          timestamp: Date.now(),
+                        })
+                      )
+                    }
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  >
+                    צפייה
+                  </Link>
+
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDelete(order.orderId)}
+                  >
+                    מחק
+                  </Button>
+                </div>
               </li>
             );
           })}

@@ -91,6 +91,7 @@ export async function initializeTables() {
         client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
         is_paid BOOLEAN DEFAULT FALSE,
         is_ready BOOLEAN DEFAULT FALSE,
+        is_test BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem',
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem'
       );
@@ -149,6 +150,7 @@ export async function initializeTables() {
         c.name AS client_name,
         c.phone AS client_phone,
         c.address AS client_address,
+        o.is_test,
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
       FROM orders o
