@@ -77,7 +77,7 @@ export async function initializeTables() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS clients (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
         address TEXT,
         phone VARCHAR(20),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem',
