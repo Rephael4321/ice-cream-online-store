@@ -22,13 +22,18 @@ export default function Clients() {
     const res = await fetch("/api/clients");
     const data = await res.json();
 
-    const normalized = (data.clients || data).map((c: any) => ({
-      id: c.id,
-      name: c.name || "",
-      phone: c.phone || "—",
-      address: c.address || "",
-      createdAt: new Date(c.created_at).toLocaleString("he-IL"),
-    }));
+    const normalized = (data.clients || data).map((c: any) => {
+      const date = new Date(c.createdAt || c.created_at);
+      return {
+        id: c.id,
+        name: c.name || "",
+        phone: c.phone || "—",
+        address: c.address || "",
+        createdAt: !isNaN(date.getTime())
+          ? date.toLocaleString("he-IL")
+          : c.createdAt || c.created_at,
+      };
+    });
 
     setClients(normalized);
     setLoading(false);

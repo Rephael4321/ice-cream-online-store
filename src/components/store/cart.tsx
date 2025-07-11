@@ -72,12 +72,16 @@ export default function Cart() {
     }
   };
 
+  const isValidPhone = (phone: string) => {
+    const clean = phone.replace(/\D/g, "");
+    const isMobile = /^05\d{8}$/.test(clean);
+    const isLandline = /^0(?!5)\d{8}$/.test(clean);
+    return isMobile || isLandline;
+  };
+
   const finalizeOrder = async (phone: string) => {
     const businessPhone = process.env.NEXT_PUBLIC_PHONE;
-    if (!businessPhone) {
-      console.error("WhatsApp number not defined.");
-      return;
-    }
+    if (!businessPhone) return;
 
     const payload = {
       phone,
@@ -104,12 +108,17 @@ export default function Cart() {
   };
 
   const savePhoneNumber = () => {
-    const trimmed = phoneInput.trim();
-    if (!trimmed) return;
+    const trimmed = phoneInput.trim().replace(/\D/g, "");
+    if (!isValidPhone(trimmed)) {
+      alert("נא להזין מספר נייד או טלפון תקין.");
+      return;
+    }
+
     Cookies.set("phoneNumber", trimmed, {
       expires: 3650,
       sameSite: "Lax",
     });
+
     setPhoneModal(false);
     finalizeOrder(trimmed);
   };
@@ -138,7 +147,7 @@ export default function Cart() {
         <div className="fixed top-0 left-0 h-full w-full sm:w-80 bg-white shadow-lg flex flex-col p-4 z-[1000] transition-all">
           <button
             onClick={() => setIsOpen(false)}
-            className="self-end text-lg font-bold text-gray-600 hover:text-gray-800 mb-4 cursor-pointer"
+            className="self-end text-xl font-bold text-red-500 hover:text-red-700 mb-4 cursor-pointer transition"
           >
             ✕
           </button>
@@ -148,10 +157,7 @@ export default function Cart() {
           ) : (
             <ul className="flex flex-col gap-4 overflow-y-auto flex-grow">
               {grouped.map((group) => (
-                <li
-                  key={group.categoryId}
-                  className="border-b pb-2 text-sm sm:text-base"
-                >
+                <li key={group.categoryId} className="border-b pb-2 text-sm">
                   <div className="flex justify-between items-center">
                     <p className="font-bold">
                       מבצע מקטגוריית {group.categoryName}
@@ -195,7 +201,7 @@ export default function Cart() {
                 return (
                   <li
                     key={item.id}
-                    className="flex gap-3 items-start border-b pb-2 text-sm sm:text-base"
+                    className="flex gap-3 items-start border-b pb-2 text-sm"
                   >
                     <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden border border-gray-200">
                       <Image
@@ -251,7 +257,7 @@ export default function Cart() {
                 onClick={initiatePayment}
                 className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition cursor-pointer"
               >
-                לתשלום
+                צור הזמנה
               </button>
               <button
                 onClick={clearCart}
@@ -268,11 +274,11 @@ export default function Cart() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100]">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
             <h2 className="text-lg font-bold mb-4 text-center">
-              נא להזין טלפון נייד לצורך ביצוע הזמנה
+              נא להזין טלפון לצורך ביצוע הזמנה
             </h2>
             <input
               type="tel"
-              placeholder="למשל: 0501234567"
+              placeholder="למשל: 050-123-4567"
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value)}
               className="w-full border px-3 py-2 mb-4 rounded text-right"
@@ -301,7 +307,7 @@ export default function Cart() {
             <p className="text-lg font-bold">
               ההזמנה בוצעה בהצלחה. מספר הזמנה {pendingOrderId}.
               <br />
-              רוצה ליידע את ספק השירות עם הודעת וואטסאפ (חשוב לשיפור השירות)
+              בכדי להבטיח אימות הזמנה, שלחו הודעה לספק השירות.
             </p>
             <div className="flex gap-4">
               <button
