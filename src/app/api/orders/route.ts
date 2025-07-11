@@ -16,14 +16,31 @@ export async function POST(req: NextRequest) {
 
     await client.query("BEGIN");
 
-    // 1. Insert order (temporary – phone kept until client linking is done)
-    const orderResult = await client.query<{ id: number }>(
-      "INSERT INTO orders (phone) VALUES ($1) RETURNING id",
+    // 1. Check if client exists
+    const existingClient = await client.query<{ id: number }>(
+      `SELECT id FROM clients WHERE phone = $1`,
       [phone]
+    );
+
+    let clientId: number;
+    if (existingClient.rows.length > 0) {
+      clientId = existingClient.rows[0].id;
+    } else {
+      const insertClient = await client.query<{ id: number }>(
+        `INSERT INTO clients (phone) VALUES ($1) RETURNING id`,
+        [phone]
+      );
+      clientId = insertClient.rows[0].id;
+    }
+
+    // 2. Create order with client_id
+    const orderResult = await client.query<{ id: number }>(
+      `INSERT INTO orders (client_id) VALUES ($1) RETURNING id`,
+      [clientId]
     );
     const orderId = orderResult.rows[0].id;
 
-    // 2. Insert items
+    // 3. Insert order items
     for (const item of items) {
       const {
         productId,
