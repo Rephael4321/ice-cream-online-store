@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -16,10 +16,13 @@ type Order = {
   clientPhone: string | null;
 };
 
+const SCROLL_KEY = "lastViewedOrder";
+
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const containerRef = useRef<HTMLUListElement>(null);
 
   const getCurrentWeekRange = () => {
     const now = new Date();
@@ -52,11 +55,13 @@ export default function Orders() {
     setLoading(false);
   };
 
+  // Load orders on mount
   useEffect(() => {
     const { from, to } = getCurrentWeekRange();
     fetchOrders(from, to);
   }, []);
 
+  // Handle filtering
   useEffect(() => {
     if (selectedDate === null) {
       const { from, to } = getCurrentWeekRange();
@@ -66,6 +71,31 @@ export default function Orders() {
       fetchOrders(dateStr, dateStr);
     }
   }, [selectedDate]);
+
+  // Scroll to saved order if recent
+  useEffect(() => {
+    const raw = localStorage.getItem(SCROLL_KEY);
+    if (!raw) return;
+
+    try {
+      const { orderId, timestamp } = JSON.parse(raw);
+      const now = Date.now();
+
+      const FOUR_HOURS = 4 * 60 * 60 * 1000;
+      if (now - timestamp > FOUR_HOURS) {
+        localStorage.removeItem(SCROLL_KEY);
+        return;
+      }
+
+      const el = document.querySelector(`[data-order-id="${orderId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        localStorage.removeItem(SCROLL_KEY);
+      }
+    } catch (err) {
+      localStorage.removeItem(SCROLL_KEY);
+    }
+  }, [orders]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -88,7 +118,7 @@ export default function Orders() {
       ) : orders.length === 0 ? (
         <p>אין הזמנות לתאריך זה.</p>
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-4" ref={containerRef}>
           {orders.map((order) => {
             const date = new Date(order.createdAt);
             const formatted = !isNaN(date.getTime())
@@ -98,6 +128,7 @@ export default function Orders() {
             return (
               <li
                 key={order.orderId}
+                data-order-id={order.orderId}
                 className="border rounded p-4 shadow flex justify-between items-center"
               >
                 <div>
@@ -112,6 +143,15 @@ export default function Orders() {
                 </div>
                 <Link
                   href={`/orders/${order.orderId}`}
+                  onClick={() =>
+                    localStorage.setItem(
+                      SCROLL_KEY,
+                      JSON.stringify({
+                        orderId: order.orderId,
+                        timestamp: Date.now(),
+                      })
+                    )
+                  }
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 >
                   צפייה
