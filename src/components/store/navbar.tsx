@@ -4,13 +4,54 @@ import Image from "next/image";
 
 export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
   return (
-    <div className="sticky top-0 z-50 w-full bg-pink-100 px-4 py-3 sm:px-6 md:px-8 shadow-md">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-        {/* Top: Logo + Cart */}
-        <div className="flex items-center justify-between">
+    <div className="sticky top-0 z-50 w-full bg-white px-4 py-3 sm:px-6 md:px-8 shadow-md border-b border-gray-200">
+      {/* Desktop layout */}
+      <div className="hidden sm:flex items-center justify-between w-full">
+        {/* Logo */}
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-2xl font-bold text-pink-700 whitespace-nowrap"
+        >
+          <Image
+            src="/favicon_io/android-chrome-192x192.png"
+            alt="המפנק"
+            width={32}
+            height={32}
+            sizes="(max-width: 640px) 32px, (max-width: 1024px) 64px, 128px"
+          />
+          המפנק
+        </Link>
+
+        {/* Nav buttons */}
+        <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-pink-700"
+            className="px-4 py-2 bg-pink-50 text-pink-700 text-lg rounded-md shadow-sm hover:bg-pink-100 hover:text-pink-900 transition font-semibold max-w-[200px] w-full sm:w-auto text-center"
+          >
+            חזרה לתפריט ראשי
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href="/management-menu"
+              className="px-4 py-2 bg-red-100 text-red-700 text-lg rounded-md shadow-sm hover:bg-red-200 hover:text-red-900 transition font-semibold max-w-[200px] w-full sm:w-auto text-center"
+            >
+              ניהול חנות ⚙️
+            </Link>
+          )}
+        </div>
+
+        {/* Cart */}
+        <Cart />
+      </div>
+
+      {/* Mobile layout */}
+      <div className="sm:hidden flex flex-col w-full">
+        {/* Top: Logo + Cart */}
+        <div className="flex justify-between items-center w-full">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-bold text-pink-700 whitespace-nowrap"
           >
             <Image
               src="/favicon_io/android-chrome-192x192.png"
@@ -21,35 +62,26 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
             />
             המפנק
           </Link>
-
-          {/* Cart always top-right on mobile */}
-          <div className="sm:hidden">
-            <Cart />
-          </div>
+          <Cart />
         </div>
 
-        {/* Nav Links */}
-        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 mt-2 sm:mt-0">
+        {/* Bottom: Buttons centered and size-limited */}
+        <div className="flex justify-center mt-3 px-8 w-full max-w-[640px] mx-auto gap-3">
           <Link
             href="/"
-            className="px-4 py-2 bg-white text-pink-700 text-base sm:text-lg rounded-md shadow hover:bg-pink-200 hover:text-pink-900 transition font-semibold w-full sm:w-auto text-center"
+            className="px-3 py-2 bg-pink-50 text-pink-700 text-sm rounded-md shadow-sm hover:bg-pink-100 hover:text-pink-900 transition font-semibold w-full max-w-[180px] text-center"
           >
-            חזרה לתפריט ראשי
+            חזרה לתפריט
           </Link>
 
           {isAdmin && (
             <Link
               href="/management-menu"
-              className="text-base sm:text-xl font-semibold text-red-600 underline w-full sm:w-auto text-center"
+              className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-md shadow-sm hover:bg-red-200 hover:text-red-900 transition font-semibold w-full max-w-[180px] text-center"
             >
               ניהול חנות ⚙️
             </Link>
           )}
-        </div>
-
-        {/* Cart on right for desktop */}
-        <div className="hidden sm:block mt-2 sm:mt-0">
-          <Cart />
         </div>
       </div>
     </div>
