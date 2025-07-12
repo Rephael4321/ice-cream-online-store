@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Label } from "./ui/label";
-import ImageSelector from "./ui/image-selector";
+import { Input } from "../../ui/input";
+import { Button } from "../../ui/button";
+import { Label } from "../../ui/label";
+import ImageSelector from "../../ui/image-selector";
 import { images } from "@/data/images";
 import Image from "next/image";
 
@@ -29,7 +29,7 @@ interface ProductUpdatePayload {
   salePrice?: number | null;
 }
 
-export default function Product({ params }: ParamsProps) {
+export default function ProductEdit({ params }: ParamsProps) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -1,5 +1,5 @@
-import NewProduct from "@/components/cms/new-product";
+import ProductForm from "@/components/cms/entities/product/form";
 
 export default function NewProductPage() {
-  return <NewProduct />;
+  return <ProductForm />;
 }

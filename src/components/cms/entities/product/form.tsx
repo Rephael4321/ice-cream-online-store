@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Label } from "./ui/label";
-import ImageSelector from "./ui/image-selector";
+import { Input } from "../../ui/input";
+import { Button } from "../../ui/button";
+import { Label } from "../../ui/label";
+import ImageSelector from "../../ui/image-selector";
 import { images } from "@/data/images";
 
 type ProductForm = {
@@ -24,7 +24,7 @@ type ProductPayload = {
   salePrice?: string;
 };
 
-export default function NewProduct() {
+export default function ProductForm() {
   const [product, setProduct] = useState<ProductForm>({
     name: "",
     price: "",
