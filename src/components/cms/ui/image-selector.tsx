@@ -9,6 +9,7 @@ export interface BaseItem {
   id: number | string;
   name: string;
   image?: string | null;
+  disabled?: boolean; // ✅ support for disabled items
 }
 
 interface ImageSelectorProps<T extends BaseItem> {
@@ -42,8 +43,10 @@ export default function ImageSelector<T extends BaseItem>({
   };
 
   const handleSuggestionClick = (item: T) => {
-    onChange(item);
-    setFocused(false);
+    if (!item.disabled) {
+      onChange(item);
+      setFocused(false);
+    }
   };
 
   return (
@@ -65,8 +68,13 @@ export default function ImageSelector<T extends BaseItem>({
           {filteredItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+              className={`flex items-center gap-2 px-3 py-2 text-sm ${
+                item.disabled
+                  ? "opacity-40 line-through cursor-not-allowed"
+                  : "hover:bg-gray-100 cursor-pointer"
+              }`}
               onMouseDown={() => handleSuggestionClick(item)}
+              title={item.disabled ? "מוצר כבר קיים" : undefined}
             >
               {item.image && (
                 <div className="relative w-8 h-8">
@@ -108,11 +116,16 @@ export default function ImageSelector<T extends BaseItem>({
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="cursor-pointer"
+                  className={`cursor-pointer ${
+                    item.disabled ? "opacity-40 cursor-not-allowed" : ""
+                  }`}
                   onClick={() => {
-                    handleSuggestionClick(item);
-                    setShowGallery(false);
+                    if (!item.disabled) {
+                      handleSuggestionClick(item);
+                      setShowGallery(false);
+                    }
                   }}
+                  title={item.disabled ? "מוצר כבר קיים" : undefined}
                 >
                   <div className="relative w-full h-32 border rounded bg-white">
                     {item.image && (

@@ -44,13 +44,27 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, price, image, saleQuantity, salePrice } = body;
 
-    if (!name || typeof price === "undefined") {
+    if (!name || typeof price === "undefined" || !image) {
       return NextResponse.json(
-        { error: "Name and price are required" },
+        { error: "Name, price, and image are required" },
         { status: 400 }
       );
     }
 
+    // 🚫 Prevent duplicate image
+    const existing = await pool.query(
+      "SELECT id FROM products WHERE image = $1 LIMIT 1",
+      [image]
+    );
+
+    if ((existing.rowCount ?? 0) > 0) {
+      return NextResponse.json(
+        { error: "A product with this image already exists" },
+        { status: 409 }
+      );
+    }
+
+    // ✅ Insert product
     const insertResult = await pool.query<{ id: number }>(
       "INSERT INTO products (name, price, image) VALUES ($1, $2, $3) RETURNING id",
       [name, price, image]
@@ -58,6 +72,7 @@ export async function POST(req: NextRequest) {
 
     const productId = insertResult.rows[0].id;
 
+    // Optional: Insert sale
     const quantity = Number(saleQuantity);
     const sale = Number(salePrice);
     const isValidQuantity = !isNaN(quantity) && quantity > 0;

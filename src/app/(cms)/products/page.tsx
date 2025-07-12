@@ -1,5 +1,5 @@
-import ProductList from "@/components/cms/entities/product/list";
+import ListProduct from "@/components/cms/entities/product/list";
 
 export default function ProductsPage() {
-  return <ProductList />;
+  return <ListProduct />;
 }

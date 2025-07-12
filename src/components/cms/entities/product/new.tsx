@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Input } from "../../ui/input";
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import ImageSelector from "../../ui/image-selector";
 import { images } from "@/data/images";
+import { showToast } from "../../ui/toast";
 
 type ProductForm = {
   name: string;
@@ -24,7 +25,7 @@ type ProductPayload = {
   salePrice?: string;
 };
 
-export default function ProductForm() {
+export default function NewProduct() {
   const [product, setProduct] = useState<ProductForm>({
     name: "",
     price: "",
@@ -34,6 +35,21 @@ export default function ProductForm() {
   });
 
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
+  const [usedImages, setUsedImages] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((res) => res.json())
+      .then((data) => {
+        const paths = new Set<string>();
+        data.products.forEach((p: { image: string }) => {
+          if (p.image) paths.add(p.image);
+        });
+        setUsedImages(paths);
+      })
+      .catch((err) => console.error("Failed to fetch products", err));
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -49,14 +65,18 @@ export default function ProductForm() {
     return file.split(".")[0];
   };
 
-  const imageItems = images.map((path, index) => ({
-    id: index,
-    name: getDisplayName(path),
-    image: path,
-  }));
+  const imageItems = images
+    .map((path, index) => ({
+      id: index,
+      name: getDisplayName(path),
+      image: path,
+      disabled: usedImages.has(path),
+    }))
+    .sort((a, b) => Number(a.disabled) - Number(b.disabled));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     const fullImagePath =
       imagePathMap[product.image] ||
@@ -79,9 +99,13 @@ export default function ProductForm() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Failed to save product");
+      if (!response.ok) {
+        const errorRes = await response.json();
+        throw new Error(errorRes.error || "Unknown error");
+      }
+
       const result = await response.json();
-      alert("נשמר בהצלחה עם מזהה: " + result.productId);
+      showToast(`✔ נשמר בהצלחה (מזהה: ${result.productId})`);
 
       setProduct({
         name: "",
@@ -90,9 +114,11 @@ export default function ProductForm() {
         saleQuantity: "",
         salePrice: "",
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("שגיאה בשמירת המוצר");
+      showToast(`❌ שגיאה: ${err.message}`, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -111,16 +137,12 @@ export default function ProductForm() {
         onSubmit={handleSubmit}
         className="flex flex-col md:flex-row gap-6 items-start"
       >
-        {/* Left Column */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             items={imageItems}
             value={product.image}
             onChange={(item) => {
-              if (!item) {
-                setProduct((prev) => ({ ...prev, image: "" }));
-                return;
-              }
+              if (!item || item.disabled) return;
 
               setProduct((prev) => ({
                 ...prev,
@@ -145,6 +167,7 @@ export default function ProductForm() {
                 onChange={handleChange}
                 placeholder="שם מוצר"
                 required
+                disabled={isSubmitting}
               />
               {product.name && (
                 <Button
@@ -152,6 +175,7 @@ export default function ProductForm() {
                   variant="outline"
                   className="px-2 cursor-pointer"
                   onClick={clearName}
+                  disabled={isSubmitting}
                 >
                   נקה
                 </Button>
@@ -171,6 +195,7 @@ export default function ProductForm() {
               onChange={handleChange}
               placeholder="מחיר רגיל"
               required
+              disabled={isSubmitting}
             />
           </div>
 
@@ -185,6 +210,7 @@ export default function ProductForm() {
                 onChange={handleChange}
                 placeholder="כמות"
                 className="w-1/2"
+                disabled={isSubmitting}
               />
               <span className="text-sm">ב־</span>
               <Input
@@ -196,16 +222,42 @@ export default function ProductForm() {
                 onChange={handleChange}
                 placeholder="מחיר"
                 className="w-1/2"
+                disabled={isSubmitting}
               />
             </div>
           </div>
 
-          <Button type="submit" className="w-full mt-4 md:mt-6 cursor-pointer">
-            צור מוצר
+          <Button
+            type="submit"
+            className="w-full mt-4 md:mt-6 flex items-center justify-center gap-2"
+            disabled={isSubmitting}
+          >
+            {isSubmitting && (
+              <svg
+                className="animate-spin h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            )}
+            {isSubmitting ? "שומר..." : "צור מוצר"}
           </Button>
         </div>
 
-        {/* Right Column: Preview */}
         <div className="w-full md:w-1/2">
           {previewSrc && (
             <Image

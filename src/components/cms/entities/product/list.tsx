@@ -13,7 +13,7 @@ interface Product {
   salePrice?: string | number;
 }
 
-export default function ProductList() {
+export default function ListProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
