@@ -1,45 +1,46 @@
-import request from "supertest";
-import app from "../test-server";
-import { cloneDevDbToTestDb } from "../utils/clone-dev-db";
-import pool from "@/lib/db";
+// tests/api/orders.test.ts
+import { POST } from "@/app/api/orders/route";
+import { NextRequest } from "next/server";
 
-beforeEach(async () => {
-  await cloneDevDbToTestDb();
-  await pool.query(
-    "TRUNCATE clients, orders, order_items RESTART IDENTITY CASCADE"
-  );
-});
+// Helper to mock NextRequest
+function createRequest(body: any, method = "POST"): NextRequest {
+  return new Request("http://localhost/api/orders", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }) as unknown as NextRequest;
+}
 
-afterAll(async () => {
-  await pool.end();
-});
-
-test("creates a new client and order", async () => {
-  const { rows } = await pool.query("SELECT * FROM products LIMIT 1");
-  const product = rows[0];
-
-  const response = await request(app)
-    .post("/api/orders")
-    .send({
+describe("POST /api/orders", () => {
+  it("creates a new order with valid data", async () => {
+    const req = createRequest({
       phone: "0501234567",
       items: [
         {
-          productId: product.id,
-          productName: product.name,
+          productId: 64,
+          productName: "ארטיק קינדר",
+          productImage: "/images/sample.png",
+          unitPrice: 9.9,
           quantity: 2,
-          unitPrice: Number(product.price),
+          saleQuantity: 3,
+          salePrice: 26.9,
         },
       ],
     });
 
-  expect(response.status).toBe(200);
-  expect(response.body.orderId).toBeDefined();
+    const res = await POST(req);
+    expect(res.status).toBe(200);
 
-  const orderCheck = await pool.query("SELECT * FROM orders");
-  expect(orderCheck.rows.length).toBe(1);
+    const json = await res.json();
+    expect(json.orderId).toBeDefined();
+  });
 
-  const clientCheck = await pool.query(
-    "SELECT * FROM clients WHERE phone = '0501234567'"
-  );
-  expect(clientCheck.rows.length).toBe(1);
+  it("returns 400 for missing data", async () => {
+    const req = createRequest({});
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
 });

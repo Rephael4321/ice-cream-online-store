@@ -1,4 +1,8 @@
+// tests/setup.ts
 import { config } from "dotenv";
+import path from "path";
 
-config({ path: "./tests/.env.test" });
-(process.env as any).NODE_ENV = "test";
+// Load .env.test before any imports
+const envPath = path.resolve(__dirname, "../.env.test");
+console.log("🧪 Loading .env.test from:", envPath);
+config({ path: envPath });
