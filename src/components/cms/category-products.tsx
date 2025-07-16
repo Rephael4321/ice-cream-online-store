@@ -130,13 +130,13 @@ function SortableProduct({ product }: { product: Product }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="w-full border p-2 rounded shadow flex items-center gap-2 bg-white"
+      className="w-full border p-6 rounded-2xl shadow-lg flex items-center gap-8 bg-white min-h-[140px]"
     >
-      {/* Drag handle only */}
+      {/* Drag handle */}
       <div
         {...attributes}
         {...listeners}
-        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 cursor-grab active:cursor-grabbing touch-none"
+        className="text-3xl font-bold text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none pr-4"
         title="גרור להזזה"
       >
         ≡
@@ -145,17 +145,17 @@ function SortableProduct({ product }: { product: Product }) {
       <Image
         src={product.image}
         alt={product.name}
-        width={32}
-        height={32}
-        className="rounded object-contain w-8 h-8"
+        width={96}
+        height={96}
+        className="rounded-xl object-contain w-24 h-24"
       />
 
-      <div className="flex-1">
-        <div className="font-medium text-sm">{product.name}</div>
-        <div className="text-xs text-gray-600">
+      <div className="flex-1 space-y-2">
+        <div className="font-bold text-2xl">{product.name}</div>
+        <div className="text-lg text-gray-700">
           ₪{Number(product.price).toFixed(2)}
           {product.sale_price !== null && (
-            <span className="ml-2 text-green-600 font-semibold">
+            <span className="ml-4 text-green-600 font-semibold">
               מבצע: ₪{Number(product.sale_price).toFixed(2)} (
               {product.sale_quantity} יח')
             </span>
