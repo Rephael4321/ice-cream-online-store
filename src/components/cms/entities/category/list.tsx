@@ -46,31 +46,6 @@ export default function ListCategory() {
     fetchCategories();
   }, []);
 
-  const handleToggleShowInMenu = async (
-    categoryId: number,
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation(); // prevent row click
-    try {
-      const res = await fetch(`/api/categories/${categoryId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ show_in_menu: true }),
-      });
-
-      if (!res.ok) throw new Error("Failed to update");
-
-      setCategories((prev) =>
-        prev.map((cat) =>
-          cat.id === categoryId ? { ...cat, show_in_menu: 1 } : cat
-        )
-      );
-    } catch (err) {
-      alert("שגיאה בעדכון הקטגוריה");
-      console.error(err);
-    }
-  };
-
   if (loading) return <div className="p-4">טוען...</div>;
   if (error) return <div className="p-4 text-red-600">שגיאה: {error}</div>;
 
@@ -80,71 +55,126 @@ export default function ListCategory() {
         רשימת קטגוריות
       </h1>
 
-      <div className="overflow-x-auto rounded-lg shadow border border-gray-200">
-        <table className="min-w-full text-sm sm:text-base text-right border-collapse">
-          <thead className="bg-gray-100 text-gray-700">
-            <tr>
-              <th className="px-4 py-2 border-b">תמונה</th>
-              <th className="px-4 py-2 border-b">מוצרים</th>
-              <th className="px-4 py-2 border-b">שם</th>
-              <th className="px-4 py-2 border-b">סוג</th>
-              <th className="px-4 py-2 border-b">תיאור</th>
-              <th className="px-4 py-2 border-b">אב</th>
-              <th className="px-4 py-2 border-b">בתפריט?</th>
-            </tr>
-          </thead>
-          <tbody>
+      {categories.length === 0 ? (
+        <p className="text-center text-gray-500">אין קטגוריות.</p>
+      ) : (
+        <div className="grid gap-4 sm:table w-full">
+          {/* Desktop Table */}
+          <table className="hidden sm:table min-w-full text-sm sm:text-base text-right border-collapse">
+            <thead className="bg-gray-100 text-gray-700">
+              <tr>
+                <th className="px-4 py-2 border-b">תמונה</th>
+                <th className="px-4 py-2 border-b">מוצרים</th>
+                <th className="px-4 py-2 border-b">שם</th>
+                <th className="px-4 py-2 border-b">סוג</th>
+                <th className="px-4 py-2 border-b">תיאור</th>
+                <th className="px-4 py-2 border-b">אב</th>
+                <th className="px-4 py-2 border-b">בתפריט?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat) => (
+                <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-2 border-t text-center">
+                    <div
+                      className="w-16 h-16 mx-auto relative cursor-pointer"
+                      onClick={() => router.push(`/categories/${cat.id}`)}
+                    >
+                      <Image
+                        src={cat.image}
+                        alt={cat.name}
+                        fill
+                        className="object-contain rounded-md"
+                        sizes="64px"
+                      />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 border-t text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/categories/${cat.id}/products`);
+                      }}
+                    >
+                      הצג מוצרים
+                    </Button>
+                  </td>
+                  <td className="px-4 py-2 border-t">{cat.name}</td>
+                  <td className="px-4 py-2 border-t">
+                    {cat.type === "sale" ? "מבצע" : "אוסף"}
+                  </td>
+                  <td className="px-4 py-2 border-t text-gray-600">
+                    {cat.description || (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 border-t text-gray-600">
+                    {cat.parent_id ?? <span className="text-gray-400">—</span>}
+                  </td>
+                  <td className="px-4 py-2 border-t text-center">
+                    {cat.show_in_menu ? (
+                      <span className="text-green-600 font-bold">✓</span>
+                    ) : (
+                      <span className="text-red-500 font-bold">✗</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Mobile Cards */}
+          <div className="sm:hidden space-y-4">
             {categories.map((cat) => (
-              <tr
+              <div
                 key={cat.id}
-                onClick={() => router.push(`/categories/${cat.id}`)}
-                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                className="border rounded-lg p-4 shadow flex flex-col gap-2"
               >
-                <td className="px-4 py-2 border-t text-center">
-                  {cat.image && (
-                    <Image
-                      src={cat.image}
-                      alt={cat.name}
-                      width={40}
-                      height={40}
-                      className="object-contain inline-block"
-                    />
-                  )}
-                </td>
-                <td className="px-4 py-2 border-t text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/categories/${cat.id}/products`);
-                    }}
-                  >
-                    הצג מוצרים
-                  </Button>
-                </td>
-                <td className="px-4 py-2 border-t">{cat.name}</td>
-                <td className="px-4 py-2 border-t">
-                  {cat.type === "sale" ? "מבצע" : "אוסף"}
-                </td>
-                <td className="px-4 py-2 border-t text-gray-600">
-                  {cat.description || <span className="text-gray-400">—</span>}
-                </td>
-                <td className="px-4 py-2 border-t text-gray-600">
-                  {cat.parent_id ?? <span className="text-gray-400">—</span>}
-                </td>
-                <td className="px-4 py-2 border-t text-center">
+                <div
+                  className="w-full h-40 relative cursor-pointer"
+                  onClick={() => router.push(`/categories/${cat.id}`)}
+                >
+                  <Image
+                    src={cat.image}
+                    alt={cat.name}
+                    fill
+                    className="object-contain rounded-md"
+                  />
+                </div>
+                <div>
+                  <strong>שם:</strong> {cat.name}
+                </div>
+                <div>
+                  <strong>סוג:</strong> {cat.type === "sale" ? "מבצע" : "אוסף"}
+                </div>
+                <div>
+                  <strong>תיאור:</strong> {cat.description || "—"}
+                </div>
+                <div>
+                  <strong>אב:</strong> {cat.parent_id ?? "—"}
+                </div>
+                <div>
+                  <strong>בתפריט?</strong>{" "}
                   {cat.show_in_menu ? (
                     <span className="text-green-600 font-bold">✓</span>
                   ) : (
                     <span className="text-red-500 font-bold">✗</span>
                   )}
-                </td>
-              </tr>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/categories/${cat.id}/products`)}
+                >
+                  הצג מוצרים
+                </Button>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
