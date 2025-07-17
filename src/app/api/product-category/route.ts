@@ -101,3 +101,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    // Parse productId and categoryId from query params
+    const { searchParams } = new URL(req.url);
+    const productId = Number(searchParams.get("productId"));
+    const categoryId = Number(searchParams.get("categoryId"));
+
+    if (!productId || !categoryId) {
+      return NextResponse.json(
+        { error: "Missing productId or categoryId" },
+        { status: 400 }
+      );
+    }
+
+    // Delete the relation
+    await pool.query(
+      `DELETE FROM product_categories WHERE product_id = $1 AND category_id = $2`,
+      [productId, categoryId]
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (err: unknown) {
+    console.error("Error unlinking product from category:", err);
+    const error =
+      err instanceof Error
+        ? err.message
+        : "Failed to unlink product from category";
+    return NextResponse.json({ error }, { status: 500 });
+  }
+}

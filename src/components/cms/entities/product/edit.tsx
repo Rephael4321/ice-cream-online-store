@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input } from "../../ui/input";
-import { Button } from "../../ui/button";
-import { Label } from "../../ui/label";
-import ImageSelector from "../../ui/image-selector";
+import { Input } from "@/components/cms/ui/input";
+import { Button } from "@/components/cms/ui/button";
+import { Label } from "@/components/cms/ui/label";
+import ImageSelector from "@/components/cms/ui/image-selector";
 import { images } from "@/data/images";
 import Image from "next/image";
 
@@ -35,6 +35,9 @@ export default function EditProduct({ params }: ParamsProps) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>(
+    []
+  );
 
   useEffect(() => {
     async function fetchProduct() {
@@ -57,6 +60,11 @@ export default function EditProduct({ params }: ParamsProps) {
         });
 
         setImagePathMap({ [displayName]: loaded.image });
+
+        // Fetch categories
+        const catRes = await fetch(`/api/products/${loaded.id}/categories`);
+        const catData = await catRes.json();
+        setCategories(catData.categories || []);
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -76,6 +84,24 @@ export default function EditProduct({ params }: ParamsProps) {
     if (!product) return;
     const { name, value } = e.target;
     setProduct({ ...product, [name]: value });
+  };
+
+  const unlinkCategory = async (categoryId: number) => {
+    if (!product) return;
+
+    try {
+      const res = await fetch(
+        `/api/product-category?productId=${product.id}&categoryId=${categoryId}`,
+        { method: "DELETE" }
+      );
+
+      if (!res.ok) throw new Error("הסרת הקטגוריה נכשלה");
+
+      setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+    } catch (err) {
+      console.error("Failed to unlink category:", err);
+      alert("שגיאה בהסרת הקטגוריה");
+    }
   };
 
   const handleSave = async () => {
@@ -215,6 +241,30 @@ export default function EditProduct({ params }: ParamsProps) {
               }
             }}
           />
+
+          {categories.length > 0 && (
+            <div>
+              <Label>קטגוריות משויכות:</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {categories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    className="bg-gray-100 border px-3 py-1 rounded-full flex items-center gap-2 text-sm"
+                  >
+                    {cat.name}
+                    <button
+                      type="button"
+                      className="text-red-500 hover:text-red-700 font-bold"
+                      onClick={() => unlinkCategory(cat.id)}
+                      title="הסר קטגוריה"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="name">שם:</Label>
