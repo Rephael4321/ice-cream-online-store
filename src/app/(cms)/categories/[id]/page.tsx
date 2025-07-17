@@ -1,4 +1,4 @@
-import EditCategory from "@/components/cms/edit-category";
+import EditCategory from "@/components/cms/entities/category/edit";
 
 interface EditCategoryPageProps {
   params: { id: string };

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Button } from "./ui/button";
-import ImageSelector, { BaseItem } from "./ui/image-selector";
+import { Button } from "@/components/cms/ui/button";
+import ImageSelector, { BaseItem } from "@/components/cms/ui/image-selector";
 
 interface Product {
   id: number;
@@ -21,7 +21,7 @@ interface Category {
 
 type CombinedItem = BaseItem;
 
-export default function LinkProductToCategory() {
+export default function LinkProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedItem, setSelectedItem] = useState<CombinedItem | null>(null);

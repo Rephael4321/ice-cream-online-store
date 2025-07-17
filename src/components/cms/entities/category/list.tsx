@@ -19,7 +19,7 @@ type ApiResponse = {
   categories: Category[];
 };
 
-export default function Categories() {
+export default function ListCategory() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

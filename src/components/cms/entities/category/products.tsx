@@ -30,7 +30,7 @@ type Product = {
   sort_order: number;
 };
 
-export default function CategoryProducts({ id }: { id: string }) {
+export default function ProductsCategory({ id }: { id: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -8,11 +8,11 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "./ui/select";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Label } from "./ui/label";
-import ImageSelector from "./ui/image-selector";
+} from "@/components/cms/ui/select";
+import { Input } from "@/components/cms/ui/input";
+import { Button } from "@/components/cms/ui/button";
+import { Label } from "@/components/cms/ui/label";
+import ImageSelector from "@/components/cms/ui/image-selector";
 import { images } from "@/data/images";
 
 type CategoryForm = {

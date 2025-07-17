@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Button } from "./ui/button";
-import ImageSelector from "./ui/image-selector";
+import { Input } from "@/components/cms/ui/input";
+import { Label } from "@/components/cms/ui/label";
+import { Button } from "@/components/cms/ui/button";
+import ImageSelector from "@/components/cms/ui/image-selector";
 import { images } from "@/data/images";
 import Image from "next/image";
 

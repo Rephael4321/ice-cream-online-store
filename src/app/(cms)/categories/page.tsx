@@ -1,5 +1,5 @@
-import Categories from "@/components/cms/categories";
+import ListCategory from "@/components/cms/entities/category/list";
 
 export default function CategoriesPage() {
-  return <Categories />;
+  return <ListCategory />;
 }

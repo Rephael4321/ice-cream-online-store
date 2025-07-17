@@ -1,5 +1,5 @@
-import LinkProductToCategory from "@/components/cms/link-product-to-category";
+import LinkProduct from "@/components/cms/entities/category/link-product";
 
 export default function LinkProductToCategoryPage() {
-  return <LinkProductToCategory />;
+  return <LinkProduct />;
 }
