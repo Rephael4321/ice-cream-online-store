@@ -28,39 +28,38 @@ type Item = {
   productName: string;
   productImage: string;
   quantity: number;
-  unitPrice: number; // string → number later
+  unitPrice: number; // will be coerced to number
   saleQuantity: number | null;
-  salePrice: number | null; // string → number later
+  salePrice: number | null; // will be coerced to number
 };
-/** runtime‑only flag */
 type ExtendedItem = Item & { inStock: boolean };
 
 /* ---------- component ---------- */
 export default function OrderDetails() {
-  /* params / state */
   const id = useParams()?.id as string | undefined;
+
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<ExtendedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoad] = useState(true);
 
-  /* edit‑client modal */
+  /* ✏️ modal */
   const [editOpen, setEditOpen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newAddress, setNewAddress] = useState("");
+  const [newAddr, setNewAddr] = useState("");
 
-  /* hidden “mark test” */
+  /* hidden mark‑as‑test */
   const [clicks, setClicks] = useState(0);
   const clickTimer = useRef<NodeJS.Timeout | null>(null);
 
-  /* ────────── utilities ────────── */
+  /* ────────── helpers ────────── */
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
-    const res = await fetch(`/api/orders/${order.orderId}`, {
+    const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isTest: flag }),
     });
-    const data = await res.json();
+    const data = await r.json();
     setOrder((o) => (o ? { ...o, ...data } : o));
     toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
   };
@@ -68,18 +67,18 @@ export default function OrderDetails() {
   const handleTitleClick = () => {
     setClicks((c) => c + 1);
     clickTimer.current && clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClicks(0), 1000);
+    clickTimer.current = setTimeout(() => setClicks(0), 1_000);
     if (clicks + 1 >= 5) {
       setClicks(0);
       markAsTest(true);
     }
   };
 
-  /* ────────── fetch order + stock on mount ────────── */
+  /* ────────── initial fetch ────────── */
   useEffect(() => {
     if (!id) return;
 
-    const fetchStockMap = async (): Promise<Record<number, boolean>> => {
+    const fetchStock = async (): Promise<Record<number, boolean>> => {
       try {
         const res = await fetch(`/api/orders/${id}/stock`);
         if (!res.ok) return {};
@@ -92,13 +91,14 @@ export default function OrderDetails() {
 
     (async () => {
       try {
-        const orderRes = await fetch(`/api/orders/${id}`);
-        const { order, items: raw }: { order: Order; items: Item[] } =
-          await orderRes.json();
+        const ordRes = await fetch(`/api/orders/${id}`);
+        const { order: o, items: raw } = (await ordRes.json()) as {
+          order: Order;
+          items: Item[];
+        };
 
-        const stock = await fetchStockMap();
-
-        setOrder(order);
+        const stock = await fetchStock();
+        setOrder(o);
         setItems(
           raw.map((it) => ({
             ...it,
@@ -108,48 +108,43 @@ export default function OrderDetails() {
           }))
         );
       } finally {
-        setLoading(false);
+        setLoad(false);
       }
     })();
   }, [id]);
 
-  /* ────────── PATCH helpers ────────── */
-  const patchOrderField = async (field: "isPaid" | "isReady") => {
+  /* ────────── API PATCH helpers ────────── */
+  const flipOrderBool = async (field: "isPaid" | "isReady") => {
     if (!order) return;
-    const res = await fetch(`/api/orders/${order.orderId}`, {
+    const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !order[field] }),
     });
-    const data = await res.json();
+    const data = await r.json();
     setOrder((o) => (o ? { ...o, ...data } : o));
   };
 
-  /* persist in_stock flag */
-  /* persist in_stock flag */
+  /* toggle in‑stock & persist */
   const toggleStock = async (productId: number) => {
-    /* ─ 1. flip locally ─ */
-    setItems((prev) =>
-      prev.map((it) =>
+    setItems((prev) => {
+      const nextState = prev.map((it) =>
         it.productId === productId ? { ...it, inStock: !it.inStock } : it
-      )
-    );
-
-    /* ─ 2. look up new value so we send the correct state ─ */
-    const current =
-      items.find((it) => it.productId === productId)?.inStock ?? true;
-    const next = !current;
-
-    /* ─ 3. persist to API ─ */
-    await fetch(`/api/orders/${order?.orderId}/stock`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, inStock: next }),
+      );
+      /* compute the value we just set so we can persist */
+      const justToggled = nextState.find((it) => it.productId === productId)!;
+      /* fire‑and‑forget API */
+      fetch(`/api/orders/${order?.orderId}/stock`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, inStock: justToggled.inStock }),
+      });
+      return nextState;
     });
   };
 
-  /* totals */
-  const totals = () => {
+  /* totals (for WA message) */
+  const calcTotals = () => {
     let before = 0,
       after = 0,
       actual = 0;
@@ -166,65 +161,54 @@ export default function OrderDetails() {
       after += withDisc;
       if (it.inStock) actual += withDisc;
     }
-    return {
-      before,
-      discount: before - after,
-      orderSum: after,
-      actual,
-    };
+    return { before, discount: before - after, orderSum: after, actual };
   };
 
-  /* ready button logic (opens WA if something missing) */
+  /* “הזמנה מוכנה” behaviour */
   const handleReadyClick = async () => {
     if (!order) return;
 
     const missing = items.filter((it) => !it.inStock);
-    await patchOrderField("isReady");
+    await flipOrderBool("isReady");
 
-    if (missing.length === 0) return;
+    if (missing.length === 0) return; // nothing to tell
 
-    const { before, discount, orderSum, actual } = totals();
+    const { before, discount, orderSum, actual } = calcTotals();
     const msg = [
       `שלום ${order.name ?? ""},`,
       "ההזמנה מוכנה אך חלק מהמוצרים אינם במלאי:",
       ...missing.map((m) => `• ${m.productName} (כמות: ${m.quantity})`),
       "",
-      `סה״כ לפני הנחה: ₪${before.toFixed(2)}`,
-      `סה״כ הנחה: ₪${discount.toFixed(2)}`,
-      `סה״כ הזמנה: ₪${orderSum.toFixed(2)}`,
-      `סה״כ לתשלום בפועל: ₪${actual.toFixed(2)}`,
+      `סה״כ לתשלום: ₪${actual.toFixed(2)}`,
     ].join("\n");
 
     const phone = order.phone.replace(/[^0-9]/g, "").replace(/^0/, "972");
-    window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(
+    const whatsappURL = `https://wa.me/${phone}?text=${encodeURIComponent(
       msg
     )}`;
+    window.location.href = whatsappURL;
   };
 
-  /* delete & client edit (allow clearing) */
+  /* delete & client‑edit */
   const handleDelete = async () => {
     if (!order) return;
-    if (!confirm("האם אתה בטוח?")) return;
-    const res = await fetch(`/api/orders/${order.orderId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      toast.success("🗑️ הזמנה נמחקה");
-      window.location.href = "/orders";
-    } else toast.error("❌ שגיאה במחיקה");
+    if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
+    const r = await fetch(`/api/orders/${order.orderId}`, { method: "DELETE" });
+    r.ok
+      ? (toast.success("🗑️ הזמנה נמחקה"), (window.location.href = "/orders"))
+      : toast.error("❌ שגיאה במחיקה");
   };
-
   const handleUpdateClient = async () => {
     if (!order) return;
-    const res = await fetch(`/api/orders/${order.orderId}`, {
+    const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: newName.trim() === "" ? null : newName,
-        address: newAddress.trim() === "" ? null : newAddress,
+        name: newName.trim() || null,
+        address: newAddr.trim() || null,
       }),
     });
-    const data = await res.json();
+    const data = await r.json();
     setOrder((o) => (o ? { ...o, ...data } : o));
     toast.success("📝 עודכן בהצלחה");
     setEditOpen(false);
@@ -240,22 +224,20 @@ export default function OrderDetails() {
         ← חזרה לרשימת הזמנות
       </Link>
 
-      {/* control panel */}
       <ClientControlPanel
         order={order}
         onDelete={handleDelete}
         onMarkTest={markAsTest}
         onEdit={() => {
           setNewName(order.name ?? "");
-          setNewAddress(order.address ?? "");
+          setNewAddr(order.address ?? "");
           setEditOpen(true);
         }}
-        onTogglePaid={() => patchOrderField("isPaid")}
+        onTogglePaid={() => flipOrderBool("isPaid")}
         onReadyClick={handleReadyClick}
         handleTitleClick={handleTitleClick}
       />
 
-      {/* items box (contains new totals) */}
       <OrderItemList
         items={items}
         isTest={!!order.isTest}
@@ -286,8 +268,8 @@ export default function OrderDetails() {
             <label className="block mb-4">
               כתובת:
               <input
-                value={newAddress}
-                onChange={(e) => setNewAddress(e.target.value)}
+                value={newAddr}
+                onChange={(e) => setNewAddr(e.target.value)}
                 className="mt-1 w-full border p-2 rounded"
               />
             </label>
