@@ -31,7 +31,7 @@ export default function ViewProducts({ id }: { id: string }) {
       {products.map((product) => (
         <Link
           key={product.id}
-          href={`/cms/products/${product.id}`}
+          href={`/products/${product.id}`}
           className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02]"
         >
           <Image
