@@ -1,47 +1,58 @@
+/* ──────────────────────────────────────────────────────────
+   src/components/cms/order-details.tsx
+   (page.tsx inside app/(cms)/orders/[id] can simply re‑export this)
+   ────────────────────────────────────────────────────────── */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { toast } from "sonner";
 
+import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
+import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
+
+/* ---------- types ---------- */
 type Order = {
   orderId: number;
   phone: string;
-  name: string;
-  address: string;
+  name: string | null;
+  address: string | null;
   createdAt: string;
   isPaid: boolean;
   isReady: boolean;
   isTest?: boolean;
 };
-
 type Item = {
   productId: number;
   productName: string;
   productImage: string;
   quantity: number;
-  unitPrice: number;
+  unitPrice: number; // string → number later
   saleQuantity: number | null;
-  salePrice: number | null;
+  salePrice: number | null; // string → number later
 };
+/** runtime‑only flag */
+type ExtendedItem = Item & { inStock: boolean };
 
+/* ---------- component ---------- */
 export default function OrderDetails() {
-  const params = useParams();
-  const id = params?.id as string | undefined;
-
+  /* params / state */
+  const id = useParams()?.id as string | undefined;
   const [order, setOrder] = useState<Order | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<ExtendedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  /* edit‑client modal */
   const [editOpen, setEditOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
 
-  const [clickCount, setClickCount] = useState(0);
+  /* hidden “mark test” */
+  const [clicks, setClicks] = useState(0);
   const clickTimer = useRef<NodeJS.Timeout | null>(null);
 
+  /* ────────── utilities ────────── */
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
     const res = await fetch(`/api/orders/${order.orderId}`, {
@@ -49,298 +60,223 @@ export default function OrderDetails() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isTest: flag }),
     });
-
     const data = await res.json();
-    setOrder((prev) => prev && { ...prev, ...data });
-
+    setOrder((o) => (o ? { ...o, ...data } : o));
     toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
   };
 
   const handleTitleClick = () => {
-    setClickCount((prev) => prev + 1);
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClickCount(0), 1000);
-    if (clickCount + 1 >= 5) {
-      setClickCount(0);
+    setClicks((c) => c + 1);
+    clickTimer.current && clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => setClicks(0), 1000);
+    if (clicks + 1 >= 5) {
+      setClicks(0);
       markAsTest(true);
     }
   };
 
+  /* ────────── fetch order + stock on mount ────────── */
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/orders/${id}`)
-      .then((res) => res.json())
-      .then((data: { order: Order; items: Item[] }) => {
-        setOrder(data.order);
-        const parsedItems = data.items.map((item) => ({
-          ...item,
-          unitPrice: parseFloat(item.unitPrice as unknown as string),
-          salePrice:
-            item.salePrice !== null
-              ? parseFloat(item.salePrice as unknown as string)
-              : null,
-        }));
-        setItems(parsedItems);
+
+    const fetchStockMap = async (): Promise<Record<number, boolean>> => {
+      try {
+        const res = await fetch(`/api/orders/${id}/stock`);
+        if (!res.ok) return {};
+        const { outOfStock } = (await res.json()) as { outOfStock: number[] };
+        return Object.fromEntries(outOfStock.map((pid) => [pid, false]));
+      } catch {
+        return {};
+      }
+    };
+
+    (async () => {
+      try {
+        const orderRes = await fetch(`/api/orders/${id}`);
+        const { order, items: raw }: { order: Order; items: Item[] } =
+          await orderRes.json();
+
+        const stock = await fetchStockMap();
+
+        setOrder(order);
+        setItems(
+          raw.map((it) => ({
+            ...it,
+            unitPrice: +it.unitPrice,
+            salePrice: it.salePrice !== null ? +it.salePrice : null,
+            inStock: stock[it.productId] !== false,
+          }))
+        );
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    })();
   }, [id]);
 
-  const toggleStatus = async (field: "isPaid" | "isReady") => {
+  /* ────────── PATCH helpers ────────── */
+  const patchOrderField = async (field: "isPaid" | "isReady") => {
     if (!order) return;
-    const updated = await fetch(`/api/orders/${order.orderId}`, {
+    const res = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !order[field] }),
     });
-    const data = await updated.json();
-    setOrder((prev) => prev && { ...prev, ...data });
+    const data = await res.json();
+    setOrder((o) => (o ? { ...o, ...data } : o));
+  };
+
+  /* persist in_stock flag */
+  /* persist in_stock flag */
+  const toggleStock = async (productId: number) => {
+    /* ─ 1. flip locally ─ */
+    setItems((prev) =>
+      prev.map((it) =>
+        it.productId === productId ? { ...it, inStock: !it.inStock } : it
+      )
+    );
+
+    /* ─ 2. look up new value so we send the correct state ─ */
+    const current =
+      items.find((it) => it.productId === productId)?.inStock ?? true;
+    const next = !current;
+
+    /* ─ 3. persist to API ─ */
+    await fetch(`/api/orders/${order?.orderId}/stock`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId, inStock: next }),
+    });
+  };
+
+  /* totals */
+  const totals = () => {
+    let before = 0,
+      after = 0,
+      actual = 0;
+    for (const it of items) {
+      const base = it.unitPrice * it.quantity;
+      before += base;
+
+      let withDisc = base;
+      if (it.saleQuantity && it.salePrice && it.quantity >= it.saleQuantity) {
+        const bundles = Math.floor(it.quantity / it.saleQuantity);
+        const rest = it.quantity % it.saleQuantity;
+        withDisc = bundles * it.salePrice + rest * it.unitPrice;
+      }
+      after += withDisc;
+      if (it.inStock) actual += withDisc;
+    }
+    return {
+      before,
+      discount: before - after,
+      orderSum: after,
+      actual,
+    };
+  };
+
+  /* ready button logic (opens WA if something missing) */
+  const handleReadyClick = async () => {
+    if (!order) return;
+
+    const missing = items.filter((it) => !it.inStock);
+    await patchOrderField("isReady");
+
+    if (missing.length === 0) return;
+
+    const { before, discount, orderSum, actual } = totals();
+    const msg = [
+      `שלום ${order.name ?? ""},`,
+      "ההזמנה מוכנה אך חלק מהמוצרים אינם במלאי:",
+      ...missing.map((m) => `• ${m.productName} (כמות: ${m.quantity})`),
+      "",
+      `סה״כ לפני הנחה: ₪${before.toFixed(2)}`,
+      `סה״כ הנחה: ₪${discount.toFixed(2)}`,
+      `סה״כ הזמנה: ₪${orderSum.toFixed(2)}`,
+      `סה״כ לתשלום בפועל: ₪${actual.toFixed(2)}`,
+    ].join("\n");
+
+    const phone = order.phone.replace(/[^0-9]/g, "").replace(/^0/, "972");
+    window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(
+      msg
+    )}`;
+  };
+
+  /* delete & client edit (allow clearing) */
+  const handleDelete = async () => {
+    if (!order) return;
+    if (!confirm("האם אתה בטוח?")) return;
+    const res = await fetch(`/api/orders/${order.orderId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      toast.success("🗑️ הזמנה נמחקה");
+      window.location.href = "/orders";
+    } else toast.error("❌ שגיאה במחיקה");
   };
 
   const handleUpdateClient = async () => {
     if (!order) return;
-    const updated = await fetch(`/api/orders/${order.orderId}`, {
+    const res = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, address: newAddress }),
+      body: JSON.stringify({
+        name: newName.trim() === "" ? null : newName,
+        address: newAddress.trim() === "" ? null : newAddress,
+      }),
     });
-    const data = await updated.json();
-    setOrder((prev) => prev && { ...prev, ...data });
-    toast.success("📝 הפרטים עודכנו בהצלחה");
+    const data = await res.json();
+    setOrder((o) => (o ? { ...o, ...data } : o));
+    toast.success("📝 עודכן בהצלחה");
     setEditOpen(false);
   };
 
-  const handleDelete = async () => {
-    if (!order) return;
-    const confirmDelete = confirm("האם אתה בטוח שברצונך למחוק את ההזמנה?");
-    if (!confirmDelete) return;
-
-    const res = await fetch(`/api/orders/${order.orderId}`, {
-      method: "DELETE",
-    });
-
-    if (res.ok) {
-      toast.success("🗑️ ההזמנה נמחקה בהצלחה");
-      window.location.href = "/orders";
-    } else {
-      toast.error("❌ שגיאה במחיקת ההזמנה");
-    }
-  };
-
-  if (loading) return <p className="p-6">טוען...</p>;
-  if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
-
-  let totalWithoutDiscount = 0;
-  let totalWithDiscount = 0;
-
-  const renderedItems = items.map((item, i) => {
-    const baseTotal = item.unitPrice * item.quantity;
-    totalWithoutDiscount += baseTotal;
-
-    let finalTotal = baseTotal;
-    let discount = 0;
-
-    if (
-      item.saleQuantity !== null &&
-      item.salePrice !== null &&
-      item.quantity >= item.saleQuantity
-    ) {
-      const bundles = Math.floor(item.quantity / item.saleQuantity);
-      const remainder = item.quantity % item.saleQuantity;
-      finalTotal = bundles * item.salePrice + remainder * item.unitPrice;
-      discount = baseTotal - finalTotal;
-    }
-
-    totalWithDiscount += finalTotal;
-
-    return (
-      <li key={i} className="border-b pb-2 flex gap-4 items-start">
-        {item.productImage && (
-          <Image
-            src={item.productImage}
-            alt={item.productName}
-            width={60}
-            height={60}
-            className="rounded border"
-          />
-        )}
-        <div>
-          <p className="font-semibold">{item.productName}</p>
-          <p>כמות: {item.quantity}</p>
-          <p>מחיר רגיל: {item.unitPrice.toFixed(2)} ש״ח</p>
-          {item.salePrice !== null &&
-            item.saleQuantity !== null &&
-            item.quantity >= item.saleQuantity && (
-              <>
-                <p>
-                  מחיר מבצע: {item.salePrice.toFixed(2)} ש״ח ל-
-                  {item.saleQuantity}
-                </p>
-                <p className="text-green-600">
-                  הנחה: {discount.toFixed(2)} ש״ח
-                </p>
-              </>
-            )}
-          <p className="font-bold">סה״כ למוצר: {finalTotal.toFixed(2)} ש״ח</p>
-        </div>
-      </li>
-    );
-  });
-
-  const totalDiscount = totalWithoutDiscount - totalWithDiscount;
-  const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
+  /* ────────── render ────────── */
+  if (loading) return <p className="p-6">טוען…</p>;
+  if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <Link href="/orders" className="text-blue-600 hover:underline">
-        ← חזרה לרשימת הזמנות
+        ← חזרה לרשימת הזמנות
       </Link>
 
-      {/* Order Info */}
-      <div className={`border p-4 rounded shadow ${testStyle}`}>
-        <div className="flex items-start justify-between">
-          <h1
-            onClick={handleTitleClick}
-            title="לחץ 5 פעמים לסימון כבדיקה"
-            className={`text-xl font-bold mb-2 select-none ${
-              order.isTest ? "text-orange-600" : ""
-            }`}
-          >
-            הזמנה #{order.orderId}
-          </h1>
+      {/* control panel */}
+      <ClientControlPanel
+        order={order}
+        onDelete={handleDelete}
+        onMarkTest={markAsTest}
+        onEdit={() => {
+          setNewName(order.name ?? "");
+          setNewAddress(order.address ?? "");
+          setEditOpen(true);
+        }}
+        onTogglePaid={() => patchOrderField("isPaid")}
+        onReadyClick={handleReadyClick}
+        handleTitleClick={handleTitleClick}
+      />
 
-          <div className="flex gap-2">
-            {order.isTest && (
-              <button
-                onClick={() => markAsTest(false)}
-                className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded"
-              >
-                הסר בדיקה
-              </button>
-            )}
-            <button
-              onClick={handleDelete}
-              className="text-sm bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded"
-            >
-              🗑️ מחק הזמנה
-            </button>
-          </div>
-        </div>
+      {/* items box (contains new totals) */}
+      <OrderItemList
+        items={items}
+        isTest={!!order.isTest}
+        onToggleInStock={toggleStock}
+      />
 
-        <p>שם: {order.name}</p>
-        <p>כתובת: {order.address}</p>
-        <p>
-          טלפון:&nbsp;
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(order.phone);
-              toast.success("📋 מספר הטלפון הועתק");
-            }}
-            className="underline text-blue-700 hover:text-blue-900"
-          >
-            {order.phone}
-          </button>
-        </p>
-
-        {order.phone && (
-          <div className="flex items-center gap-4 mt-2">
-            <a
-              href={`tel:${order.phone}`}
-              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
-            >
-              📞 התקשר
-            </a>
-            <a
-              href={`https://wa.me/${order.phone
-                .replace(/[^0-9]/g, "")
-                .replace(/^0/, "972")}?text=${encodeURIComponent("")}`}
-              rel="noopener noreferrer"
-              className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
-            >
-              💬 וואטסאפ
-            </a>
-          </div>
-        )}
-
-        <div className="mt-2">
-          <button
-            onClick={() => {
-              setNewName(order.name ?? "");
-              setNewAddress(order.address ?? "");
-              setEditOpen(true);
-            }}
-            className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
-          >
-            ✏️ ערוך פרטי לקוח
-          </button>
-        </div>
-
-        <p className="mt-2">
-          תאריך:{" "}
-          {isNaN(new Date(order.createdAt).getTime())
-            ? order.createdAt
-            : new Date(order.createdAt).toLocaleString("he-IL")}
-        </p>
-
-        <div className="mt-4 flex gap-4 flex-wrap">
-          <button
-            onClick={() => toggleStatus("isPaid")}
-            className={`px-3 py-1 rounded text-white cursor-pointer transition ${
-              order.isPaid
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-red-500 hover:bg-red-600"
-            }`}
-          >
-            {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
-          </button>
-
-          <button
-            onClick={() => toggleStatus("isReady")}
-            className={`px-3 py-1 rounded text-white cursor-pointer transition ${
-              order.isReady
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-red-500 hover:bg-red-600"
-            }`}
-          >
-            {order.isReady ? "הזמנה מוכנה ✅" : "הזמנה חדשה 🆕"}
-          </button>
-        </div>
-      </div>
-
-      {/* Items */}
-      <div className={`border p-4 rounded shadow ${testStyle}`}>
-        <h2 className="text-lg font-bold mb-4">פרטי מוצרים</h2>
-        <ul className="space-y-4">{renderedItems}</ul>
-
-        <div className="text-right mt-6 space-y-2 border-t pt-4">
-          <p className="text-base text-gray-500 font-medium">
-            סה״כ לפני הנחה: {totalWithoutDiscount.toFixed(2)} ש״ח
-          </p>
-          <p className="text-base text-green-600 font-medium">
-            סה״כ הנחה: {totalDiscount.toFixed(2)} ש״ח
-          </p>
-          <p className="text-xl font-bold text-pink-700">
-            סה״כ לתשלום: {totalWithDiscount.toFixed(2)} ש״ח
-          </p>
-        </div>
-      </div>
-
-      {/* Edit Modal */}
+      {/* ✏️ modal */}
       {editOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => setEditOpen(false)}
         >
           <div
-            className="bg-white p-6 rounded shadow-lg w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
+            className="bg-white p-6 rounded shadow-lg w-full max-w-md"
           >
-            <h2 className="text-lg font-bold mb-4">עריכת פרטי לקוח</h2>
+            <h2 className="text-lg font-bold mb-4">עריכת פרטי לקוח</h2>
 
             <label className="block mb-2">
               שם:
               <input
-                type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 className="mt-1 w-full border p-2 rounded"
@@ -350,7 +286,6 @@ export default function OrderDetails() {
             <label className="block mb-4">
               כתובת:
               <input
-                type="text"
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
                 className="mt-1 w-full border p-2 rounded"
