@@ -1,7 +1,3 @@
-/* ──────────────────────────────────────────────────────────
-   src/components/cms/order-details.tsx
-   (page.tsx inside app/(cms)/orders/[id] can simply re‑export this)
-   ────────────────────────────────────────────────────────── */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -28,13 +24,12 @@ type Item = {
   productName: string;
   productImage: string;
   quantity: number;
-  unitPrice: number; // will be coerced to number
+  unitPrice: number; // coerced to number
   saleQuantity: number | null;
-  salePrice: number | null; // will be coerced to number
+  salePrice: number | null; // coerced to number
 };
 type ExtendedItem = Item & { inStock: boolean };
 
-/* ---------- component ---------- */
 export default function ViewOrder() {
   const id = useParams()?.id as string | undefined;
 
@@ -42,16 +37,14 @@ export default function ViewOrder() {
   const [items, setItems] = useState<ExtendedItem[]>([]);
   const [loading, setLoad] = useState(true);
 
-  /* ✏️ modal */
   const [editOpen, setEditOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newAddr, setNewAddr] = useState("");
 
-  /* hidden mark‑as‑test */
   const [clicks, setClicks] = useState(0);
   const clickTimer = useRef<NodeJS.Timeout | null>(null);
 
-  /* ────────── helpers ────────── */
+  /* ---------- helpers ---------- */
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
     const r = await fetch(`/api/orders/${order.orderId}`, {
@@ -74,7 +67,7 @@ export default function ViewOrder() {
     }
   };
 
-  /* ────────── initial fetch ────────── */
+  /* ---------- initial fetch ---------- */
   useEffect(() => {
     if (!id) return;
 
@@ -113,7 +106,7 @@ export default function ViewOrder() {
     })();
   }, [id]);
 
-  /* ────────── API PATCH helpers ────────── */
+  /* ---------- utils ---------- */
   const flipOrderBool = async (field: "isPaid" | "isReady") => {
     if (!order) return;
     const r = await fetch(`/api/orders/${order.orderId}`, {
@@ -125,15 +118,12 @@ export default function ViewOrder() {
     setOrder((o) => (o ? { ...o, ...data } : o));
   };
 
-  /* toggle in‑stock & persist */
   const toggleStock = async (productId: number) => {
     setItems((prev) => {
       const nextState = prev.map((it) =>
         it.productId === productId ? { ...it, inStock: !it.inStock } : it
       );
-      /* compute the value we just set so we can persist */
       const justToggled = nextState.find((it) => it.productId === productId)!;
-      /* fire‑and‑forget API */
       fetch(`/api/orders/${order?.orderId}/stock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -143,53 +133,27 @@ export default function ViewOrder() {
     });
   };
 
-  /* totals (for WA message) */
   const calcTotals = () => {
-    let before = 0,
-      after = 0,
-      actual = 0;
+    let actual = 0;
     for (const it of items) {
-      const base = it.unitPrice * it.quantity;
-      before += base;
-
-      let withDisc = base;
+      let line = it.unitPrice * it.quantity;
       if (it.saleQuantity && it.salePrice && it.quantity >= it.saleQuantity) {
         const bundles = Math.floor(it.quantity / it.saleQuantity);
         const rest = it.quantity % it.saleQuantity;
-        withDisc = bundles * it.salePrice + rest * it.unitPrice;
+        line = bundles * it.salePrice + rest * it.unitPrice;
       }
-      after += withDisc;
-      if (it.inStock) actual += withDisc;
+      if (it.inStock) actual += line;
     }
-    return { before, discount: before - after, orderSum: after, actual };
+    return actual;
   };
 
-  /* “הזמנה מוכנה” behaviour */
+  /* ---------- ready click: only toggle DB flag ---------- */
   const handleReadyClick = async () => {
     if (!order) return;
-
-    const missing = items.filter((it) => !it.inStock);
     await flipOrderBool("isReady");
-
-    if (missing.length === 0) return; // nothing to tell
-
-    const { before, discount, orderSum, actual } = calcTotals();
-    const msg = [
-      `שלום ${order.name ?? ""},`,
-      "ההזמנה מוכנה אך חלק מהמוצרים אינם במלאי:",
-      ...missing.map((m) => `• ${m.productName} (כמות: ${m.quantity})`),
-      "",
-      `סה״כ לתשלום: ₪${actual.toFixed(2)}`,
-    ].join("\n");
-
-    const phone = order.phone.replace(/[^0-9]/g, "").replace(/^0/, "972");
-    const whatsappURL = `https://wa.me/${phone}?text=${encodeURIComponent(
-      msg
-    )}`;
-    window.location.href = whatsappURL;
   };
 
-  /* delete & client‑edit */
+  /* ---------- delete / client edit ---------- */
   const handleDelete = async () => {
     if (!order) return;
     if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
@@ -198,6 +162,7 @@ export default function ViewOrder() {
       ? (toast.success("🗑️ הזמנה נמחקה"), (window.location.href = "/orders"))
       : toast.error("❌ שגיאה במחיקה");
   };
+
   const handleUpdateClient = async () => {
     if (!order) return;
     const r = await fetch(`/api/orders/${order.orderId}`, {
@@ -214,9 +179,10 @@ export default function ViewOrder() {
     setEditOpen(false);
   };
 
-  /* ────────── render ────────── */
   if (loading) return <p className="p-6">טוען…</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
+
+  const finalTotal = calcTotals();
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -226,6 +192,7 @@ export default function ViewOrder() {
 
       <ClientControlPanel
         order={order}
+        finalTotal={finalTotal}
         onDelete={handleDelete}
         onMarkTest={markAsTest}
         onEdit={() => {
@@ -244,7 +211,6 @@ export default function ViewOrder() {
         onToggleInStock={toggleStock}
       />
 
-      {/* ✏️ modal */}
       {editOpen && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"

@@ -14,18 +14,18 @@ type Props = {
     isReady: boolean;
     isTest?: boolean;
   };
+  finalTotal: number; // ✅ Added to support WhatsApp message
   onDelete: () => void;
   onMarkTest: (flag: boolean) => void;
   onEdit: () => void;
   onTogglePaid: () => void;
-  /** “הזמנה מוכנה / חדשה” — opens WA when something missing                */
   onReadyClick: () => void;
-  /** hidden 5‑click Easter‑egg                                                */
   handleTitleClick: () => void;
 };
 
 export default function ClientControlPanel({
   order,
+  finalTotal, // ✅ Destructure new prop
   onDelete,
   onMarkTest,
   onEdit,
@@ -34,6 +34,10 @@ export default function ClientControlPanel({
   handleTitleClick,
 }: Props) {
   const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
+
+  const waMessage = `שלום${
+    order.name ? " " + order.name : ""
+  }, ההזמנה מוכנה והיא תצא בהקדם, סכום לתשלום: ₪${finalTotal.toFixed(2)}`;
 
   return (
     <div className={`border p-4 rounded shadow ${testStyle}`}>
@@ -93,7 +97,7 @@ export default function ClientControlPanel({
         <a
           href={`https://wa.me/${order.phone
             .replace(/[^0-9]/g, "")
-            .replace(/^0/, "972")}?text=${encodeURIComponent("")}`}
+            .replace(/^0/, "972")}?text=${encodeURIComponent(waMessage)}`} // ✅ WhatsApp message
           className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
           rel="noopener noreferrer"
         >
