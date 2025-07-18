@@ -6,7 +6,8 @@ export async function GET(_req: NextRequest) {
     const result = await pool.query(
       `SELECT id, name, image, description, type
        FROM categories
-       WHERE parent_id IS NULL`
+       WHERE parent_id IS NULL
+       ORDER BY sort_order ASC`
     );
 
     return NextResponse.json({ categories: result.rows });
