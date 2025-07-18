@@ -1,5 +1,5 @@
-import Orders from "@/components/cms/orders";
+import ListOrder from "@/components/cms/entities/fulfillment/list";
 
 export default function OrdersPage() {
-  return <Orders />;
+  return <ListOrder />;
 }

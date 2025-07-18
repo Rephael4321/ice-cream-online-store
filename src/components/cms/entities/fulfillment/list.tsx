@@ -21,7 +21,7 @@ type Order = {
 
 const SCROLL_KEY = "lastViewedOrder";
 
-export default function Orders() {
+export default function ListOrder() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);

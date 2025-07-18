@@ -35,7 +35,7 @@ type Item = {
 type ExtendedItem = Item & { inStock: boolean };
 
 /* ---------- component ---------- */
-export default function OrderDetails() {
+export default function ViewOrder() {
   const id = useParams()?.id as string | undefined;
 
   const [order, setOrder] = useState<Order | null>(null);
