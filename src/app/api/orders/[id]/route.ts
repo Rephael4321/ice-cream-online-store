@@ -25,7 +25,7 @@ type OrderItemRow = {
   updatedAt: string;
 };
 
-// === GET single order ===
+// === GET single order (visible only) ===
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -49,7 +49,7 @@ export async function GET(
          o.is_test AS "isTest"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
-       WHERE o.id = $1`,
+       WHERE o.id = $1 AND o.is_visible = true`, // ✅ soft-delete-aware
       [orderId]
     );
 
@@ -84,7 +84,7 @@ export async function GET(
         updatedAt: order.updatedAt,
         isPaid: order.isPaid,
         isReady: order.isReady,
-        isTest: order.isTest, // ✅ added
+        isTest: order.isTest,
       },
       items: itemsResult.rows,
     });
@@ -170,7 +170,7 @@ export async function PATCH(
   }
 }
 
-// === DELETE order ===
+// === DELETE → SOFT DELETE ===
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -181,10 +181,14 @@ export async function DELETE(
   }
 
   try {
-    await pool.query(`DELETE FROM orders WHERE id = $1`, [orderId]);
+    // ✅ SOFT DELETE
+    await pool.query(`UPDATE orders SET is_visible = false WHERE id = $1`, [
+      orderId,
+    ]);
+
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Error deleting order:", err);
+    console.error("Error soft-deleting order:", err);
     return NextResponse.json(
       { error: "Failed to delete order" },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
+// === Create New Order ===
 export async function POST(req: NextRequest) {
   const client = await pool.connect();
   try {
@@ -33,14 +34,14 @@ export async function POST(req: NextRequest) {
       clientId = insertClient.rows[0].id;
     }
 
-    // 2. Create order with client_id
+    // 2. Create order
     const orderResult = await client.query<{ id: number }>(
       `INSERT INTO orders (client_id) VALUES ($1) RETURNING id`,
       [clientId]
     );
     const orderId = orderResult.rows[0].id;
 
-    // 3. Insert order items
+    // 3. Insert items
     for (const item of items) {
       const {
         productId,
@@ -81,13 +82,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// === List Orders (visible only) ===
 export async function GET(req: NextRequest) {
   try {
     const from = req.nextUrl.searchParams.get("from");
     const to = req.nextUrl.searchParams.get("to");
 
     const values: any[] = [];
-    let whereClause = "";
+    let whereClause = `WHERE o.is_visible = true`;
 
     if (from && to) {
       const fromUTC = new Date(`${from}T00:00:00+03:00`).toISOString();
@@ -95,7 +97,7 @@ export async function GET(req: NextRequest) {
       toUTC.setDate(toUTC.getDate() + 1);
       const toUTCString = toUTC.toISOString();
 
-      whereClause = `WHERE o.created_at >= $1 AND o.created_at < $2`;
+      whereClause += ` AND o.created_at >= $1 AND o.created_at < $2`;
       values.push(fromUTC, toUTCString);
     }
 
