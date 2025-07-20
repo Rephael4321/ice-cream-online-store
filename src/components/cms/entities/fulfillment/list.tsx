@@ -27,19 +27,16 @@ export default function ListOrder() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const containerRef = useRef<HTMLUListElement>(null);
 
-  const getCurrentWeekRange = () => {
+  const getLast7DaysRange = () => {
     const now = new Date();
-    const sunday = new Date(now);
-    sunday.setDate(now.getDate() - now.getDay());
-
-    const saturday = new Date(sunday);
-    saturday.setDate(sunday.getDate() + 6);
+    const from = new Date(now);
+    from.setDate(now.getDate() - 6);
 
     const format = (d: Date) => d.toISOString().split("T")[0];
 
     return {
-      from: format(sunday),
-      to: format(saturday),
+      from: format(from),
+      to: format(now),
     };
   };
 
@@ -54,13 +51,13 @@ export default function ListOrder() {
   };
 
   useEffect(() => {
-    const { from, to } = getCurrentWeekRange();
+    const { from, to } = getLast7DaysRange();
     fetchOrders(from, to);
   }, []);
 
   useEffect(() => {
     if (selectedDate === null) {
-      const { from, to } = getCurrentWeekRange();
+      const { from, to } = getLast7DaysRange();
       fetchOrders(from, to);
     } else {
       const dateStr = selectedDate.toLocaleDateString("sv-SE");
