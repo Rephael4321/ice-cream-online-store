@@ -125,12 +125,18 @@ export default function Cart() {
 
   const confirmAndRedirectToWhatsapp = () => {
     if (!pendingOrderId) return;
+
     const businessPhone = process.env.NEXT_PUBLIC_PHONE!;
     const phoneNumber = businessPhone.replace(/\D/g, "");
-    const msg = `הי, ביצעתי הזמנה באתר. מספר הזמנה ${pendingOrderId}`;
-    const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-      msg
-    )}`;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+      "http://localhost:3000";
+    const orderUrl = `${baseUrl}/order/${pendingOrderId}`;
+
+    const msg = `מספר הזמנה ${pendingOrderId}.\n\nניתן לצפות בפירוט הזמנה בקישור הבא:\n${orderUrl}`;
+    const encodedMsg = encodeURIComponent(msg);
+
+    const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodedMsg}`;
     window.location.href = whatsappURL;
   };
 
