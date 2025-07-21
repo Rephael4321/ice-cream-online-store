@@ -9,7 +9,7 @@ export interface BaseItem {
   id: number | string;
   name: string;
   image?: string | null;
-  disabled?: boolean; // ✅ support for disabled items
+  disabled?: boolean;
 }
 
 interface ImageSelectorProps<T extends BaseItem> {

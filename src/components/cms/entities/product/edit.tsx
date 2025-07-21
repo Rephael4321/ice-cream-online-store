@@ -7,6 +7,7 @@ import { Label } from "@/components/cms/ui/label";
 import ImageSelector from "@/components/cms/ui/image-selector";
 import { images } from "@/data/images";
 import Image from "next/image";
+import Category from "@/components/cms/entities/product/ui/category";
 
 interface ProductDetail {
   id: string;
@@ -61,7 +62,6 @@ export default function EditProduct({ params }: ParamsProps) {
 
         setImagePathMap({ [displayName]: loaded.image });
 
-        // Fetch categories
         const catRes = await fetch(`/api/products/${loaded.id}/categories`);
         const catData = await catRes.json();
         setCategories(catData.categories || []);
@@ -84,24 +84,6 @@ export default function EditProduct({ params }: ParamsProps) {
     if (!product) return;
     const { name, value } = e.target;
     setProduct({ ...product, [name]: value });
-  };
-
-  const unlinkCategory = async (categoryId: number) => {
-    if (!product) return;
-
-    try {
-      const res = await fetch(
-        `/api/product-category?productId=${product.id}&categoryId=${categoryId}`,
-        { method: "DELETE" }
-      );
-
-      if (!res.ok) throw new Error("הסרת הקטגוריה נכשלה");
-
-      setCategories((prev) => prev.filter((c) => c.id !== categoryId));
-    } catch (err) {
-      console.error("Failed to unlink category:", err);
-      alert("שגיאה בהסרת הקטגוריה");
-    }
   };
 
   const handleSave = async () => {
@@ -242,29 +224,11 @@ export default function EditProduct({ params }: ParamsProps) {
             }}
           />
 
-          {categories.length > 0 && (
-            <div>
-              <Label>קטגוריות משויכות:</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="bg-gray-100 border px-3 py-1 rounded-full flex items-center gap-2 text-sm"
-                  >
-                    {cat.name}
-                    <button
-                      type="button"
-                      className="text-red-500 hover:text-red-700 font-bold"
-                      onClick={() => unlinkCategory(cat.id)}
-                      title="הסר קטגוריה"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <Category
+            productId={product.id}
+            initialCategories={categories}
+            onUpdate={setCategories}
+          />
 
           <div>
             <Label htmlFor="name">שם:</Label>
