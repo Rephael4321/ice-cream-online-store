@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Input } from "@/components/cms/ui/input";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Product {
   id: string;
@@ -18,8 +19,16 @@ export default function ListProduct() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
 
+  const [search, setSearch] = useState("");
+  const router = useRouter();
+
+  // Fill search from URL on first load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialSearch = params.get("q") || "";
+    setSearch(initialSearch);
+  }, []);
   useEffect(() => {
     async function fetchProducts() {
       try {
@@ -47,10 +56,24 @@ export default function ListProduct() {
   }, [products]);
 
   const filtered = useMemo(() => {
-    return products.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase())
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.id.toString().includes(search)
     );
   }, [products, search]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setSearch(newValue);
+    const params = new URLSearchParams(window.location.search);
+    if (newValue) {
+      params.set("q", newValue);
+    } else {
+      params.delete("q");
+    }
+    router.replace(`?${params.toString()}`);
+  };
 
   if (loading) return <p className="p-4">טוען מוצרים...</p>;
   if (error) return <p className="p-4 text-red-500">שגיאה: {error}</p>;
@@ -61,9 +84,9 @@ export default function ListProduct() {
         <h1 className="text-2xl font-bold">רשימת מוצרים</h1>
         <Input
           type="text"
-          placeholder="חפש מוצר לפי שם..."
+          placeholder="חפש מוצר לפי שם או מספר..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
           className="max-w-sm"
         />
       </div>
