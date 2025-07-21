@@ -115,7 +115,10 @@ export default function ListProduct() {
                     className="rounded-xl object-contain w-24 h-24"
                   />
                 )}
-                <div className="mt-2 font-bold text-center">{product.name}</div>
+                <div className="text-xs text-gray-400 text-center">
+                  ID: {product.id}
+                </div>
+                <div className="mt-1 font-bold text-center">{product.name}</div>
                 <div className="text-gray-700 text-sm text-center">
                   ₪{Number(product.price).toFixed(2)}
                 </div>
