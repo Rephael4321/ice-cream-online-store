@@ -167,6 +167,7 @@ export default function EditProduct({ params }: ParamsProps) {
     if (!product) return;
     if (!confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) return;
 
+    setSaving(true);
     try {
       const res = await fetch(`/api/products/${product.id}`, {
         method: "DELETE",
@@ -178,6 +179,8 @@ export default function EditProduct({ params }: ParamsProps) {
     } catch (err) {
       console.error(err);
       alert("תקלה במחיקת מוצר");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -201,8 +204,15 @@ export default function EditProduct({ params }: ParamsProps) {
           e.preventDefault();
           handleSave();
         }}
-        className="flex flex-col md:flex-row gap-6 items-start"
+        className="relative flex flex-col md:flex-row gap-6 items-start"
       >
+        {/* LOCKING OVERLAY */}
+        {saving && (
+          <div className="absolute inset-0 bg-white/60 z-50 flex items-center justify-center rounded-md">
+            <span className="text-xl font-semibold">שומר...</span>
+          </div>
+        )}
+
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             items={images.map((path, index) => ({
@@ -222,12 +232,14 @@ export default function EditProduct({ params }: ParamsProps) {
                 }));
               }
             }}
+            disabled={saving}
           />
 
           <Category
             productId={product.id}
             initialCategories={categories}
             onUpdate={setCategories}
+            disabled={saving}
           />
 
           <div>
@@ -239,6 +251,7 @@ export default function EditProduct({ params }: ParamsProps) {
               onChange={handleChange}
               placeholder="שם מוצר"
               required
+              disabled={saving}
             />
           </div>
 
@@ -254,6 +267,7 @@ export default function EditProduct({ params }: ParamsProps) {
               onChange={handleChange}
               placeholder="0.00"
               required
+              disabled={saving}
             />
           </div>
 
@@ -269,6 +283,7 @@ export default function EditProduct({ params }: ParamsProps) {
                 value={product.saleQuantity || ""}
                 onChange={handleChange}
                 className="w-1/2"
+                disabled={saving}
               />
               <span className="text-sm">ב־</span>
               <Input
@@ -280,11 +295,12 @@ export default function EditProduct({ params }: ParamsProps) {
                 value={product.salePrice || ""}
                 onChange={handleChange}
                 className="w-1/2"
+                disabled={saving}
               />
             </div>
           </div>
 
-          <Button type="submit" className="w-full mt-4">
+          <Button type="submit" className="w-full mt-4" disabled={saving}>
             {saving ? "שומר..." : "שמור"}
           </Button>
 
@@ -292,6 +308,7 @@ export default function EditProduct({ params }: ParamsProps) {
             type="button"
             className="w-full mt-2 bg-red-600 text-white hover:bg-red-700"
             onClick={handleDelete}
+            disabled={saving}
           >
             מחק מוצר
           </Button>

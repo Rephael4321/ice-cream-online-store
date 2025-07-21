@@ -18,6 +18,7 @@ interface ImageSelectorProps<T extends BaseItem> {
   onChange: (item: T | null) => void;
   label?: string;
   placeholder?: string;
+  disabled?: boolean; // ✅ NEW
 }
 
 export default function ImageSelector<T extends BaseItem>({
@@ -26,6 +27,7 @@ export default function ImageSelector<T extends BaseItem>({
   onChange,
   label = "תמונה",
   placeholder = "שם",
+  disabled = false, // ✅ default value
 }: ImageSelectorProps<T>) {
   const [focused, setFocused] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
@@ -43,7 +45,7 @@ export default function ImageSelector<T extends BaseItem>({
   };
 
   const handleSuggestionClick = (item: T) => {
-    if (!item.disabled) {
+    if (!item.disabled && !disabled) {
       onChange(item);
       setFocused(false);
     }
@@ -58,9 +60,10 @@ export default function ImageSelector<T extends BaseItem>({
         value={value}
         onChange={handleInputChange}
         placeholder={placeholder}
-        onFocus={() => setFocused(true)}
+        onFocus={() => !disabled && setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 100)}
         className="hover:cursor-pointer"
+        disabled={disabled} // ✅ disable typing
       />
 
       {focused && filteredItems.length > 0 && (
@@ -69,12 +72,18 @@ export default function ImageSelector<T extends BaseItem>({
             <li
               key={item.id}
               className={`flex items-center gap-2 px-3 py-2 text-sm ${
-                item.disabled
+                item.disabled || disabled
                   ? "opacity-40 line-through cursor-not-allowed"
                   : "hover:bg-gray-100 cursor-pointer"
               }`}
               onMouseDown={() => handleSuggestionClick(item)}
-              title={item.disabled ? "מוצר כבר קיים" : undefined}
+              title={
+                item.disabled
+                  ? "מוצר כבר קיים"
+                  : disabled
+                  ? "פעולה חסומה"
+                  : undefined
+              }
             >
               {item.image && (
                 <div className="relative w-8 h-8">
@@ -93,8 +102,11 @@ export default function ImageSelector<T extends BaseItem>({
           <li className="text-center px-3 py-2 border-t bg-gray-50">
             <button
               type="button"
-              onMouseDown={() => setShowGallery(true)}
-              className="text-blue-600 hover:underline text-sm"
+              onMouseDown={() => !disabled && setShowGallery(true)}
+              className={`text-blue-600 hover:underline text-sm ${
+                disabled ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={disabled}
             >
               הצג את כל התמונות
             </button>
@@ -117,15 +129,23 @@ export default function ImageSelector<T extends BaseItem>({
                 <div
                   key={item.id}
                   className={`cursor-pointer ${
-                    item.disabled ? "opacity-40 cursor-not-allowed" : ""
+                    item.disabled || disabled
+                      ? "opacity-40 cursor-not-allowed"
+                      : ""
                   }`}
                   onClick={() => {
-                    if (!item.disabled) {
+                    if (!item.disabled && !disabled) {
                       handleSuggestionClick(item);
                       setShowGallery(false);
                     }
                   }}
-                  title={item.disabled ? "מוצר כבר קיים" : undefined}
+                  title={
+                    item.disabled
+                      ? "מוצר כבר קיים"
+                      : disabled
+                      ? "פעולה חסומה"
+                      : undefined
+                  }
                 >
                   <div className="relative w-full h-32 border rounded bg-white">
                     {item.image && (

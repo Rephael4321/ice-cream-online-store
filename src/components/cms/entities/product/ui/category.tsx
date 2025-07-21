@@ -20,12 +20,14 @@ interface Props {
   productId: string;
   initialCategories: Category[];
   onUpdate: (newCategories: Category[]) => void;
+  disabled?: boolean; // ✅ added
 }
 
 export default function CategorySelector({
   productId,
   initialCategories,
   onUpdate,
+  disabled = false, // ✅ default value
 }: Props) {
   const [linked, setLinked] = useState<Category[]>(initialCategories);
   const [available, setAvailable] = useState<Category[]>([]);
@@ -45,6 +47,7 @@ export default function CategorySelector({
   }, [linked]);
 
   const unlink = async (categoryId: number) => {
+    if (disabled) return;
     await fetch(
       `/api/product-category?productId=${productId}&categoryId=${categoryId}`,
       { method: "DELETE" }
@@ -55,7 +58,7 @@ export default function CategorySelector({
   };
 
   const link = async () => {
-    if (!selectedId) return;
+    if (!selectedId || disabled) return;
     await fetch("/api/product-category", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,8 +87,9 @@ export default function CategorySelector({
               {cat.name}
               <button
                 type="button"
-                className="text-red-500 hover:text-red-700 font-bold"
+                className="text-red-500 hover:text-red-700 font-bold disabled:opacity-50"
                 onClick={() => unlink(cat.id)}
+                disabled={disabled}
               >
                 ×
               </button>
@@ -100,6 +104,7 @@ export default function CategorySelector({
       {available.length > 0 && (
         <div className="flex items-center gap-2">
           <Select
+            disabled={disabled}
             value={selectedId?.toString() || ""}
             onValueChange={(value) => {
               const num = Number(value);
@@ -117,7 +122,7 @@ export default function CategorySelector({
               ))}
             </SelectContent>
           </Select>
-          <Button type="button" onClick={link}>
+          <Button type="button" onClick={link} disabled={disabled}>
             הוסף
           </Button>
         </div>
