@@ -11,11 +11,9 @@ export default function Order() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("🔍 Fetching order for ID:", id);
-    fetch(`/api/orders/client/${id}`)
+    fetch(`/api/orders/client/${id}`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
-        console.log("📦 Response data:", data);
         if (data.error) {
           setError(data.error);
         } else {
@@ -23,8 +21,7 @@ export default function Order() {
           setItems(data.items);
         }
       })
-      .catch((err) => {
-        console.error("❌ Fetch error:", err);
+      .catch(() => {
         setError("שגיאה בעת טעינת ההזמנה");
       });
   }, [id]);
@@ -51,7 +48,7 @@ export default function Order() {
         <p>👤 לקוח: {order.clientName ?? "—"}</p>
         <p>🏠 כתובת: {order.clientAddress ?? "—"}</p>
         <p>📅 תאריך: {new Date(order.createdAt).toLocaleString("he-IL")}</p>
-        <p>🏷️ סטטוס: {order.is_ready ? "✅ מוכנה" : "🕒 בטיפול"}</p>
+        <p>🏷️ סטטוס: {order.isReady ? "✅ מוכנה" : "🕒 בטיפול"}</p>
       </div>
 
       <h2 className="mt-6 font-semibold text-lg">📋 פרטי המוצרים:</h2>
