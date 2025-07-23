@@ -34,11 +34,38 @@ export default function Order() {
   if (!order)
     return <div className="p-4 text-right rtl">📦 טוען את פרטי ההזמנה...</div>;
 
-  const total = items.reduce((acc, item) => {
-    const qty = item.sale_quantity ?? item.quantity;
-    const price = Number(item.sale_price ?? item.unit_price);
-    return acc + qty * price;
-  }, 0);
+  let totalBeforeDiscount = 0;
+  let finalTotal = 0;
+
+  const processedItems = items.map((item) => {
+    const qty = item.quantity;
+    const unitPrice = Number(item.unit_price);
+    const saleQty = item.sale_quantity;
+    const salePrice = item.sale_price !== null ? Number(item.sale_price) : null;
+
+    totalBeforeDiscount += qty * unitPrice;
+
+    let productTotal = 0;
+    if (saleQty && salePrice !== null && qty >= saleQty) {
+      const bundles = Math.floor(qty / saleQty);
+      const rest = qty % saleQty;
+      productTotal = bundles * salePrice + rest * unitPrice;
+    } else {
+      productTotal = qty * unitPrice;
+    }
+
+    finalTotal += productTotal;
+
+    return {
+      ...item,
+      unitPrice,
+      saleQty,
+      salePrice,
+      productTotal,
+    };
+  });
+
+  const totalSavings = totalBeforeDiscount - finalTotal;
 
   return (
     <div className="max-w-2xl mx-auto p-6 text-right rtl">
@@ -52,8 +79,8 @@ export default function Order() {
       </div>
 
       <h2 className="mt-6 font-semibold text-lg">📋 פרטי המוצרים:</h2>
-      <ul className="space-y-4 mt-2">
-        {items.map((item, i) => (
+      <ul className="space-y-6 mt-2">
+        {processedItems.map((item, i) => (
           <li
             key={i}
             className="border rounded p-4 shadow-sm flex items-center gap-4"
@@ -73,21 +100,31 @@ export default function Order() {
                 </div>
               )}
             </div>
-            <div className="flex-1 space-y-1">
-              <p className="font-semibold">🧁 {item.product_name}</p>
-              <p>🔢 כמות: {item.sale_quantity ?? item.quantity}</p>
-              <p>
-                💰 מחיר: ₪
-                {Number(item.sale_price ?? item.unit_price).toFixed(2)}
-              </p>
+            <div className="flex-1 space-y-1 text-right rtl">
+              <p className="font-semibold">{item.product_name}</p>
+              <p>{item.product_name}</p>
+              <p>כמות: {item.quantity}</p>
+              <p>מחיר רגיל: ₪{item.unitPrice.toFixed(2)}</p>
+              {item.saleQty &&
+                item.salePrice !== null &&
+                item.quantity >= item.saleQty && (
+                  <p>
+                    מחיר מבצע: ₪{item.salePrice.toFixed(2)} ל‑{item.saleQty}
+                  </p>
+                )}
+              <p>סה״כ למוצר: ₪{item.productTotal.toFixed(2)}</p>
+              <p className="text-green-700">✔️ במלאי</p>
             </div>
           </li>
         ))}
       </ul>
 
-      <p className="mt-6 text-xl font-bold">
-        💵 סה״כ לתשלום: ₪{total.toFixed(2)}
-      </p>
+      <div className="mt-6 text-xl font-bold space-y-1 text-right rtl">
+        {totalSavings > 0 && (
+          <p className="text-green-700">🎁 חסכת: ₪{totalSavings.toFixed(2)}</p>
+        )}
+        <p>💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}</p>
+      </div>
     </div>
   );
 }

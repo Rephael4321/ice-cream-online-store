@@ -28,11 +28,11 @@ export async function GET(
         isAdmin = true;
       }
     } catch {
-      // Invalid token → fallback to phone
+      // Token invalid → fallback to phone
     }
   }
 
-  const query = `
+  const orderQuery = `
     SELECT 
       o.id AS "orderId",
       o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
@@ -47,8 +47,8 @@ export async function GET(
     ${isAdmin ? "" : "AND c.phone = $2"}
   `;
 
-  const paramsList = isAdmin ? [orderId] : [orderId, phone];
-  const orderResult = await pool.query(query, paramsList);
+  const orderParams = isAdmin ? [orderId] : [orderId, phone];
+  const orderResult = await pool.query(orderQuery, orderParams);
 
   if (orderResult.rowCount === 0) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -56,8 +56,8 @@ export async function GET(
 
   const order = orderResult.rows[0];
 
-  const itemsResult = await pool.query(
-    `SELECT 
+  const itemsQuery = `
+    SELECT 
       product_name, 
       product_image, 
       quantity, 
@@ -65,19 +65,23 @@ export async function GET(
       sale_quantity, 
       sale_price
     FROM order_items
-    WHERE order_id = $1`,
-    [orderId]
-  );
+    WHERE order_id = $1
+  `;
+  const itemsResult = await pool.query(itemsQuery, [orderId]);
 
   const items = itemsResult.rows.map((item) => {
     const quantity = item.quantity;
     const unitPrice = Number(item.unit_price);
     const saleQuantity = item.sale_quantity;
-    const salePrice = item.sale_price ? Number(item.sale_price) : null;
+    const salePrice = item.sale_price !== null ? Number(item.sale_price) : null;
 
     let total = unitPrice * quantity;
 
-    if (saleQuantity && salePrice !== null && quantity >= saleQuantity) {
+    if (
+      saleQuantity !== null &&
+      salePrice !== null &&
+      quantity >= saleQuantity
+    ) {
       const bundles = Math.floor(quantity / saleQuantity);
       const rest = quantity % saleQuantity;
       total = bundles * salePrice + rest * unitPrice;
