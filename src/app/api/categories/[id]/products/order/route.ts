@@ -1,10 +1,35 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
+// ✅ Shared Admin Check
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ✅ PUT /api/categories/[id]/organize — admin only
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const isAdmin = await verifyAdmin();
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const categoryId = Number(params.id);
   if (isNaN(categoryId)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });

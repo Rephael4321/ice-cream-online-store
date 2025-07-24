@@ -11,9 +11,9 @@ import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-l
 /* ---------- types ---------- */
 type Order = {
   orderId: number;
-  phone: string;
-  name: string | null;
-  address: string | null;
+  clientPhone: string;
+  clientName: string | null;
+  clientAddress: string | null;
   createdAt: string;
   isPaid: boolean;
   isReady: boolean;
@@ -24,9 +24,9 @@ type Item = {
   productName: string;
   productImage: string;
   quantity: number;
-  unitPrice: number; // coerced to number
+  unitPrice: number;
   saleQuantity: number | null;
-  salePrice: number | null; // coerced to number
+  salePrice: number | null;
 };
 type ExtendedItem = Item & { inStock: boolean };
 
@@ -44,7 +44,6 @@ export default function ViewOrder() {
   const [clicks, setClicks] = useState(0);
   const clickTimer = useRef<NodeJS.Timeout | null>(null);
 
-  /* ---------- helpers ---------- */
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
     const r = await fetch(`/api/orders/${order.orderId}`, {
@@ -60,14 +59,13 @@ export default function ViewOrder() {
   const handleTitleClick = () => {
     setClicks((c) => c + 1);
     clickTimer.current && clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClicks(0), 1_000);
+    clickTimer.current = setTimeout(() => setClicks(0), 1000);
     if (clicks + 1 >= 5) {
       setClicks(0);
       markAsTest(true);
     }
   };
 
-  /* ---------- initial fetch ---------- */
   useEffect(() => {
     if (!id) return;
 
@@ -106,7 +104,6 @@ export default function ViewOrder() {
     })();
   }, [id]);
 
-  /* ---------- utils ---------- */
   const flipOrderBool = async (field: "isPaid" | "isReady") => {
     if (!order) return;
     const r = await fetch(`/api/orders/${order.orderId}`, {
@@ -147,20 +144,18 @@ export default function ViewOrder() {
     return actual;
   };
 
-  /* ---------- ready click: only toggle DB flag ---------- */
   const handleReadyClick = async () => {
     if (!order) return;
     await flipOrderBool("isReady");
   };
 
-  /* ---------- delete / client edit ---------- */
   const handleDelete = async () => {
     if (!order) return;
     if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
     const r = await fetch(`/api/orders/${order.orderId}`, { method: "DELETE" });
     r.ok
-      ? (toast.success("🗑️ הזמנה נמחקה"), (window.location.href = "/orders"))
-      : toast.error("❌ שגיאה במחיקה");
+      ? (toast.success("🗑️ הזמנה נמחקה"), (window.location.href = "/orders"))
+      : toast.error("❌ שגיאה במחיקה");
   };
 
   const handleUpdateClient = async () => {
@@ -175,19 +170,19 @@ export default function ViewOrder() {
     });
     const data = await r.json();
     setOrder((o) => (o ? { ...o, ...data } : o));
-    toast.success("📝 עודכן בהצלחה");
+    toast.success("📝 עודכן בהצלחה");
     setEditOpen(false);
   };
 
   if (loading) return <p className="p-6">טוען…</p>;
-  if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
+  if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
   const finalTotal = calcTotals();
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <Link href="/orders" className="text-blue-600 hover:underline">
-        ← חזרה לרשימת הזמנות
+        ← חזרה לרשימת הזמנות
       </Link>
 
       <ClientControlPanel
@@ -196,8 +191,8 @@ export default function ViewOrder() {
         onDelete={handleDelete}
         onMarkTest={markAsTest}
         onEdit={() => {
-          setNewName(order.name ?? "");
-          setNewAddr(order.address ?? "");
+          setNewName(order.clientName ?? "");
+          setNewAddr(order.clientAddress ?? "");
           setEditOpen(true);
         }}
         onTogglePaid={() => flipOrderBool("isPaid")}
@@ -220,7 +215,7 @@ export default function ViewOrder() {
             onClick={(e) => e.stopPropagation()}
             className="bg-white p-6 rounded shadow-lg w-full max-w-md"
           >
-            <h2 className="text-lg font-bold mb-4">עריכת פרטי לקוח</h2>
+            <h2 className="text-lg font-bold mb-4">עריכת פרטי לקוח</h2>
 
             <label className="block mb-2">
               שם:

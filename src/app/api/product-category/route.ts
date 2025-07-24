@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-// Request body type
+// === Types ===
 type LinkProductToCategoryPayload = {
   productId: number;
   categoryId: number;
@@ -15,7 +17,29 @@ type ProductPriceRow = {
   price: number;
 };
 
+// === Admin check ===
+async function isAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === POST /api/products/categories (🔐 admin only) ===
 export async function POST(req: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { productId, categoryId }: LinkProductToCategoryPayload =
       await req.json();
@@ -42,13 +66,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (category.type === "sale") {
-      // Step 2: Get the price of the new product
+      // Step 2: Get new product price
       const productResult = await pool.query<ProductPriceRow>(
         "SELECT price FROM products WHERE id = $1",
         [productId]
       );
       const newProduct = productResult.rows[0];
-
       if (!newProduct) {
         return NextResponse.json(
           { error: "Product not found" },
@@ -56,7 +79,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Step 3: Get one existing product in the category
+      // Step 3: Compare with existing products
       const existingResult = await pool.query<ProductPriceRow>(
         `SELECT p.price
          FROM products p
@@ -78,15 +101,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 4: Insert relation with dynamic sort_order
+    // Step 4: Insert with incremental sort_order
     await pool.query(
-      `
-      INSERT INTO product_categories (product_id, category_id, sort_order)
-      SELECT $1, $2, COALESCE(MAX(sort_order), -1) + 1
-      FROM product_categories
-      WHERE category_id = $2
-      ON CONFLICT (product_id, category_id) DO NOTHING
-      `,
+      `INSERT INTO product_categories (product_id, category_id, sort_order)
+       SELECT $1, $2, COALESCE(MAX(sort_order), -1) + 1
+       FROM product_categories
+       WHERE category_id = $2
+       ON CONFLICT (product_id, category_id) DO NOTHING`,
       [productId, categoryId]
     );
 
@@ -95,16 +116,20 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (err: unknown) {
-    console.error("Error linking product to category:", err);
+    console.error("❌ Error linking product to category:", err);
     const error =
       err instanceof Error ? err.message : "Failed to link product to category";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
+// === DELETE /api/products/categories (🔐 admin only) ===
 export async function DELETE(req: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    // Parse productId and categoryId from query params
     const { searchParams } = new URL(req.url);
     const productId = Number(searchParams.get("productId"));
     const categoryId = Number(searchParams.get("categoryId"));
@@ -116,7 +141,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Delete the relation
     await pool.query(
       `DELETE FROM product_categories WHERE product_id = $1 AND category_id = $2`,
       [productId, categoryId]
@@ -124,7 +148,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    console.error("Error unlinking product from category:", err);
+    console.error("❌ Error unlinking product from category:", err);
     const error =
       err instanceof Error
         ? err.message

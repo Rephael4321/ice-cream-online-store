@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
+// GET /api/categories/root → public
 export async function GET(_req: NextRequest) {
   try {
     const result = await pool.query(

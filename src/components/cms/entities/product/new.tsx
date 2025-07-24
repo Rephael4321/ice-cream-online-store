@@ -19,10 +19,10 @@ type ProductForm = {
 
 type ProductPayload = {
   name: string;
-  price: string;
+  price: number;
   image: string;
-  saleQuantity?: string;
-  salePrice?: string;
+  saleQuantity?: number;
+  salePrice?: number;
 };
 
 export default function NewProduct() {
@@ -85,12 +85,15 @@ export default function NewProduct() {
 
     const payload: ProductPayload = {
       name: product.name,
-      price: product.price,
+      price: Number(product.price),
       image: fullImagePath,
     };
 
-    if (product.saleQuantity) payload.saleQuantity = product.saleQuantity;
-    if (product.salePrice) payload.salePrice = product.salePrice;
+    const quantity = Number(product.saleQuantity);
+    const sale = Number(product.salePrice);
+
+    if (!isNaN(quantity)) payload.saleQuantity = quantity;
+    if (!isNaN(sale)) payload.salePrice = sale;
 
     try {
       const response = await fetch("/api/products", {

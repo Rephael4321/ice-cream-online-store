@@ -2,19 +2,18 @@
 
 import { toast } from "sonner";
 
-/** Props coming from `<OrderDetails />` */
 type Props = {
   order: {
     orderId: number;
-    phone: string;
-    name: string | null;
-    address: string | null;
+    clientPhone: string;
+    clientName: string | null;
+    clientAddress: string | null;
     createdAt: string;
     isPaid: boolean;
     isReady: boolean;
     isTest?: boolean;
   };
-  finalTotal: number; // ✅ Added to support WhatsApp message
+  finalTotal: number;
   onDelete: () => void;
   onMarkTest: (flag: boolean) => void;
   onEdit: () => void;
@@ -25,7 +24,7 @@ type Props = {
 
 export default function ClientControlPanel({
   order,
-  finalTotal, // ✅ Destructure new prop
+  finalTotal,
   onDelete,
   onMarkTest,
   onEdit,
@@ -33,11 +32,19 @@ export default function ClientControlPanel({
   onReadyClick,
   handleTitleClick,
 }: Props) {
+  const phone = order.clientPhone;
+  const name = order.clientName;
+  const address = order.clientAddress;
+
   const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
 
   const waMessage = `שלום${
-    order.name ? " " + order.name : ""
-  }, ההזמנה מוכנה והיא תצא בהקדם, סכום לתשלום: ₪${finalTotal.toFixed(2)}`;
+    name ? " " + name : ""
+  }, ההזמנה מוכנה והיא תצא בהקדם, סכום לתשלום: ₪${finalTotal.toFixed(2)} 🍦`;
+  const waPhone = phone?.replace(/[^0-9]/g, "").replace(/^0/, "972");
+  const waLink = waPhone
+    ? `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}`
+    : "#";
 
   return (
     <div className={`border p-4 rounded shadow ${testStyle}`}>
@@ -72,34 +79,43 @@ export default function ClientControlPanel({
       </div>
 
       {/* ───────── contact ───────── */}
-      <p>שם: {order.name ?? "—"}</p>
-      <p>כתובת: {order.address ?? "—"}</p>
+      <p>שם: {name ?? "—"}</p>
+      <p>כתובת: {address ?? "—"}</p>
       <p>
         טלפון:&nbsp;
         <button
           onClick={() => {
-            navigator.clipboard.writeText(order.phone);
-            toast.success("📋 מספר הטלפון הועתק");
+            navigator.clipboard.writeText(phone);
+            toast.success("📋 מספר הטלפון הועתק");
           }}
           className="underline text-blue-700 hover:text-blue-900"
         >
-          {order.phone}
+          {phone}
         </button>
       </p>
 
       <div className="flex items-center gap-4 mt-2">
         <a
-          href={`tel:${order.phone}`}
+          href={`tel:${phone}`}
           className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
         >
           📞 התקשר
         </a>
+
         <a
-          href={`https://wa.me/${order.phone
-            .replace(/[^0-9]/g, "")
-            .replace(/^0/, "972")}?text=${encodeURIComponent(waMessage)}`} // ✅ WhatsApp message
-          className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
+          href={waLink}
+          className={`text-sm px-3 py-1 rounded transition text-white ${
+            waPhone
+              ? "bg-green-600 hover:bg-green-700"
+              : "bg-gray-400 cursor-not-allowed"
+          }`}
           rel="noopener noreferrer"
+          onClick={(e) => {
+            if (!waPhone) {
+              e.preventDefault();
+              toast.error("מספר טלפון לא זמין או לא תקין");
+            }
+          }}
         >
           💬 וואטסאפ
         </a>
@@ -111,7 +127,7 @@ export default function ClientControlPanel({
           onClick={onEdit}
           className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
         >
-          ✏️ ערוך פרטי לקוח
+          ✏️ ערוך פרטי לקוח
         </button>
       </div>
 
@@ -132,7 +148,7 @@ export default function ClientControlPanel({
               : "bg-red-500 hover:bg-red-600"
           }`}
         >
-          {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
+          {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
         </button>
 
         <button
@@ -143,7 +159,7 @@ export default function ClientControlPanel({
               : "bg-red-500 hover:bg-red-600"
           }`}
         >
-          {order.isReady ? "הזמנה מוכנה ✅" : "הזמנה חדשה 🆕"}
+          {order.isReady ? "הזמנה מוכנה ✅" : "הזמנה חדשה 🆕"}
         </button>
       </div>
     </div>

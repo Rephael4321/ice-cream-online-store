@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-// Types
+// === Types ===
 type SaleCategory = {
   id: number;
   name: string;
@@ -25,10 +27,7 @@ type EffectiveSale =
       fromCategory: true;
       quantity: number;
       price: number;
-      category: {
-        id: number;
-        name: string;
-      };
+      category: { id: number; name: string };
     }
   | {
       fromCategory: false;
@@ -36,7 +35,24 @@ type EffectiveSale =
       price: number;
     };
 
-// GET /api/products/[id]
+// === Admin Check ===
+async function isAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === GET /api/products/[id] === (🟢 Public)
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -128,11 +144,15 @@ export async function GET(
   }
 }
 
-// PUT /api/products/[id]
+// === PUT /api/products/[id] === (🔐 Admin only)
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const id = Number(params.id);
     if (isNaN(id)) {
@@ -193,11 +213,15 @@ export async function PUT(
   }
 }
 
-// DELETE /api/products/[id]
+// === DELETE /api/products/[id] === (🔐 Admin only)
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const id = Number(params.id);
     if (isNaN(id)) {

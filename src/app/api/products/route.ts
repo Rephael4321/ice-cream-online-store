@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
 type ProductRow = {
@@ -13,7 +15,24 @@ type ProductRow = {
   saleUpdatedAt: string | null;
 };
 
-// GET /api/products
+// === JWT Admin Verification ===
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === GET /api/products ===
 export async function GET() {
   try {
     const result = await pool.query<ProductRow>(
@@ -38,8 +57,12 @@ export async function GET() {
   }
 }
 
-// POST /api/products
+// === POST /api/products (admin only) ===
 export async function POST(req: NextRequest) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { name, price, image, saleQuantity, salePrice } = body;

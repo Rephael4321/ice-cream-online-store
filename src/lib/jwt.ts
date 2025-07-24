@@ -1,15 +1,24 @@
-import jwt, { JwtPayload } from "jsonwebtoken";
+// lib/jwt.ts
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("Missing JWT_SECRET");
 
-export function createJWT(payload: Record<string, unknown>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "14d" }) as string;
+const encoder = new TextEncoder();
+const key = encoder.encode(JWT_SECRET);
+
+export async function createJWT(payload: JWTPayload): Promise<string> {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("14d")
+    .sign(key);
 }
 
-export function verifyJWT(token: string): JwtPayload | null {
+export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return typeof decoded === "string" ? null : decoded;
+    const { payload } = await jwtVerify(token, key);
+    return payload;
   } catch {
     return null;
   }

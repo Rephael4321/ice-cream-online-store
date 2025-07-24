@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-// DB types
+// Types
 type Category = {
   id: number;
   name: string;
@@ -26,7 +28,23 @@ type CategorySale = {
   sale_price: number;
 };
 
-// GET /api/categories/[id]
+// ✅ Shared Admin Check
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ✅ GET /api/categories/[id] — public
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -59,18 +77,21 @@ export async function GET(
     }
 
     return NextResponse.json({ category: result.rows[0] });
-  } catch (err: unknown) {
-    const error =
-      err instanceof Error ? err.message : "Unexpected error occurred";
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Unexpected error";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
-// PUT /api/categories/[id]
+// ✅ PUT /api/categories/[id] — admin only
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const {
       name,
@@ -110,7 +131,6 @@ export async function PUT(
     if (type === "sale") {
       const quantity = Number(saleQuantity);
       const price = Number(salePrice);
-
       if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
         return NextResponse.json(
           { error: "Invalid saleQuantity or salePrice" },
@@ -141,21 +161,23 @@ export async function PUT(
     }
 
     return NextResponse.json({ message: "Category updated" });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("PUT /categories/[id] error:", err);
-    const error =
-      err instanceof Error ? err.message : "Unexpected error occurred";
+    const error = err instanceof Error ? err.message : "Unexpected error";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
-// DELETE /api/categories/[id]
+// ✅ DELETE /api/categories/[id] — admin only
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const id = Number(params.id);
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  const id = Number(params.id);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
   }
@@ -174,10 +196,9 @@ export async function DELETE(
     }
 
     return new NextResponse(null, { status: 204 });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("DELETE /categories/[id] error:", err);
-    const error =
-      err instanceof Error ? err.message : "Unexpected error occurred";
+    const error = err instanceof Error ? err.message : "Unexpected error";
     return NextResponse.json({ error }, { status: 500 });
   }
 }

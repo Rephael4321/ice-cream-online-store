@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
 type OrderRow = {
@@ -25,13 +27,30 @@ type OrderItemRow = {
   updatedAt: string;
 };
 
-// === GET single order (visible only) ===
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === GET /api/orders/[id] (public view) ===
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const orderId = Number(params.id);
   if (isNaN(orderId)) {
+    console.warn("❌ Invalid order ID:", params.id);
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
@@ -49,12 +68,13 @@ export async function GET(
          o.is_test AS "isTest"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
-       WHERE o.id = $1 AND o.is_visible = true`, // ✅ soft-delete-aware
+       WHERE o.id = $1 AND o.is_visible = true`,
       [orderId]
     );
 
     const order = orderResult.rows[0];
     if (!order) {
+      console.warn("❌ Order not found or is not visible");
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
@@ -75,31 +95,25 @@ export async function GET(
     );
 
     return NextResponse.json({
-      order: {
-        orderId: order.orderId,
-        phone: order.clientPhone,
-        name: order.clientName,
-        address: order.clientAddress,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        isPaid: order.isPaid,
-        isReady: order.isReady,
-        isTest: order.isTest,
-      },
+      order,
       items: itemsResult.rows,
     });
   } catch (err: unknown) {
-    console.error("Error fetching order:", err);
+    console.error("❌ Error fetching order:", err);
     const error = err instanceof Error ? err.message : "Failed to fetch order";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
-// === PATCH: update status, client, or mark as test ===
+// === PATCH /api/orders/[id] (admin only) ===
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const orderId = Number(params.id);
   if (isNaN(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
@@ -170,18 +184,21 @@ export async function PATCH(
   }
 }
 
-// === DELETE → SOFT DELETE ===
+// === DELETE /api/orders/[id] (admin only) ===
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const orderId = Number(params.id);
   if (isNaN(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
   try {
-    // ✅ SOFT DELETE
     await pool.query(`UPDATE orders SET is_visible = false WHERE id = $1`, [
       orderId,
     ]);

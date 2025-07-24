@@ -1,36 +1,23 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { verifyJWT } from "@/lib/jwt"; // ✅ uses your verified decoder
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const cookie = cookies();
-  const phone = (await cookie).get("phoneNumber")?.value;
-  const jwtToken = (await cookie).get("token")?.value;
   const orderId = Number(params.id);
-
   if (isNaN(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
-  let isAdmin = false;
+  const cookie = cookies();
+  const phone = (await cookie).get("phoneNumber")?.value;
+  const jwtToken = (await cookie).get("token")?.value;
 
-  if (jwtToken) {
-    try {
-      const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET!);
-      if (
-        typeof decoded === "object" &&
-        ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-      ) {
-        isAdmin = true;
-      }
-    } catch {
-      // Token invalid → fallback to phone
-    }
-  }
+  const payload = jwtToken ? await verifyJWT(jwtToken) : null;
+  const isAdmin = payload?.role === "admin" || payload?.id === "admin";
 
   const orderQuery = `
     SELECT 
@@ -56,18 +43,18 @@ export async function GET(
 
   const order = orderResult.rows[0];
 
-  const itemsQuery = `
-    SELECT 
+  const itemsResult = await pool.query(
+    `SELECT 
       product_name, 
       product_image, 
       quantity, 
       unit_price, 
       sale_quantity, 
       sale_price
-    FROM order_items
-    WHERE order_id = $1
-  `;
-  const itemsResult = await pool.query(itemsQuery, [orderId]);
+     FROM order_items
+     WHERE order_id = $1`,
+    [orderId]
+  );
 
   const items = itemsResult.rows.map((item) => {
     const quantity = item.quantity;

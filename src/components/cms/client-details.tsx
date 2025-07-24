@@ -15,8 +15,9 @@ type Client = {
 };
 
 export default function ClientDetails() {
-  const { id } = useParams();
+  const params = useParams();
   const router = useRouter();
+  const id = params.id as string;
 
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,12 +27,24 @@ export default function ClientDetails() {
   useEffect(() => {
     async function fetchClient() {
       try {
-        const res = await fetch(`/api/clients/${id}`);
+        const res: Response = await fetch(`/api/clients/${id}`);
         if (!res.ok) throw new Error("Failed to fetch client");
-        const data = await res.json();
+        const data: any = await res.json();
+
+        const {
+          id: clientId,
+          name = "",
+          phone = "",
+          address = "",
+          created_at,
+        } = data;
+
         setClient({
-          ...data,
-          createdAt: new Date(data.created_at).toLocaleString("he-IL"),
+          id: clientId,
+          name,
+          phone,
+          address,
+          createdAt: new Date(created_at).toLocaleString("he-IL"),
         });
       } catch (err) {
         setError("תקלה בטעינת לקוח");
@@ -100,19 +113,27 @@ export default function ClientDetails() {
       <div className="space-y-4">
         <div>
           <Label htmlFor="name">שם</Label>
-          <Input name="name" value={client.name} onChange={handleChange} />
+          <Input
+            name="name"
+            value={client?.name ?? ""}
+            onChange={handleChange}
+          />
         </div>
 
         <div>
           <Label htmlFor="phone">טלפון</Label>
-          <Input name="phone" value={client.phone} onChange={handleChange} />
+          <Input
+            name="phone"
+            value={client?.phone ?? ""}
+            onChange={handleChange}
+          />
         </div>
 
         <div>
           <Label htmlFor="address">כתובת</Label>
           <Input
             name="address"
-            value={client.address}
+            value={client?.address ?? ""}
             onChange={handleChange}
           />
         </div>

@@ -1,7 +1,8 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-// Shared Types
 type Category = {
   id: number;
   name: string;
@@ -14,7 +15,24 @@ type Category = {
   updated_at: string;
 };
 
-// GET /api/categories
+// === Reusable Admin Check ===
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === GET /api/categories (public) ===
 export async function GET(req: NextRequest) {
   try {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
@@ -43,8 +61,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/categories
+// === POST /api/categories (admin only) ===
 export async function POST(req: NextRequest) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const {
       name,
@@ -118,8 +140,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH /api/categories
+// === PATCH /api/categories (admin only) ===
 export async function PATCH(req: NextRequest) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const {
       id,

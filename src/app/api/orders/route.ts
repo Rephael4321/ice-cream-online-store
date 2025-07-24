@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { protectAPI } from "@/lib/api/jwt-protect";
 
 // === Create New Order ===
 export async function POST(req: NextRequest) {
@@ -17,7 +18,6 @@ export async function POST(req: NextRequest) {
 
     await client.query("BEGIN");
 
-    // 1. Check if client exists
     const existingClient = await client.query<{ id: number }>(
       `SELECT id FROM clients WHERE phone = $1`,
       [phone]
@@ -34,14 +34,12 @@ export async function POST(req: NextRequest) {
       clientId = insertClient.rows[0].id;
     }
 
-    // 2. Create order
     const orderResult = await client.query<{ id: number }>(
       `INSERT INTO orders (client_id) VALUES ($1) RETURNING id`,
       [clientId]
     );
     const orderId = orderResult.rows[0].id;
 
-    // 3. Insert items
     for (const item of items) {
       const {
         productId,
@@ -84,6 +82,9 @@ export async function POST(req: NextRequest) {
 
 // === List Orders (visible only) ===
 export async function GET(req: NextRequest) {
+  const authError = await protectAPI(req);
+  if (authError) return authError;
+
   try {
     const from = req.nextUrl.searchParams.get("from");
     const to = req.nextUrl.searchParams.get("to");

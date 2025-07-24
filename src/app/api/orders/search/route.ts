@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { protectAPI } from "@/lib/api/jwt-protect";
 
 export async function GET(req: NextRequest) {
+  const authError = await protectAPI(req);
+  if (authError) return authError;
+
   const query = req.nextUrl.searchParams.get("query")?.trim() ?? "";
 
   if (!query) return NextResponse.json({ orders: [] });

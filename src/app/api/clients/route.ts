@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { protectAPI } from "@/lib/api/jwt-protect";
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // ✅ Admin-only access
+  const authError = await protectAPI(req);
+  if (authError) return authError;
+
   try {
     const result = await pool.query(`
       SELECT 

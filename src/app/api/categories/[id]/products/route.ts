@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { protectAPI } from "@/lib/api/jwt-protect";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Explicitly invoke the protection (will allow GET requests)
+  const auth = await protectAPI(req);
+  if (auth) return auth;
+
   const categoryId = Number(params.id);
   if (isNaN(categoryId)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });

@@ -1,6 +1,26 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
+// === Reusable Admin Check ===
+async function verifyAdmin(): Promise<boolean> {
+  try {
+    const cookie = cookies();
+    const token = (await cookie).get("token")?.value;
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return (
+      typeof decoded === "object" &&
+      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === GET /api/clients/[id] – Public Access ===
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -12,17 +32,15 @@ export async function GET(
 
   try {
     const result = await pool.query(
-      `
-      SELECT 
-        id,
-        name,
-        phone,
-        address,
-        created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-        updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
-      FROM clients
-      WHERE id = $1
-      `,
+      `SELECT 
+         id,
+         name,
+         phone,
+         address,
+         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
+       FROM clients
+       WHERE id = $1`,
       [clientId]
     );
 
@@ -40,29 +58,29 @@ export async function GET(
   }
 }
 
+// === PUT /api/clients/[id] – Admin Only ===
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const clientId = Number(params.id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
   }
 
   try {
-    const body = await req.json();
-    const { name, phone, address } = body;
+    const { name, phone, address } = await req.json();
 
     if (!name || !phone || !address) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
     await pool.query(
-      `
-      UPDATE clients
-      SET name = $1, phone = $2, address = $3
-      WHERE id = $4
-      `,
+      `UPDATE clients SET name = $1, phone = $2, address = $3 WHERE id = $4`,
       [name.trim(), phone.trim(), address.trim(), clientId]
     );
 
@@ -76,10 +94,15 @@ export async function PUT(
   }
 }
 
+// === DELETE /api/clients/[id] – Admin Only ===
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!(await verifyAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const clientId = Number(params.id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
@@ -89,22 +112,18 @@ export async function DELETE(
   try {
     await client.query("BEGIN");
 
-    // 1. Get all related orders
     const ordersRes = await client.query<{ id: number }>(
       `SELECT id FROM orders WHERE client_id = $1`,
       [clientId]
     );
-
     const orderIds = ordersRes.rows.map((o) => o.id);
 
-    // 2. Delete all related orders (order_items will cascade)
     if (orderIds.length > 0) {
       await client.query(`DELETE FROM orders WHERE id = ANY($1::int[])`, [
         orderIds,
       ]);
     }
 
-    // 3. Delete the client
     await client.query(`DELETE FROM clients WHERE id = $1`, [clientId]);
 
     await client.query("COMMIT");
