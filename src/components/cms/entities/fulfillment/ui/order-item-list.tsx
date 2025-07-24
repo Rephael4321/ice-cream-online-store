@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 
-/* ─── Types passed from <OrderDetails /> ─── */
 export type Item = {
   productId: number;
   productName: string;
@@ -25,12 +25,10 @@ export default function OrderItemList({
   isTest,
   onToggleInStock,
 }: Props) {
-  /* ─── running totals ─── */
   let before = 0,
     after = 0,
     actual = 0;
 
-  /* ─── each line ─── */
   const rows = items.map((it) => {
     const base = it.unitPrice * it.quantity;
     before += base;
@@ -41,19 +39,21 @@ export default function OrderItemList({
       const rest = it.quantity % it.saleQuantity;
       withDisc = bundles * it.salePrice + rest * it.unitPrice;
     }
+
     after += withDisc;
     if (it.inStock) actual += withDisc;
 
     return (
       <li key={it.productId} className="border-b pb-2 flex gap-4 items-start">
         {it.productImage && (
-          <Image
-            src={it.productImage}
-            alt={it.productName}
-            width={60}
-            height={60}
-            className="rounded border"
-          />
+          <div className="w-[60px] h-[60px] relative shrink-0">
+            <Image
+              src={it.productImage}
+              alt={it.productName}
+              fill
+              className="object-contain rounded border"
+            />
+          </div>
         )}
 
         <div className="flex-1">
@@ -70,21 +70,31 @@ export default function OrderItemList({
           <p className="font-bold">סה״כ למוצר: ₪{withDisc.toFixed(2)}</p>
         </div>
 
-        <button
-          onClick={() => onToggleInStock(it.productId)}
-          className={`text-sm px-3 py-1 rounded h-fit mt-1 ${
-            it.inStock ? "bg-green-500 text-white" : "bg-gray-300"
-          }`}
-        >
-          {it.inStock ? "✔️ במלאי" : "❌ חסר"}
-        </button>
+        <div className="flex flex-col items-end gap-2 mt-1">
+          {/* ✔️ Stock toggle button */}
+          <button
+            onClick={() => onToggleInStock(it.productId)}
+            className={`text-sm px-3 py-1 rounded ${
+              it.inStock ? "bg-green-500 text-white" : "bg-gray-300"
+            }`}
+          >
+            {it.inStock ? "✔️ במלאי" : "❌ חסר"}
+          </button>
+
+          {/* ✏️ Edit product button */}
+          <Link
+            href={`/products/${it.productId}`}
+            className="text-sm px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 text-center"
+          >
+            ערוך מוצר
+          </Link>
+        </div>
       </li>
     );
   });
 
   const discount = before - after;
 
-  /* ─── box ─── */
   return (
     <div
       className={`border p-4 rounded shadow ${
