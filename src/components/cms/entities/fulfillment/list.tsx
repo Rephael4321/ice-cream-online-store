@@ -25,15 +25,15 @@ export default function ListOrder() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLUListElement>(null);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const getLast7DaysRange = () => {
     const now = new Date();
     const from = new Date(now);
     from.setDate(now.getDate() - 6);
-
     const format = (d: Date) => d.toISOString().split("T")[0];
-
     return {
       from: format(from),
       to: format(now),
@@ -50,12 +50,33 @@ export default function ListOrder() {
     setLoading(false);
   };
 
+  const searchOrders = async (query: string) => {
+    if (!query) {
+      const { from, to } = getLast7DaysRange();
+      fetchOrders(from, to);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/orders/search?query=${encodeURIComponent(query)}`
+      );
+      const data = await res.json();
+      setOrders(data.orders || []);
+    } catch {
+      toast.error("❌ שגיאה בחיפוש");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const { from, to } = getLast7DaysRange();
     fetchOrders(from, to);
   }, []);
 
   useEffect(() => {
+    if (search.trim()) return; // skip date fetch during search
     if (selectedDate === null) {
       const { from, to } = getLast7DaysRange();
       fetchOrders(from, to);
@@ -68,7 +89,6 @@ export default function ListOrder() {
   useEffect(() => {
     const raw = localStorage.getItem(SCROLL_KEY);
     if (!raw) return;
-
     try {
       const { orderId, timestamp } = JSON.parse(raw);
       const now = Date.now();
@@ -77,7 +97,6 @@ export default function ListOrder() {
         localStorage.removeItem(SCROLL_KEY);
         return;
       }
-
       const el = document.querySelector(`[data-order-id="${orderId}"]`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -100,26 +119,52 @@ export default function ListOrder() {
     }
   };
 
-  return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">📦 הזמנות</h1>
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      searchOrders(value.trim());
+    }, 300);
+  };
 
-      <div className="mb-6 flex items-center gap-4">
-        <label className="font-semibold">סנן לפי תאריך:</label>
-        <DatePicker
-          selected={selectedDate}
-          onChange={(date) => setSelectedDate(date)}
-          placeholderText="בחר תאריך"
-          dateFormat="dd/MM/yyyy"
-          className="border px-3 py-2 rounded"
-          isClearable
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* 🔙 Go back */}
+      <Link href="/cms" className="text-blue-600 hover:underline">
+        ← חזרה לניהול
+      </Link>
+
+      <h1 className="text-2xl font-bold">📦 הזמנות</h1>
+
+      {/* 🔍 Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="font-semibold">סנן לפי תאריך:</label>
+          <DatePicker
+            selected={selectedDate}
+            onChange={(date) => setSelectedDate(date)}
+            placeholderText="בחר תאריך"
+            dateFormat="dd/MM/yyyy"
+            className="border px-3 py-2 rounded"
+            isClearable
+            disabled={search.trim().length > 0}
+          />
+        </div>
+
+        <input
+          type="text"
+          placeholder="חיפוש לפי שם, כתובת, טלפון או מספר הזמנה"
+          value={search}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="w-full sm:max-w-xs px-3 py-2 border rounded"
         />
       </div>
 
+      {/* 📃 Orders List */}
       {loading ? (
         <p>טוען הזמנות...</p>
       ) : orders.length === 0 ? (
-        <p>אין הזמנות לתאריך זה.</p>
+        <p>לא נמצאו הזמנות.</p>
       ) : (
         <ul className="space-y-4" ref={containerRef}>
           {orders.map((order) => {
