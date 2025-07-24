@@ -48,7 +48,6 @@ export default function EditCategory({ id }: Props) {
   const [selectedParent, setSelectedParent] = useState<MinimalCategory | null>(
     null
   );
-  const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function load() {
@@ -60,12 +59,14 @@ export default function EditCategory({ id }: Props) {
         const data: { category: Category } = await res.json();
         const all: { categories: Category[] } = await listRes.json();
 
-        setCategory({
+        const parsedCategory = {
           ...data.category,
           description: data.category.description || "",
           saleQuantity: data.category.saleQuantity?.toString() ?? "",
           salePrice: data.category.salePrice?.toString() ?? "",
-        });
+        };
+
+        setCategory(parsedCategory);
 
         const filtered = all.categories.filter((c) => c.id !== Number(id));
         setParentCategories(filtered);
@@ -111,7 +112,7 @@ export default function EditCategory({ id }: Props) {
     const payload: UpdateCategoryPayload = {
       name: category.name,
       type: category.type,
-      image: imagePathMap[category.image] || category.image,
+      image: category.image,
       description: category.description,
       parent_id: selectedParent?.id || null,
       show_in_menu: category.show_in_menu,
@@ -175,10 +176,7 @@ export default function EditCategory({ id }: Props) {
     image: path,
   }));
 
-  const previewSrc =
-    imagePathMap[category.image] ||
-    images.find((img) => img.includes(category.image)) ||
-    "";
+  const previewSrc = category.image;
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
@@ -196,17 +194,13 @@ export default function EditCategory({ id }: Props) {
             items={imageItems}
             value={category.image}
             onChange={(item) => {
-              if (!item) {
-                setCategory((prev) => (prev ? { ...prev, image: "" } : prev));
-                return;
-              }
               setCategory((prev) =>
-                prev ? { ...prev, image: item.name } : prev
+                prev ? { ...prev, image: item?.image || "" } : prev
               );
-              setImagePathMap((prev) => ({
-                ...prev,
-                [item.name]: item.image || "",
-              }));
+            }}
+            getDisplayValue={(val) => {
+              const found = imageItems.find((i) => i.image === val);
+              return found?.name || "";
             }}
             placeholder="בחר תמונה"
             label="תמונה"
@@ -273,12 +267,18 @@ export default function EditCategory({ id }: Props) {
               name: cat.name,
               image: cat.image,
             }))}
-            value={selectedParent?.name || ""}
+            value={selectedParent?.id?.toString() || ""}
             onChange={(item) => {
               setSelectedParent(item);
               setCategory((prev) =>
                 prev ? { ...prev, parent_id: item?.id || null } : prev
               );
+            }}
+            getDisplayValue={(val) => {
+              const found = parentCategories.find(
+                (cat) => cat.id.toString() === val
+              );
+              return found?.name || "";
             }}
             placeholder="בחר קטגוריה"
             label="קטגוריית אב"

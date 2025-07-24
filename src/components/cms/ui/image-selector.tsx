@@ -18,7 +18,8 @@ interface ImageSelectorProps<T extends BaseItem> {
   onChange: (item: T | null) => void;
   label?: string;
   placeholder?: string;
-  disabled?: boolean; // ✅ NEW
+  disabled?: boolean;
+  getDisplayValue?: (value: string) => string; // NEW: to display name instead of raw value
 }
 
 export default function ImageSelector<T extends BaseItem>({
@@ -27,17 +28,22 @@ export default function ImageSelector<T extends BaseItem>({
   onChange,
   label = "תמונה",
   placeholder = "שם",
-  disabled = false, // ✅ default value
+  disabled = false,
+  getDisplayValue,
 }: ImageSelectorProps<T>) {
   const [focused, setFocused] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
 
+  const displayValue = getDisplayValue ? getDisplayValue(value) : value;
+
   const filteredItems = useMemo(() => {
-    if (!value) return items.slice(0, 10);
+    if (!displayValue) return items.slice(0, 10);
     return items
-      .filter((item) => item.name.toLowerCase().includes(value.toLowerCase()))
+      .filter((item) =>
+        item.name.toLowerCase().includes(displayValue.toLowerCase())
+      )
       .slice(0, 10);
-  }, [items, value]);
+  }, [items, displayValue]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typed = e.target.value;
@@ -57,13 +63,14 @@ export default function ImageSelector<T extends BaseItem>({
       <Input
         id="image-input"
         name="image"
-        value={value}
+        value={displayValue}
         onChange={handleInputChange}
         placeholder={placeholder}
         onFocus={() => !disabled && setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 100)}
         className="hover:cursor-pointer"
-        disabled={disabled} // ✅ disable typing
+        disabled={disabled}
+        autoComplete="off"
       />
 
       {focused && filteredItems.length > 0 && (
