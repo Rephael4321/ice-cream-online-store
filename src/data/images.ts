@@ -88,6 +88,8 @@ export const images = [
   "/images/01-07-2025/1/קרח/קרח קרחנה תות בננה 1ב-1.50 5ב- 5 .jpg",
   "/images/24-07-2025/רולר דובדבן.png",
   "/images/24-07-2025/רולר מנגו פסיפלורה.png",
+  "/images/25-07-2025/שטראוס בננה.png",
+  "/images/25-07-2025/שטראוס שוקו.png",
   "/images/RAW/jm_DFPV_qbepESHWT8/אוליאל/124224.jpg",
   "/images/RAW/jm_DFPV_qbepESHWT8/אוליאל/24242.jpg",
   "/images/RAW/jm_DFPV_qbepESHWT8/אוליאל/254341.jpg",
