@@ -11,10 +11,15 @@ export default function Order() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/orders/client/${id}`, { credentials: "include" })
+    const controller = new AbortController();
+
+    fetch(`/api/orders/client/${id}`, {
+      credentials: "include",
+      signal: controller.signal,
+    })
       .then((res) => {
-        if (res.redirected) {
-          // Follow the redirect manually in the browser
+        if (res.status === 307 || res.redirected) {
+          // Redirect manually in browser
           window.location.href = res.url;
           return;
         }
@@ -22,7 +27,7 @@ export default function Order() {
         return res.json();
       })
       .then((data) => {
-        if (!data) return; // Redirect already handled
+        if (!data) return; // Already redirected
 
         if (data.error) {
           setError(data.error);
@@ -31,9 +36,13 @@ export default function Order() {
           setItems(data.items);
         }
       })
-      .catch(() => {
-        setError("שגיאה בעת טעינת ההזמנה");
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setError("שגיאה בעת טעינת ההזמנה");
+        }
       });
+
+    return () => controller.abort();
   }, [id]);
 
   if (error)

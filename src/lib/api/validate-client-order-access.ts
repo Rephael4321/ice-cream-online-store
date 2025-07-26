@@ -22,9 +22,9 @@ export async function validateClientOrderAccess(
   const isAdmin = payload?.role === "admin" || payload?.id === "admin";
 
   if (isAdmin) {
-    const url = `${process.env.NEXT_PUBLIC_SITE_URL}/orders/${orderId}`;
+    const url = `/orders/${orderId}`;
     console.log("🧑‍💼 Admin detected – redirecting to CMS:", url);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL(url, req.url));
   }
 
   if (!phone) {
