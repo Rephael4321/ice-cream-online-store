@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // GET /api/categories/name/[name]/children
-export async function GET(
+async function getCategoryChildren(
   _req: NextRequest,
   context: { params: { name: string } }
 ) {
   try {
-    const { name } = await context.params;
+    const { name } = context.params;
     const slug = decodeURIComponent(name); // e.g. "ללא-גלוטן"
 
     // Step 1: Get category ID by matching the slugified name
@@ -43,3 +44,6 @@ export async function GET(
     );
   }
 }
+
+// ✅ Wrap with middleware (safe for GET)
+export const GET = withMiddleware(getCategoryChildren);

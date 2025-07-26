@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // Types
 type Category = {
@@ -28,24 +27,8 @@ type CategorySale = {
   sale_price: number;
 };
 
-// ✅ Shared Admin Check
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
 // ✅ GET /api/categories/[id] — public
-export async function GET(
+async function getCategory(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -84,14 +67,10 @@ export async function GET(
 }
 
 // ✅ PUT /api/categories/[id] — admin only
-export async function PUT(
+async function updateCategory(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const {
       name,
@@ -169,14 +148,10 @@ export async function PUT(
 }
 
 // ✅ DELETE /api/categories/[id] — admin only
-export async function DELETE(
+async function deleteCategory(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const id = Number(params.id);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
@@ -202,3 +177,8 @@ export async function DELETE(
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+// ✅ Export all handlers with middleware
+export const GET = withMiddleware(getCategory);
+export const PUT = withMiddleware(updateCategory);
+export const DELETE = withMiddleware(deleteCategory);

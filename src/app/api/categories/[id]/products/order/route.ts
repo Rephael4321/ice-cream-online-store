@@ -1,35 +1,11 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
-// ✅ Shared Admin Check
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
-// ✅ PUT /api/categories/[id]/organize — admin only
-export async function PUT(
+async function orderCategory(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const isAdmin = await verifyAdmin();
-  if (!isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const categoryId = Number(params.id);
   if (isNaN(categoryId)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
@@ -76,3 +52,6 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
+
+// 🔒 Protect this PUT handler with your middleware
+export const PUT = withMiddleware(orderCategory);

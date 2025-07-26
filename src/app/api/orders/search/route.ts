@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { protectAPI } from "@/lib/api/jwt-protect";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
-export async function GET(req: NextRequest) {
-  const authError = await protectAPI(req);
-  if (authError) return authError;
-
+async function searchOrders(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("query")?.trim() ?? "";
 
   if (!query) return NextResponse.json({ orders: [] });
@@ -45,3 +42,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Search error" }, { status: 500 });
   }
 }
+
+export const GET = withMiddleware(searchOrders);

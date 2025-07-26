@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // GET /api/categories/root → public
-export async function GET(_req: NextRequest) {
+async function getRootCategories(_req: NextRequest) {
   try {
     const result = await pool.query(
       `SELECT id, name, image, description, type
@@ -20,3 +21,6 @@ export async function GET(_req: NextRequest) {
     );
   }
 }
+
+// ✅ Use middleware (harmless for GET, consistent for all)
+export const GET = withMiddleware(getRootCategories);

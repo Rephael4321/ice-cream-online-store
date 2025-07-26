@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { protectAPI } from "@/lib/api/jwt-protect";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
-export async function GET(req: NextRequest) {
-  // ✅ Admin-only access
-  const authError = await protectAPI(req);
-  if (authError) return authError;
-
+async function getClients(_req: NextRequest) {
   try {
     const result = await pool.query(`
       SELECT 
@@ -29,3 +25,6 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+// ✅ Admin-only via withMiddleware
+export const GET = withMiddleware(getClients);

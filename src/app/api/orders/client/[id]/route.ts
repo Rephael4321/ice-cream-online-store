@@ -1,26 +1,17 @@
-import { cookies } from "next/headers";
+// app/api/orders/client/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { verifyJWT } from "@/lib/jwt"; // ✅ uses your verified decoder
+import { withMiddleware } from "@/lib/api/with-middleware";
+import { validateClientOrderAccess } from "@/lib/api/validate-client-order-access";
 
-export async function GET(
+async function handler(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { phone: string; orderId: number }
 ) {
-  const orderId = Number(params.id);
-  if (isNaN(orderId)) {
-    return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
-  }
+  const { orderId, phone } = context;
 
-  const cookie = cookies();
-  const phone = (await cookie).get("phoneNumber")?.value;
-  const jwtToken = (await cookie).get("token")?.value;
-
-  const payload = jwtToken ? await verifyJWT(jwtToken) : null;
-  const isAdmin = payload?.role === "admin" || payload?.id === "admin";
-
-  const orderQuery = `
-    SELECT 
+  const orderResult = await pool.query(
+    `SELECT 
       o.id AS "orderId",
       o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
       o.is_paid AS "isPaid",
@@ -30,12 +21,9 @@ export async function GET(
       c.phone AS "clientPhone"
     FROM orders o
     JOIN clients c ON o.client_id = c.id
-    WHERE o.id = $1 AND o.is_visible = true
-    ${isAdmin ? "" : "AND c.phone = $2"}
-  `;
-
-  const orderParams = isAdmin ? [orderId] : [orderId, phone];
-  const orderResult = await pool.query(orderQuery, orderParams);
+    WHERE o.id = $1 AND o.is_visible = true AND c.phone = $2`,
+    [orderId, phone]
+  );
 
   if (orderResult.rowCount === 0) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -63,7 +51,6 @@ export async function GET(
     const salePrice = item.sale_price !== null ? Number(item.sale_price) : null;
 
     let total = unitPrice * quantity;
-
     if (
       saleQuantity !== null &&
       salePrice !== null &&
@@ -90,3 +77,7 @@ export async function GET(
     finalTotal,
   });
 }
+
+export const GET = withMiddleware(handler, {
+  middleware: validateClientOrderAccess,
+});

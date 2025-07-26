@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // === Types ===
 type LinkProductToCategoryPayload = {
@@ -17,29 +16,8 @@ type ProductPriceRow = {
   price: number;
 };
 
-// === Admin check ===
-async function isAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
 // === POST /api/products/categories (🔐 admin only) ===
-export async function POST(req: NextRequest) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function linkProduct(req: NextRequest) {
   try {
     const { productId, categoryId }: LinkProductToCategoryPayload =
       await req.json();
@@ -124,11 +102,7 @@ export async function POST(req: NextRequest) {
 }
 
 // === DELETE /api/products/categories (🔐 admin only) ===
-export async function DELETE(req: NextRequest) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function unlinkProduct(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const productId = Number(searchParams.get("productId"));
@@ -156,3 +130,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+// ✅ Use global middleware (protectAPI runs automatically for non-GETs)
+export const POST = withMiddleware(linkProduct);
+export const DELETE = withMiddleware(unlinkProduct);

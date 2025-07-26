@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 type ProductRow = {
   id: number;
@@ -15,25 +14,8 @@ type ProductRow = {
   saleUpdatedAt: string | null;
 };
 
-// === JWT Admin Verification ===
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
-// === GET /api/products ===
-export async function GET() {
+// === GET /api/products (🟢 public) ===
+async function listProducts() {
   try {
     const result = await pool.query<ProductRow>(
       `SELECT 
@@ -57,12 +39,8 @@ export async function GET() {
   }
 }
 
-// === POST /api/products (admin only) ===
-export async function POST(req: NextRequest) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+// === POST /api/products (🔐 protected by middleware) ===
+async function createProduct(req: NextRequest) {
   try {
     const body = await req.json();
     const { name, price, image, saleQuantity, salePrice } = body;
@@ -121,3 +99,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// ✅ Export with automatic middleware (auth on POST, skip for GET)
+export const GET = withMiddleware(listProducts);
+export const POST = withMiddleware(createProduct);

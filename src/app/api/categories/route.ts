@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 type Category = {
   id: number;
@@ -15,25 +14,8 @@ type Category = {
   updated_at: string;
 };
 
-// === Reusable Admin Check ===
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
 // === GET /api/categories (public) ===
-export async function GET(req: NextRequest) {
+async function getCategories(req: NextRequest) {
   try {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
 
@@ -53,7 +35,7 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({ categories: result.rows });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("GET /categories error:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
@@ -62,11 +44,7 @@ export async function GET(req: NextRequest) {
 }
 
 // === POST /api/categories (admin only) ===
-export async function POST(req: NextRequest) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function createCategory(req: NextRequest) {
   try {
     const {
       name,
@@ -132,7 +110,7 @@ export async function POST(req: NextRequest) {
       { message: "Category created", categoryId },
       { status: 201 }
     );
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("POST /categories error:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
@@ -141,11 +119,7 @@ export async function POST(req: NextRequest) {
 }
 
 // === PATCH /api/categories (admin only) ===
-export async function PATCH(req: NextRequest) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function updateCategory(req: NextRequest) {
   try {
     const {
       id,
@@ -224,10 +198,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json({ message: "Category updated" });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("PATCH /categories error:", err);
     const error =
       err instanceof Error ? err.message : "Unexpected error occurred";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+// ✅ Apply middleware
+export const GET = withMiddleware(getCategories);
+export const POST = withMiddleware(createCategory);
+export const PATCH = withMiddleware(updateCategory);

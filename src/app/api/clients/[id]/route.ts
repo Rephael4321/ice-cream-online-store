@@ -1,27 +1,9 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-// === Reusable Admin Check ===
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // === GET /api/clients/[id] – Public Access ===
-export async function GET(
+async function getClient(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -59,14 +41,10 @@ export async function GET(
 }
 
 // === PUT /api/clients/[id] – Admin Only ===
-export async function PUT(
+async function updateClient(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const clientId = Number(params.id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
@@ -95,14 +73,10 @@ export async function PUT(
 }
 
 // === DELETE /api/clients/[id] – Admin Only ===
-export async function DELETE(
+async function deleteClient(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const clientId = Number(params.id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
@@ -139,3 +113,8 @@ export async function DELETE(
     client.release();
   }
 }
+
+// ✅ Export handlers with middleware
+export const GET = withMiddleware(getClient);
+export const PUT = withMiddleware(updateClient);
+export const DELETE = withMiddleware(deleteClient);

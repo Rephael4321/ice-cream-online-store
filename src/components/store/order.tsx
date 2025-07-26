@@ -12,8 +12,18 @@ export default function Order() {
 
   useEffect(() => {
     fetch(`/api/orders/client/${id}`, { credentials: "include" })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.redirected) {
+          // Follow the redirect manually in the browser
+          window.location.href = res.url;
+          return;
+        }
+
+        return res.json();
+      })
       .then((data) => {
+        if (!data) return; // Redirect already handled
+
         if (data.error) {
           setError(data.error);
         } else {

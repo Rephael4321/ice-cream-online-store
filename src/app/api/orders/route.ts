@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { protectAPI } from "@/lib/api/jwt-protect";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
-// === Create New Order ===
-export async function POST(req: NextRequest) {
+// === POST /api/orders – Create new order (protected) ===
+async function createOrder(req: NextRequest) {
   const client = await pool.connect();
   try {
     const body = await req.json();
@@ -80,11 +80,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// === List Orders (visible only) ===
-export async function GET(req: NextRequest) {
-  const authError = await protectAPI(req);
-  if (authError) return authError;
-
+// === GET /api/orders – List visible orders (public) ===
+async function listOrders(req: NextRequest) {
   try {
     const from = req.nextUrl.searchParams.get("from");
     const to = req.nextUrl.searchParams.get("to");
@@ -132,3 +129,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+// ✅ Apply withMiddleware – protectAPI is automatic inside
+export const GET = withMiddleware(listOrders);
+export const POST = withMiddleware(createOrder, { skipAuth: true });

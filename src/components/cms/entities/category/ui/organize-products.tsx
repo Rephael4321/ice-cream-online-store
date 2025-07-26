@@ -73,6 +73,7 @@ export default function OrganizeProducts({ id }: { id: string }) {
       const res = await fetch(`/api/categories/${id}/products/order`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // ✅ send cookies!
         body: JSON.stringify({ productOrder }),
       });
 

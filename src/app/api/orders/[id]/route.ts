@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 type OrderRow = {
   orderId: number;
@@ -27,24 +26,8 @@ type OrderItemRow = {
   updatedAt: string;
 };
 
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
 // === GET /api/orders/[id] (public view) ===
-export async function GET(
+async function getOrder(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -106,14 +89,10 @@ export async function GET(
 }
 
 // === PATCH /api/orders/[id] (admin only) ===
-export async function PATCH(
+async function updateOrder(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const orderId = Number(params.id);
   if (isNaN(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
@@ -185,14 +164,10 @@ export async function PATCH(
 }
 
 // === DELETE /api/orders/[id] (admin only) ===
-export async function DELETE(
+async function deleteOrder(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const orderId = Number(params.id);
   if (isNaN(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
@@ -212,3 +187,8 @@ export async function DELETE(
     );
   }
 }
+
+// === Export handlers with middleware ===
+export const GET = withMiddleware(getOrder); // Public
+export const PATCH = withMiddleware(updateOrder); // Admin only
+export const DELETE = withMiddleware(deleteOrder); // Admin only

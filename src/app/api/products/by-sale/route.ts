@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
-export async function GET() {
+async function listProducts(_req: NextRequest) {
   const result = await db.query(`
     SELECT
       p.id,
@@ -47,3 +48,5 @@ export async function GET() {
 
   return NextResponse.json(groups);
 }
+
+export const GET = withMiddleware(listProducts);

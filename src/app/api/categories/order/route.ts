@@ -1,31 +1,9 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-// ✅ Shared Admin Check
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // ✅ PUT /api/categories/organize (admin only)
-export async function PUT(req: NextRequest) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function organizeCategories(req: NextRequest) {
   try {
     const { categoryOrder } = await req.json();
 
@@ -65,3 +43,6 @@ export async function PUT(req: NextRequest) {
     );
   }
 }
+
+// ✅ Secure with middleware
+export const PUT = withMiddleware(organizeCategories);

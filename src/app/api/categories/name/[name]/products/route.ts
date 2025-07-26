@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 type ProductRow = {
   id: number;
@@ -21,15 +22,15 @@ type CategorySaleRow = {
   sale_price: number;
 };
 
-export async function GET(
+async function getProductsByCategoryName(
   _req: NextRequest,
   context: { params: { name: string } }
 ) {
   try {
-    const { name } = await context.params;
-    const slug = decodeURIComponent(name); // ex: 'חלב-מיוחדים'
+    const { name } = context.params;
+    const slug = decodeURIComponent(name); // e.g. 'חלב-מיוחדים'
 
-    // Step 0: Get category ID by exact match (since names are slugified in DB)
+    // Step 0: Get category ID by exact match (slugified)
     const categoryRes = await pool.query<{ id: number }>(
       `SELECT id FROM categories WHERE name = $1`,
       [slug]
@@ -69,7 +70,7 @@ export async function GET(
       return NextResponse.json({ products: [] });
     }
 
-    // Step 2: Fetch sale prices from all sale categories linked to these products
+    // Step 2: Fetch sale prices from category_sales
     const productIds = products.map((p) => p.id);
     const placeholders = productIds.map((_, i) => `$${i + 1}`).join(", ");
 
@@ -87,9 +88,6 @@ export async function GET(
       productIds
     );
 
-    const categorySales = categorySalesResult.rows;
-
-    // Step 3: Build a sale map (best sale per product)
     const saleMap = new Map<
       number,
       {
@@ -99,7 +97,7 @@ export async function GET(
       }
     >();
 
-    for (const row of categorySales) {
+    for (const row of categorySalesResult.rows) {
       const existing = saleMap.get(row.productId);
       if (!existing || row.sale_price < existing.price) {
         saleMap.set(row.productId, {
@@ -113,7 +111,7 @@ export async function GET(
       }
     }
 
-    // Step 4: Build response
+    // Step 3: Build final product list
     const finalProducts = products.map((product) => {
       const categorySale = saleMap.get(product.id);
       let sale = null;
@@ -156,3 +154,6 @@ export async function GET(
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+// ✅ Wrap with middleware (even if public GET)
+export const GET = withMiddleware(getProductsByCategoryName);

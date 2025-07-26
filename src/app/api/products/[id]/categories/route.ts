@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
-export async function GET(
+async function getProductCategories(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -25,3 +26,5 @@ export async function GET(
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+
+export const GET = withMiddleware(getProductCategories);

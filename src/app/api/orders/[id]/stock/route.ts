@@ -1,30 +1,9 @@
-/* ────────────────────────────────────────────────
-   src/app/api/orders/[id]/stock/route.ts
-   ──────────────────────────────────────────────── */
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-/* ─── Reusable Admin Check ─── */
-async function verifyAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 /* ─── GET (public): return out-of-stock product IDs for given order ─── */
-export async function GET(
+async function getOutOfStock(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -44,14 +23,10 @@ export async function GET(
 }
 
 /* ─── PATCH (admin only): toggle product stock status ─── */
-export async function PATCH(
+async function updateProductStock(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await verifyAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const orderId = Number(params.id);
   if (isNaN(orderId))
     return NextResponse.json({ error: "Bad order id" }, { status: 400 });
@@ -78,3 +53,7 @@ export async function PATCH(
 
   return NextResponse.json({ success: true });
 }
+
+// ✅ Export with middleware (GET remains public, PATCH is protected)
+export const GET = withMiddleware(getOutOfStock);
+export const PATCH = withMiddleware(updateProductStock);

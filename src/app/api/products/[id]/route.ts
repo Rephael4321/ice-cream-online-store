@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 // === Types ===
 type SaleCategory = {
@@ -35,25 +34,8 @@ type EffectiveSale =
       price: number;
     };
 
-// === Admin Check ===
-async function isAdmin(): Promise<boolean> {
-  try {
-    const cookie = cookies();
-    const token = (await cookie).get("token")?.value;
-    if (!token) return false;
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    return (
-      typeof decoded === "object" &&
-      ("role" in decoded ? decoded.role === "admin" : decoded.id === "admin")
-    );
-  } catch {
-    return false;
-  }
-}
-
-// === GET /api/products/[id] === (🟢 Public)
-export async function GET(
+// === GET /api/products/[id] – Public ===
+async function getProduct(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -144,15 +126,11 @@ export async function GET(
   }
 }
 
-// === PUT /api/products/[id] === (🔐 Admin only)
-export async function PUT(
+// === PUT /api/products/[id] – Admin only ===
+async function updateProduct(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const id = Number(params.id);
     if (isNaN(id)) {
@@ -213,15 +191,11 @@ export async function PUT(
   }
 }
 
-// === DELETE /api/products/[id] === (🔐 Admin only)
-export async function DELETE(
+// === DELETE /api/products/[id] – Admin only ===
+async function deleteProduct(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const id = Number(params.id);
     if (isNaN(id)) {
@@ -244,3 +218,8 @@ export async function DELETE(
     return NextResponse.json({ error }, { status: 500 });
   }
 }
+
+// ✅ Export routes using middleware
+export const GET = withMiddleware(getProduct); // Public
+export const PUT = withMiddleware(updateProduct); // 🔐 Admin required
+export const DELETE = withMiddleware(deleteProduct); // 🔐 Admin required
