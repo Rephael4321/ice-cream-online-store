@@ -22,7 +22,7 @@ export async function validateClientOrderAccess(
   const isAdmin = payload?.role === "admin" || payload?.id === "admin";
 
   if (isAdmin) {
-    const url = `http://localhost:3000/orders/${orderId}`;
+    const url = `${process.env.NEXT_PUBLIC_SITE_URL}/orders/${orderId}`;
     console.log("🧑‍💼 Admin detected – redirecting to CMS:", url);
     return NextResponse.redirect(url);
   }
