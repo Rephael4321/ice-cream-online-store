@@ -51,7 +51,7 @@ async function getOrder(
          o.is_test AS "isTest"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
-       WHERE o.id = $1 AND o.is_visible = true`,
+       WHERE o.id = $1`,
       [orderId]
     );
 
