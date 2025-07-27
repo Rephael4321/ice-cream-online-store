@@ -112,7 +112,18 @@ export default function ViewOrder() {
       body: JSON.stringify({ [field]: !order[field] }),
     });
     const data = await r.json();
-    setOrder((o) => (o ? { ...o, ...data } : o));
+    setOrder((o) =>
+      o
+        ? {
+            ...o,
+            isPaid: data.isPaid ?? o.isPaid,
+            isReady: data.isReady ?? o.isReady,
+            clientName: data.name ?? o.clientName,
+            clientAddress: data.address ?? o.clientAddress,
+            clientPhone: data.phone ?? o.clientPhone,
+          }
+        : o
+    );
   };
 
   const toggleStock = async (productId: number) => {
@@ -164,12 +175,23 @@ export default function ViewOrder() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: newName.trim() || null,
-        address: newAddr.trim() || null,
+        name: newName.trim(),
+        address: newAddr.trim(),
       }),
     });
     const data = await r.json();
-    setOrder((o) => (o ? { ...o, ...data } : o));
+    setOrder((o) =>
+      o
+        ? {
+            ...o,
+            clientName: data.name ?? o.clientName,
+            clientAddress: data.address ?? o.clientAddress,
+            clientPhone: data.phone ?? o.clientPhone,
+            isPaid: data.isPaid ?? o.isPaid,
+            isReady: data.isReady ?? o.isReady,
+          }
+        : o
+    );
     toast.success("📝 עודכן בהצלחה");
     setEditOpen(false);
   };

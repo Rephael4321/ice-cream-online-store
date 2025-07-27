@@ -117,7 +117,7 @@ export default function ClientControlPanel({
             }
           }}
         >
-          💬 וואטסאפ
+          💬 וואטסאפ
         </a>
       </div>
 

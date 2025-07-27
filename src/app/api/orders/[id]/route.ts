@@ -132,12 +132,12 @@ async function updateOrder(
       isReady: updatedIsReady,
     } = orderResult.rows[0];
 
-    if (name || address) {
+    if ("name" in body || "address" in body) {
       await pool.query(
         `UPDATE clients
-         SET name = COALESCE($1, name),
-             address = COALESCE($2, address)
-         WHERE id = $3`,
+         SET name = $1,
+         address = $2
+        WHERE id = $3`,
         [name, address, client_id]
       );
     }
