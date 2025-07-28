@@ -29,13 +29,6 @@ export default function ConfirmOrderModal({
 }: Props) {
   if (!phoneModal && !showWhatsappConfirm) return null;
 
-  const orderUrl = `${
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000"
-  }/order/${orderId}`;
-
-  const encodedMessage = `מספר הזמנה ${orderId}.\n\nניתן לצפות בפירוט הזמנה בקישור הבא:\n${orderUrl}`;
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100] p-4">
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm space-y-4 text-center">
@@ -77,15 +70,12 @@ export default function ConfirmOrderModal({
             </p>
 
             {hasOutOfStock && (
-              <p className="text-red-600 text-sm font-medium">
+              <p className="text-red-600 text-sm font-medium mt-2">
                 לתשומת לבך: חלק מהמוצרים אזלו מהמלאי.
               </p>
             )}
 
-            <pre className="text-xs text-left whitespace-pre-wrap bg-gray-100 rounded p-2 border border-gray-200">
-              {encodedMessage}
-            </pre>
-            <div className="flex gap-4">
+            <div className="flex gap-4 mt-4">
               <button
                 onClick={onCancelWhatsapp}
                 className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
