@@ -109,8 +109,12 @@ export default function EditCategory({ id }: Props) {
     e.preventDefault();
     if (!category) return;
 
+    const sanitizedName = category.name.trim().replace(/\s+/g, "-");
+    console.log("44444444444444444444444444");
+    console.log(sanitizedName);
+
     const payload: UpdateCategoryPayload = {
-      name: category.name,
+      name: sanitizedName,
       type: category.type,
       image: category.image,
       description: category.description,
