@@ -59,7 +59,12 @@ async function getCategory(
       );
     }
 
-    return NextResponse.json({ category: result.rows[0] });
+    const sanitizedCategory = {
+      ...result.rows[0],
+      name: result.rows[0].name.replace(/-/g, " "),
+    };
+
+    return NextResponse.json({ category: sanitizedCategory });
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unexpected error";
     return NextResponse.json({ error }, { status: 500 });

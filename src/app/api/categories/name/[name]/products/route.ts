@@ -107,7 +107,7 @@ async function getProductsByCategoryName(
           price: row.sale_price,
           category: {
             id: row.categoryId,
-            name: row.categoryName,
+            name: row.categoryName.replace(/-/g, " "),
           },
         });
       }

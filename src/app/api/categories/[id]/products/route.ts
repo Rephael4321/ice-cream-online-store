@@ -29,7 +29,12 @@ async function getCategoryProducts(
       [categoryId]
     );
 
-    return NextResponse.json({ products: result.rows });
+    const sanitizedProducts = result.rows.map((product) => ({
+      ...product,
+      name: product.name.replace(/-/g, " "),
+    }));
+
+    return NextResponse.json({ products: sanitizedProducts });
   } catch (err) {
     console.error("❌ Failed to fetch products:", err);
     return NextResponse.json(

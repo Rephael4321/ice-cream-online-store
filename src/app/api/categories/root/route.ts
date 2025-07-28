@@ -12,7 +12,12 @@ async function getRootCategories(_req: NextRequest) {
        ORDER BY sort_order ASC`
     );
 
-    return NextResponse.json({ categories: result.rows });
+    const sanitized = result.rows.map((cat) => ({
+      ...cat,
+      name: cat.name.replace(/-/g, " "),
+    }));
+
+    return NextResponse.json({ categories: sanitized });
   } catch (err) {
     console.error("❌ Error fetching root categories:", err);
     return NextResponse.json(

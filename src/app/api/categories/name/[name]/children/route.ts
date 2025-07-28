@@ -35,7 +35,12 @@ async function getCategoryChildren(
       [categoryId]
     );
 
-    return NextResponse.json({ children: childrenRes.rows });
+    const sanitizedChildren = childrenRes.rows.map((child) => ({
+      ...child,
+      name: child.name.replace(/-/g, " "),
+    }));
+
+    return NextResponse.json({ children: sanitizedChildren });
   } catch (err) {
     console.error("❌ Error fetching children:", err);
     return NextResponse.json(

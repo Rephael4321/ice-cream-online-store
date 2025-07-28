@@ -34,7 +34,12 @@ async function getCategories(req: NextRequest) {
        ${fullView ? "" : "WHERE show_in_menu = true"}`
     );
 
-    return NextResponse.json({ categories: result.rows });
+    const sanitized = result.rows.map((cat) => ({
+      ...cat,
+      name: cat.name.replace(/-/g, " "),
+    }));
+
+    return NextResponse.json({ categories: sanitized });
   } catch (err) {
     console.error("GET /categories error:", err);
     const error =
