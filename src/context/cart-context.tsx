@@ -55,6 +55,7 @@ type CartContextType = {
   increaseQuantity: (productId: number) => void;
   decreaseQuantity: (productId: number) => void;
   refreshStockStatus: () => void;
+  updateStockStatus: (productId: number, inStock: boolean) => void;
 };
 
 // === Context Setup ===
@@ -247,6 +248,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         increaseQuantity,
         decreaseQuantity,
         refreshStockStatus,
+        updateStockStatus: (productId: number, inStock: boolean) => {
+          setCartItems((prev) =>
+            prev.map((item) =>
+              item.id === productId ? { ...item, inStock } : item
+            )
+          );
+        },
       }}
     >
       {children}

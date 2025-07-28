@@ -47,7 +47,12 @@ export default function CartSingleItem({
         <p className="font-semibold flex items-center gap-2">
           {item.productName}
           {item.inStock === false && (
-            <span className="text-red-500 text-xs">❌ אזל מהמלאי</span>
+            <span
+              className="text-red-500 text-xs"
+              title="מוצר זה אינו זמין כעת במלאי"
+            >
+              ❌ אזל מהמלאי
+            </span>
           )}
         </p>
 

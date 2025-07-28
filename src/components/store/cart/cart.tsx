@@ -1,7 +1,7 @@
 "use client";
 
 import { useCart } from "@/context/cart-context";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Cookies from "js-cookie";
 import Image from "next/image";
 
@@ -14,6 +14,7 @@ export default function Cart() {
     getGroupedCart,
     increaseQuantity,
     decreaseQuantity,
+    updateStockStatus,
   } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -22,19 +23,53 @@ export default function Cart() {
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [showWhatsappConfirm, setShowWhatsappConfirm] = useState(false);
 
+  const hasFetchedRef = useRef(false);
+
+  useEffect(() => {
+    async function fetchStock() {
+      if (cartItems.length === 0) return;
+
+      const res = await fetch("/api/products/stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: cartItems.map((item) => item.id) }),
+      });
+
+      if (!res.ok) return;
+
+      const stockMap: Record<number, boolean> = await res.json();
+      Object.entries(stockMap).forEach(([id, inStock]) => {
+        updateStockStatus(Number(id), inStock);
+      });
+    }
+
+    if (isOpen && !hasFetchedRef.current) {
+      fetchStock();
+      hasFetchedRef.current = true;
+    }
+
+    const handleFocus = () => fetchStock();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [isOpen]);
+
   const grouped = getGroupedCart();
   const singleItems = cartItems.filter(
     (item) => !item.sale?.fromCategory || !item.sale.category?.id
   );
 
   const total = [
-    ...grouped.map((g) => g.totalPrice),
-    ...singleItems.map((item) => {
-      if (!item.sale) return item.productPrice * item.quantity;
-      const bundles = Math.floor(item.quantity / item.sale.amount);
-      const remainder = item.quantity % item.sale.amount;
-      return bundles * item.sale.price + remainder * item.productPrice;
-    }),
+    ...grouped
+      .filter((g) => g.items.every((item) => item.inStock !== false))
+      .map((g) => g.totalPrice),
+    ...singleItems
+      .filter((item) => item.inStock !== false)
+      .map((item) => {
+        if (!item.sale) return item.productPrice * item.quantity;
+        const bundles = Math.floor(item.quantity / item.sale.amount);
+        const remainder = item.quantity % item.sale.amount;
+        return bundles * item.sale.price + remainder * item.productPrice;
+      }),
   ].reduce((a, b) => a + b, 0);
 
   function getOrderItems() {
@@ -140,6 +175,8 @@ export default function Cart() {
     window.location.href = whatsappURL;
   };
 
+  const hasOutOfStock = cartItems.some((item) => item.inStock === false);
+
   return (
     <>
       <button
@@ -207,7 +244,9 @@ export default function Cart() {
                 return (
                   <li
                     key={item.id}
-                    className="flex gap-3 items-start border-b pb-2 text-sm"
+                    className={`flex gap-3 items-start border-b pb-2 text-sm ${
+                      item.inStock === false ? "opacity-50" : ""
+                    }`}
                   >
                     <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden border border-gray-200">
                       <Image
@@ -220,17 +259,24 @@ export default function Cart() {
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold">{item.productName}</p>
+                      {item.inStock === false && (
+                        <p className="text-red-600 text-xs mt-1">
+                          המוצר לא זמין כרגע
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <button
                           onClick={() => decreaseQuantity(item.id)}
-                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                          disabled={item.inStock === false}
+                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50"
                         >
                           −
                         </button>
                         <span className="w-6 text-center">{item.quantity}</span>
                         <button
                           onClick={() => increaseQuantity(item.id)}
-                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                          disabled={item.inStock === false}
+                          className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm disabled:opacity-50"
                         >
                           +
                         </button>
@@ -252,6 +298,12 @@ export default function Cart() {
                 );
               })}
             </ul>
+          )}
+
+          {hasOutOfStock && (
+            <p className="text-red-600 text-sm text-center">
+              חלק מהמוצרים אזלו מהמלאי
+            </p>
           )}
 
           {cartItems.length > 0 && (
@@ -276,6 +328,7 @@ export default function Cart() {
         </div>
       )}
 
+      {/* Phone modal and WhatsApp confirm (unchanged) */}
       {phoneModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100]">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">

@@ -9,6 +9,7 @@ interface Props {
     id: number;
     productName: string;
     quantity: number;
+    inStock?: boolean;
   }[];
   totalPrice: number;
   discount: number;
@@ -22,8 +23,14 @@ export default function CartGroupItem({
   discount,
   onRemove,
 }: Props) {
+  const hasOutOfStock = items.some((item) => item.inStock === false);
+
   return (
-    <li className="border-b pb-2 text-sm rounded">
+    <li
+      className={`border-b pb-2 text-sm rounded ${
+        hasOutOfStock ? "opacity-50 grayscale" : ""
+      }`}
+    >
       <div className="flex justify-between items-center">
         <p className="font-bold">מבצע מקטגוריית {categoryName}</p>
         <button
@@ -33,6 +40,10 @@ export default function CartGroupItem({
           הסר
         </button>
       </div>
+
+      {hasOutOfStock && (
+        <p className="text-red-600 text-xs mt-1">❌ חלק מהמוצרים אזלו מהמלאי</p>
+      )}
 
       <ul className="pl-3 list-disc text-xs mt-1 mb-2">
         {items.map((item) => (

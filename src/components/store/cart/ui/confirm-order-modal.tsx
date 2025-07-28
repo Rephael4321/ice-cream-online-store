@@ -12,6 +12,7 @@ interface Props {
   onCancelWhatsapp: () => void;
   onConfirmWhatsapp: () => void;
   orderId: number;
+  hasOutOfStock: boolean;
 }
 
 export default function ConfirmOrderModal({
@@ -24,6 +25,7 @@ export default function ConfirmOrderModal({
   onCancelWhatsapp,
   onConfirmWhatsapp,
   orderId,
+  hasOutOfStock,
 }: Props) {
   if (!phoneModal && !showWhatsappConfirm) return null;
 
@@ -73,6 +75,13 @@ export default function ConfirmOrderModal({
               <br />
               בכדי להבטיח אימות הזמנה, שלחו הודעה לספק השירות.
             </p>
+
+            {hasOutOfStock && (
+              <p className="text-red-600 text-sm font-medium">
+                לתשומת לבך: חלק מהמוצרים אזלו מהמלאי.
+              </p>
+            )}
+
             <pre className="text-xs text-left whitespace-pre-wrap bg-gray-100 rounded p-2 border border-gray-200">
               {encodedMessage}
             </pre>
