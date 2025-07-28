@@ -25,7 +25,7 @@ export default function Cart() {
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [showWhatsappConfirm, setShowWhatsappConfirm] = useState(false);
   const [hasOutOfStockAtSubmit, setHasOutOfStockAtSubmit] = useState(false);
-  const hasFetchedRef = useRef(false);
+  const hasFetchedOnOpen = useRef(false); // ✅ NEW
 
   const grouped = getGroupedCart();
   const singleItems = cartItems.filter(
@@ -48,29 +48,43 @@ export default function Cart() {
       }),
   ].reduce((a, b) => a + b, 0);
 
+  // ✅ STOCK SYNC ON OPEN AND FOCUS
   useEffect(() => {
     async function fetchStock() {
       if (cartItems.length === 0) return;
+
       const res = await fetch("/api/products/stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: cartItems.map((item) => item.id) }),
       });
+
       if (!res.ok) return;
+
       const stockMap: Record<number, boolean> = await res.json();
       Object.entries(stockMap).forEach(([id, inStock]) =>
         updateStockStatus(Number(id), inStock)
       );
     }
 
-    if (isOpen && !hasFetchedRef.current) {
+    if (isOpen && !hasFetchedOnOpen.current) {
       fetchStock();
-      hasFetchedRef.current = true;
+      hasFetchedOnOpen.current = true;
     }
 
-    const handleFocus = () => fetchStock();
+    const handleFocus = () => {
+      if (isOpen) fetchStock();
+    };
+
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
+  }, [isOpen]); // ✅ ONLY isOpen
+
+  // ✅ RESET FLAG ON CLOSE
+  useEffect(() => {
+    if (!isOpen) {
+      hasFetchedOnOpen.current = false;
+    }
   }, [isOpen]);
 
   function getOrderItems() {
@@ -108,7 +122,6 @@ export default function Cart() {
     const businessPhone = process.env.NEXT_PUBLIC_PHONE;
     if (!businessPhone) return;
 
-    // 🟢 Capture out-of-stock status before clearing cart
     const outOfStock = cartItems.some((item) => item.inStock === false);
     setHasOutOfStockAtSubmit(outOfStock);
 
