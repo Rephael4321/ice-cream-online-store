@@ -34,20 +34,7 @@ interface Product {
   sale?: Sale;
 }
 
-export const dynamicParams = true;
-
-export async function generateStaticParams() {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories?full=true`,
-    { cache: "no-store" }
-  );
-  const data = await res.json();
-
-  return data.categories.map((cat: { name: string }) => ({
-    category: cat.name.replace(/\s+/g, "-").toLowerCase(),
-  }));
-}
-
+// ✅ SSR: Only metadata generation is kept
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = decodeURIComponent(params.category);
   return {
@@ -55,10 +42,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+// ✅ Main Component
 export default async function ProductsByCategory({ params }: Props) {
   const slug = decodeURIComponent(params.category);
 
-  // Step 1: Try to fetch subcategories
+  // Step 1: Fetch subcategories
   const childrenRes = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
     { cache: "no-store" }
@@ -108,7 +96,7 @@ export default async function ProductsByCategory({ params }: Props) {
     );
   }
 
-  // Step 2: Fallback to products
+  // Step 2: Fetch products if no children
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
     { cache: "no-store" }

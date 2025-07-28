@@ -5,7 +5,7 @@ import { Metadata } from "next";
 interface Category {
   id: number;
   name: string;
-  type: "collection" | "sale"; // Only valid types per schema
+  type: "collection" | "sale";
   image?: string | null;
   description?: string | null;
 }
@@ -32,7 +32,7 @@ export default async function MainMenu() {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`,
       {
-        next: { revalidate: 3600 },
+        cache: "no-store", // ✅ SSR - always fetch fresh data
       }
     );
 
@@ -47,25 +47,8 @@ export default async function MainMenu() {
     const data = await res.json();
     categories = data.categories || [];
   } catch (err) {
-    console.error("❌ Failed to load categories, using fallback:", err);
-
-    // Provide a dummy fallback so build doesn't fail
-    categories = [
-      {
-        id: 0,
-        name: "מבצעי קיץ",
-        type: "sale",
-        image: null,
-        description: "הנחות מיוחדות למוצרים נבחרים",
-      },
-      {
-        id: 1,
-        name: "קטלוג כללי",
-        type: "collection",
-        image: null,
-        description: "מבחר מוצרים קבוע",
-      },
-    ];
+    console.error("❌ Failed to load categories:", err);
+    // No fallback data
   }
 
   return (
