@@ -1,4 +1,4 @@
-import Cart from "@/components/store/cart";
+import Cart from "@/components/store/cart/cart";
 import Link from "next/link";
 import Image from "next/image";
 

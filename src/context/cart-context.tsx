@@ -26,9 +26,12 @@ type Product = {
   productName: string;
   productPrice: number;
   sale?: SaleInfo;
+  inStock?: boolean; // ✅ Fix: Add inStock to Product type
 };
 
 type CartItem = Product & { quantity: number };
+
+export type { CartItem };
 
 type GroupedCartItem = {
   categoryId: number;
@@ -51,6 +54,7 @@ type CartContextType = {
   getGroupedCart: () => GroupedCartItem[];
   increaseQuantity: (productId: number) => void;
   decreaseQuantity: (productId: number) => void;
+  refreshStockStatus: () => void;
 };
 
 // === Context Setup ===
@@ -108,7 +112,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate from localStorage after mount (safe)
   useEffect(() => {
     try {
       const stored = localStorage.getItem("cart");
@@ -119,7 +122,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setHydrated(true);
   }, []);
 
-  // Persist to localStorage
   useEffect(() => {
     if (hydrated) {
       try {
@@ -140,12 +142,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
 
         return prev.map((item) =>
-          item.id === product.id ? { ...item, quantity: newQuantity } : item
+          item.id === product.id
+            ? {
+                ...item,
+                quantity: newQuantity,
+                inStock:
+                  product.inStock !== undefined
+                    ? product.inStock
+                    : item.inStock,
+              }
+            : item
         );
       }
 
       if (quantity > 0) {
-        return [...prev, { ...product, quantity }];
+        return [
+          ...prev,
+          {
+            ...product,
+            quantity,
+            inStock: product.inStock ?? true,
+          },
+        ];
       }
 
       return prev;
@@ -178,16 +196,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   function decreaseQuantity(productId: number) {
-    setCartItems(
-      (prev) =>
-        prev
-          .map((item) =>
-            item.id === productId && item.quantity > 1
-              ? { ...item, quantity: item.quantity - 1 }
-              : item
-          )
-          .filter((item) => item.quantity > 0) // remove if quantity reaches 0
+    setCartItems((prev) =>
+      prev
+        .map((item) =>
+          item.id === productId && item.quantity > 1
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
     );
+  }
+
+  async function refreshStockStatus() {
+    const ids = cartItems.map((item) => item.id);
+    if (ids.length === 0) return;
+
+    try {
+      const res = await fetch("/api/products/stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      if (!res.ok) return;
+
+      const stockMap: Record<number, boolean> = await res.json();
+
+      setCartItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          inStock: stockMap[item.id] ?? true,
+        }))
+      );
+    } catch (err) {
+      console.error("❌ Failed to refresh stock:", err);
+    }
   }
 
   if (!hydrated) return null;
@@ -203,6 +246,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         getGroupedCart: () => groupCartItems(cartItems),
         increaseQuantity,
         decreaseQuantity,
+        refreshStockStatus,
       }}
     >
       {children}
