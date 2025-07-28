@@ -27,33 +27,40 @@ export default function ConfirmOrderModal({
 }: Props) {
   if (!phoneModal && !showWhatsappConfirm) return null;
 
+  const orderUrl = `${
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "http://localhost:3000"
+  }/order/${orderId}`;
+
+  const encodedMessage = `מספר הזמנה ${orderId}.\n\nניתן לצפות בפירוט הזמנה בקישור הבא:\n${orderUrl}`;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white p-6 rounded shadow-lg w-full max-w-sm space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[1100] p-4">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm space-y-4 text-center">
         {phoneModal && (
           <>
-            <h2 className="text-lg font-bold">
+            <h2 className="text-lg font-bold mb-2">
               נא להזין טלפון לצורך ביצוע הזמנה
             </h2>
             <input
               type="tel"
               value={phoneInput}
               onChange={onPhoneChange}
-              className="w-full border p-2 rounded"
-              placeholder="05X-XXXXXXX"
+              placeholder="למשל: 050-123-4567"
+              className="w-full border px-3 py-2 rounded text-right"
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-between gap-4 mt-4">
               <button
                 onClick={onPhoneClose}
-                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
               >
                 ביטול
               </button>
               <button
                 onClick={onPhoneSave}
-                className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600"
+                className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600"
               >
-                אישור
+                שמור והמשך
               </button>
             </div>
           </>
@@ -61,30 +68,26 @@ export default function ConfirmOrderModal({
 
         {showWhatsappConfirm && (
           <>
-            <h2 className="text-lg font-bold">הזמנה נוצרה בהצלחה 🎉</h2>
-            <p className="text-sm whitespace-pre-line">
-              מספר הזמנה: {orderId}
-              ניתן לצפות בפירוט הזמנה בקישור הבא:
-              {`\n${
-                process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-                "http://localhost:3000"
-              }/order/${orderId}`}
+            <p className="text-lg font-bold">
+              ההזמנה בוצעה בהצלחה. מספר הזמנה {orderId}.
+              <br />
+              בכדי להבטיח אימות הזמנה, שלחו הודעה לספק השירות.
             </p>
-            <p className="text-sm">
-              מעוניין לעבור לוואטסאפ כדי לשלוח את ההזמנה?
-            </p>
-            <div className="flex justify-end gap-2">
+            <pre className="text-xs text-left whitespace-pre-wrap bg-gray-100 rounded p-2 border border-gray-200">
+              {encodedMessage}
+            </pre>
+            <div className="flex gap-4">
               <button
                 onClick={onCancelWhatsapp}
-                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
               >
-                לא תודה
+                לא עכשיו
               </button>
               <button
                 onClick={onConfirmWhatsapp}
-                className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600"
+                className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600"
               >
-                שלח לוואטסאפ
+                כן, שלח
               </button>
             </div>
           </>
