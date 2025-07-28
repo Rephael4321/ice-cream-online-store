@@ -6,6 +6,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "sonner";
 import { Button } from "@/components/cms/ui/button";
+import SingleOrder from "./ui/list/single-order";
 
 type Order = {
   orderId: number;
@@ -167,65 +168,13 @@ export default function ListOrder() {
         <p>לא נמצאו הזמנות.</p>
       ) : (
         <ul className="space-y-4" ref={containerRef}>
-          {orders.map((order) => {
-            const date = new Date(order.createdAt);
-            const formatted = !isNaN(date.getTime())
-              ? date.toLocaleString("he-IL")
-              : order.createdAt;
-
-            const testStyle = order.isTest
-              ? "bg-yellow-100 border-yellow-400"
-              : "";
-
-            return (
-              <li
-                key={order.orderId}
-                data-order-id={order.orderId}
-                className={`border rounded p-4 shadow flex justify-between items-center ${testStyle}`}
-              >
-                <div>
-                  <p className="font-bold">
-                    הזמנה #{order.orderId}{" "}
-                    {order.isTest && (
-                      <span className="text-yellow-700 text-sm">🧪 בדיקה</span>
-                    )}
-                  </p>
-                  <p>לקוח: {order.clientName}</p>
-                  <p>כתובת: {order.clientAddress}</p>
-                  <p>טלפון: {order.clientPhone || "—"}</p>
-                  <p>תאריך: {formatted}</p>
-                  <p>כמות מוצרים: {order.itemCount}</p>
-                  <p>שולם: {order.isPaid ? "✔️" : "❌"}</p>
-                  <p>מוכן: {order.isReady ? "✔️" : "❌"}</p>
-                </div>
-
-                <div className="flex flex-col gap-2 items-end">
-                  <Link
-                    href={`/orders/${order.orderId}`}
-                    onClick={() =>
-                      localStorage.setItem(
-                        SCROLL_KEY,
-                        JSON.stringify({
-                          orderId: order.orderId,
-                          timestamp: Date.now(),
-                        })
-                      )
-                    }
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                  >
-                    צפייה
-                  </Link>
-
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleDelete(order.orderId)}
-                  >
-                    מחק
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
+          {orders.map((order) => (
+            <SingleOrder
+              key={order.orderId}
+              order={order}
+              onDelete={handleDelete}
+            />
+          ))}
         </ul>
       )}
     </div>
