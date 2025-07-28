@@ -7,6 +7,7 @@ type ProductRow = {
   name: string;
   price: number;
   image: string;
+  in_stock: boolean; // ✅ added
   created_at: string;
   updated_at: string;
   productSaleQuantity: number | null;
@@ -45,13 +46,14 @@ async function getProductsByCategoryName(
 
     const categoryId = categoryRes.rows[0].id;
 
-    // Step 1: Fetch products in the category
+    // Step 1: Fetch products in the category (include in_stock!)
     const result = await pool.query<ProductRow>(
       `SELECT 
          p.id, 
          p.name, 
          p.price, 
          p.image,
+         p.in_stock, -- ✅ add in_stock field
          p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
          p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
          s.quantity AS "productSaleQuantity",
@@ -139,6 +141,7 @@ async function getProductsByCategoryName(
         name: product.name,
         price: product.price,
         image: product.image,
+        inStock: product.in_stock, // ✅ return inStock
         created_at: product.created_at,
         updated_at: product.updated_at,
         sale,

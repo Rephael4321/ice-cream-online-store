@@ -31,6 +31,7 @@ interface Product {
   name: string;
   price: number;
   image?: string;
+  inStock: boolean; // ✅ NEW
   sale?: Sale;
 }
 
@@ -129,6 +130,7 @@ export default async function ProductsByCategory({ params }: Props) {
             productImage={product.image || "/ice-scream.png"}
             productName={product.name}
             productPrice={product.price}
+            inStock={product.inStock} // ✅ pass prop
             sale={product.sale}
           />
         ))}

@@ -14,6 +14,7 @@ type SingleProductProps = {
   productImage: string;
   productName: string;
   productPrice: number;
+  inStock: boolean; // ✅ added
   sale?: {
     amount: number;
     price: number;
@@ -27,6 +28,7 @@ export default function SingleProduct({
   productImage,
   productName,
   productPrice,
+  inStock,
   sale,
 }: SingleProductProps) {
   const { cartItems, addToCart, removeFromCart } = useCart();
@@ -45,6 +47,7 @@ export default function SingleProduct({
     `/category-products/${currentCategorySlug}`;
 
   const handleAdd = () => {
+    if (!inStock) return;
     addToCart({ id, productImage, productName, productPrice, sale }, 1);
   };
 
@@ -57,8 +60,11 @@ export default function SingleProduct({
   };
 
   return (
-    <div className="w-full bg-white rounded-xl shadow-md p-4">
-      {/* Mobile/tablet: horizontal row | Desktop: vertical card */}
+    <div
+      className={`w-full bg-white rounded-xl shadow-md p-4 ${
+        !inStock ? "opacity-60" : ""
+      }`}
+    >
       <div className="flex flex-row sm:flex-row lg:flex-col items-center gap-4">
         {/* Image */}
         <div className="relative w-20 h-20 flex-shrink-0">
@@ -71,6 +77,11 @@ export default function SingleProduct({
           {sale && (
             <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-1 py-0.5 rounded-bl-md shadow">
               מבצע!
+            </div>
+          )}
+          {!inStock && (
+            <div className="absolute bottom-0 left-0 bg-black bg-opacity-80 text-white text-[10px] px-1 py-0.5 rounded-tr-md shadow">
+              אזל מהמלאי
             </div>
           )}
         </div>
@@ -111,7 +122,12 @@ export default function SingleProduct({
           <div className="flex items-center gap-2 mt-2 lg:justify-center">
             <button
               onClick={handleAdd}
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 text-lg hover:border-gray-500"
+              disabled={!inStock}
+              className={`w-8 h-8 flex items-center justify-center rounded-full border text-gray-700 text-lg ${
+                inStock
+                  ? "border-gray-300 hover:border-gray-500"
+                  : "border-gray-200 opacity-40 cursor-not-allowed"
+              }`}
             >
               +
             </button>
