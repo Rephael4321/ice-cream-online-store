@@ -7,7 +7,7 @@ async function createOrder(req: NextRequest) {
   const client = await pool.connect();
   try {
     const body = await req.json();
-    const { phone, items } = body;
+    const { phone, items, isNotified = false } = body;
 
     if (!phone || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -35,8 +35,8 @@ async function createOrder(req: NextRequest) {
     }
 
     const orderResult = await client.query<{ id: number }>(
-      `INSERT INTO orders (client_id) VALUES ($1) RETURNING id`,
-      [clientId]
+      `INSERT INTO orders (client_id, is_notified) VALUES ($1, $2) RETURNING id`,
+      [clientId, isNotified]
     );
     const orderId = orderResult.rows[0].id;
 

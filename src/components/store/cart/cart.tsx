@@ -25,7 +25,7 @@ export default function Cart() {
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [showWhatsappConfirm, setShowWhatsappConfirm] = useState(false);
   const [hasOutOfStockAtSubmit, setHasOutOfStockAtSubmit] = useState(false);
-  const hasFetchedOnOpen = useRef(false); // ✅ NEW
+  const hasFetchedOnOpen = useRef(false);
 
   const grouped = getGroupedCart();
   const singleItems = cartItems.filter(
@@ -161,8 +161,18 @@ export default function Cart() {
     finalizeOrder(trimmed);
   };
 
-  const confirmAndRedirectToWhatsapp = () => {
+  const confirmAndRedirectToWhatsapp = async () => {
     if (!pendingOrderId) return;
+
+    try {
+      await fetch(`/api/orders/${pendingOrderId}/notify`, {
+        method: "POST",
+      });
+    } catch (err) {
+      console.error("Failed to mark order as notified:", err);
+      // Optional: You could toast an error here if needed
+    }
+
     const phoneNumber = (process.env.NEXT_PUBLIC_PHONE || "").replace(
       /\D/g,
       ""
@@ -172,6 +182,7 @@ export default function Cart() {
       "http://localhost:3000";
     const orderUrl = `${baseUrl}/order/${pendingOrderId}`;
     const msg = `מספר הזמנה ${pendingOrderId}.\n\nניתן לצפות בפירוט הזמנה בקישור הבא:\n${orderUrl}`;
+
     window.location.href = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
       msg
     )}`;
