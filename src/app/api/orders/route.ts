@@ -106,6 +106,7 @@ async function listOrders(req: NextRequest) {
         o.is_paid AS "isPaid",
         o.is_ready AS "isReady",
         o.is_test AS "isTest",
+        o.is_notified AS "isNotified",
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount",

@@ -12,6 +12,7 @@ type Props = {
     isPaid: boolean;
     isReady: boolean;
     isTest?: boolean;
+    isNotified?: boolean;
     clientName: string | null;
     clientAddress: string | null;
     clientPhone: string | null;
@@ -59,6 +60,8 @@ export default function SingleOrder({
     }
   };
 
+  const showUnnotified = order.isNotified === false && order.isTest !== true;
+
   return (
     <li
       data-order-id={order.orderId}
@@ -74,7 +77,7 @@ export default function SingleOrder({
       onTouchEnd={cancelTouch}
       onTouchMove={cancelTouch}
     >
-      {/* ✅ Selection Circle (always visible on md+, conditional on small screens) */}
+      {/* ✅ Selection Circle */}
       <div
         onClick={(e) => {
           e.stopPropagation();
@@ -100,10 +103,15 @@ export default function SingleOrder({
       <div className="flex justify-between items-start pl-10 gap-4">
         {/* 📝 Order Details */}
         <div className="flex-1">
-          <p className="font-bold">
-            הזמנה #{order.orderId}{" "}
+          <p className="font-bold flex items-center gap-2">
+            הזמנה #{order.orderId}
             {order.isTest && (
               <span className="text-yellow-700 text-sm">🧪 בדיקה</span>
+            )}
+            {showUnnotified && (
+              <span className="text-red-600 text-sm font-semibold">
+                ⚠️ לא נשלחה הודעה
+              </span>
             )}
           </p>
           <p>לקוח: {order.clientName}</p>

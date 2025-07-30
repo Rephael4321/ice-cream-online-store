@@ -15,6 +15,7 @@ type Order = {
   isPaid: boolean;
   isReady: boolean;
   isTest?: boolean;
+  isNotified?: boolean;
   clientName: string | null;
   clientAddress: string | null;
   clientPhone: string | null;
@@ -29,6 +30,7 @@ export default function ListOrder() {
   const [search, setSearch] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
+  const [hasUnnotified, setHasUnnotified] = useState(false);
 
   const containerRef = useRef<HTMLUListElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -38,10 +40,7 @@ export default function ListOrder() {
     const from = new Date(now);
     from.setDate(now.getDate() - 6);
     const format = (d: Date) => d.toISOString().split("T")[0];
-    return {
-      from: format(from),
-      to: format(now),
-    };
+    return { from: format(from), to: format(now) };
   };
 
   const fetchOrders = async (from?: string, to?: string) => {
@@ -51,6 +50,11 @@ export default function ListOrder() {
     const res = await fetch(`/api/orders${query}`);
     const data = await res.json();
     setOrders(data.orders || []);
+    setHasUnnotified(
+      (data.orders || []).some(
+        (o: Order) => o.isNotified === false && o.isTest !== true
+      )
+    );
     setLoading(false);
   };
 
@@ -67,6 +71,11 @@ export default function ListOrder() {
       );
       const data = await res.json();
       setOrders(data.orders || []);
+      setHasUnnotified(
+        (data.orders || []).some(
+          (o: Order) => o.isNotified === false && o.isTest !== true
+        )
+      );
     } catch {
       toast.error("❌ שגיאה בחיפוש");
     } finally {
@@ -162,7 +171,7 @@ export default function ListOrder() {
 
   return (
     <div className="relative">
-      {/* 🧭 Floating Toolbar (absolute and overlaid) */}
+      {/* 🧭 Floating Toolbar */}
       {selectMode && (
         <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-12 p-3 rounded shadow w-full max-w-4xl">
           <span className="text-blue-800 font-semibold">
@@ -216,6 +225,13 @@ export default function ListOrder() {
             className="w-full sm:max-w-xs px-3 py-2 border rounded"
           />
         </div>
+
+        {/* ⚠️ WhatsApp Notification Warning */}
+        {hasUnnotified && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm font-medium">
+            ⚠️ ישנן הזמנות שלא נשלחה אליהן הודעת וואטסאפ.
+          </div>
+        )}
 
         {/* 📃 Orders List */}
         {loading ? (
