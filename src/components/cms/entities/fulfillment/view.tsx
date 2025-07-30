@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
 import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
 
-/* ---------- types ---------- */
 type Order = {
   orderId: number;
   clientPhone: string;
@@ -18,7 +17,9 @@ type Order = {
   isPaid: boolean;
   isReady: boolean;
   isTest?: boolean;
+  isNotified?: boolean;
 };
+
 type Item = {
   productId: number;
   productName: string;
@@ -46,12 +47,14 @@ export default function ViewOrder() {
 
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
+    console.log("📦 Marking as test:", flag);
     const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isTest: flag }),
     });
     const data = await r.json();
+    console.log("✅ MarkTest response:", data);
     setOrder((o) => (o ? { ...o, ...data } : o));
     toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
   };
@@ -71,47 +74,105 @@ export default function ViewOrder() {
 
     const fetchStock = async (): Promise<Record<number, boolean>> => {
       try {
+        console.log("📦 Fetching stock info for order:", id);
         const res = await fetch(`/api/orders/${id}/stock`);
-        if (!res.ok) return {};
+        if (!res.ok) {
+          console.warn("❌ Stock API response not OK:", res.status);
+          return {};
+        }
         const { outOfStock } = (await res.json()) as { outOfStock: number[] };
+        console.log("✅ Out of stock product IDs:", outOfStock);
         return Object.fromEntries(outOfStock.map((pid) => [pid, false]));
-      } catch {
+      } catch (err) {
+        console.error("❌ Error fetching stock:", err);
         return {};
       }
     };
 
     (async () => {
       try {
+        console.log("📦 Fetching order and items for ID:", id);
         const ordRes = await fetch(`/api/orders/${id}`);
         const { order: o, items: raw } = (await ordRes.json()) as {
           order: Order;
           items: Item[];
         };
 
+        console.log("✅ Order loaded:", o);
+        console.log("✅ Raw items:", raw);
+
         const stock = await fetchStock();
+        const enriched = raw.map((it) => ({
+          ...it,
+          unitPrice: +it.unitPrice,
+          salePrice: it.salePrice !== null ? +it.salePrice : null,
+          inStock: stock[it.productId] !== false,
+        }));
+
+        console.log("✅ Final item state with stock info:", enriched);
+
         setOrder(o);
-        setItems(
-          raw.map((it) => ({
-            ...it,
-            unitPrice: +it.unitPrice,
-            salePrice: it.salePrice !== null ? +it.salePrice : null,
-            inStock: stock[it.productId] !== false,
-          }))
-        );
+        setItems(enriched);
       } finally {
         setLoad(false);
       }
     })();
   }, [id]);
 
+  const handleNotifyAndWhatsApp = async () => {
+    if (!order) return;
+
+    const phone = order.clientPhone
+      ?.replace(/[^0-9]/g, "")
+      .replace(/^0/, "972");
+    if (!phone) {
+      toast.error("מספר טלפון לא תקין");
+      return;
+    }
+
+    try {
+      console.log("📦 Sending WhatsApp notification for order:", order.orderId);
+      const r = await fetch(`/api/orders/${order.orderId}/notify`, {
+        method: "PATCH",
+      });
+      if (!r.ok) throw new Error();
+
+      console.log("✅ Marked as notified");
+      setOrder((prev) => (prev ? { ...prev, isNotified: true } : prev));
+
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+        "http://localhost:3000"; // fallback in dev
+
+      const orderUrl = `${siteUrl}/order/${order.orderId}`;
+
+      const msg = `שלום${
+        order.clientName ? " " + order.clientName : ""
+      }, ביצעת הזמנה מספר #${
+        order.orderId
+      } אצל המפנק. תוכל לצפות בפרטי ההזמנה כאן:\n${orderUrl}\n\nנעדכן אותך כשהיא מוכנה`;
+
+      const whatsappLink = `https://wa.me/${phone}?text=${encodeURIComponent(
+        msg
+      )}`;
+      console.log("📤 Redirecting to WhatsApp:", whatsappLink);
+      window.location.href = whatsappLink;
+    } catch (err) {
+      console.error("❌ Failed to notify or redirect", err);
+      toast.error("❌ שגיאה בעדכון סטטוס וואטסאפ");
+    }
+  };
+
   const flipOrderBool = async (field: "isPaid" | "isReady") => {
     if (!order) return;
+    console.log(`📦 Toggling ${field} for order #${order.orderId}`);
     const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !order[field] }),
     });
     const data = await r.json();
+    console.log("✅ Updated order field:", data);
     setOrder((o) =>
       o
         ? {
@@ -127,11 +188,13 @@ export default function ViewOrder() {
   };
 
   const toggleStock = async (productId: number) => {
+    console.log("📦 Toggling stock for product:", productId);
     setItems((prev) => {
       const nextState = prev.map((it) =>
         it.productId === productId ? { ...it, inStock: !it.inStock } : it
       );
       const justToggled = nextState.find((it) => it.productId === productId)!;
+      console.log("✅ Stock state updated:", justToggled);
       fetch(`/api/orders/${order?.orderId}/stock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -171,6 +234,10 @@ export default function ViewOrder() {
 
   const handleUpdateClient = async () => {
     if (!order) return;
+    console.log("📦 Updating client info:", {
+      name: newName.trim(),
+      address: newAddr.trim(),
+    });
     const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -180,6 +247,7 @@ export default function ViewOrder() {
       }),
     });
     const data = await r.json();
+    console.log("✅ Client update response:", data);
     setOrder((o) =>
       o
         ? {
@@ -220,6 +288,7 @@ export default function ViewOrder() {
         onTogglePaid={() => flipOrderBool("isPaid")}
         onReadyClick={handleReadyClick}
         handleTitleClick={handleTitleClick}
+        onNotifyWhatsApp={handleNotifyAndWhatsApp}
       />
 
       <OrderItemList

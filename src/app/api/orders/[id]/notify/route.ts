@@ -25,4 +25,4 @@ async function notifyOrder(
 }
 
 // ✅ Apply middleware with skipAuth because it's used by clients
-export const POST = withMiddleware(notifyOrder, { skipAuth: true });
+export const PATCH = withMiddleware(notifyOrder);

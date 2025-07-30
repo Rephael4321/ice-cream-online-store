@@ -12,6 +12,7 @@ type OrderRow = {
   isPaid: boolean;
   isReady: boolean;
   isTest: boolean;
+  isNotified: boolean;
 };
 
 type OrderItemRow = {
@@ -48,7 +49,8 @@ async function getOrder(
          o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
          o.is_paid AS "isPaid",
          o.is_ready AS "isReady",
-         o.is_test AS "isTest"
+         o.is_test AS "isTest",
+         o.is_notified AS "isNotified"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
        WHERE o.id = $1`,
