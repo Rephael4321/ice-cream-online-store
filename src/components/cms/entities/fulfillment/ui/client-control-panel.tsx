@@ -42,9 +42,7 @@ export default function ClientControlPanel({
 
   const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
 
-  const waMessage = `שלום${
-    name ? " " + name : ""
-  }, ההזמנה מוכנה והיא תצא בהקדם, סכום לתשלום: ₪${finalTotal.toFixed(2)} 🍦`;
+  const waMessage = ``;
   const waPhone = phone?.replace(/[^0-9]/g, "").replace(/^0/, "972");
   const waLink = waPhone
     ? `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}`
