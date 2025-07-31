@@ -16,6 +16,11 @@ const entityGroups = [
         description: "צפה בכל המוצרים במערכת.",
         slug: "products",
       },
+      {
+        name: "מוצרים שאזלו מהמלאי",
+        description: "צפה והחזר מוצרים שאזלו.",
+        slug: "products/out-of-stock",
+      },
     ],
   },
   {
