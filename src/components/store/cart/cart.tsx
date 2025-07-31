@@ -166,7 +166,7 @@ export default function Cart() {
 
     try {
       await fetch(`/api/orders/${pendingOrderId}/notify`, {
-        method: "POST",
+        method: "PATCH",
       });
     } catch (err) {
       console.error("Failed to mark order as notified:", err);
