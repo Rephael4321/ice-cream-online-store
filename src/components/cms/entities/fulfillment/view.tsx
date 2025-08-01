@@ -72,23 +72,6 @@ export default function ViewOrder() {
   useEffect(() => {
     if (!id) return;
 
-    const fetchStock = async (): Promise<Record<number, boolean>> => {
-      try {
-        console.log("📦 Fetching stock info for order:", id);
-        const res = await fetch(`/api/orders/${id}/stock`);
-        if (!res.ok) {
-          console.warn("❌ Stock API response not OK:", res.status);
-          return {};
-        }
-        const { outOfStock } = (await res.json()) as { outOfStock: number[] };
-        console.log("✅ Out of stock product IDs:", outOfStock);
-        return Object.fromEntries(outOfStock.map((pid) => [pid, false]));
-      } catch (err) {
-        console.error("❌ Error fetching stock:", err);
-        return {};
-      }
-    };
-
     (async () => {
       try {
         console.log("📦 Fetching order and items for ID:", id);
@@ -101,12 +84,11 @@ export default function ViewOrder() {
         console.log("✅ Order loaded:", o);
         console.log("✅ Raw items:", raw);
 
-        const stock = await fetchStock();
-        const enriched = raw.map((it) => ({
+        const enriched = raw.map((it: any) => ({
           ...it,
           unitPrice: +it.unitPrice,
           salePrice: it.salePrice !== null ? +it.salePrice : null,
-          inStock: stock[it.productId] !== false,
+          inStock: it.inStock !== false, // fallback in case field is missing
         }));
 
         console.log("✅ Final item state with stock info:", enriched);

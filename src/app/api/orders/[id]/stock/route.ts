@@ -36,6 +36,7 @@ async function updateProductStock(
     inStock: boolean;
   };
 
+  // ✅ Ensure product belongs to this order
   const { rowCount } = await pool.query(
     `SELECT 1 FROM order_items WHERE order_id = $1 AND product_id = $2`,
     [orderId, productId]
@@ -46,10 +47,17 @@ async function updateProductStock(
       { status: 404 }
     );
 
+  // ✅ Update global product stock
   await pool.query(`UPDATE products SET in_stock = $1 WHERE id = $2`, [
     inStock,
     productId,
   ]);
+
+  // ✅ Update only this order's item stock
+  await pool.query(
+    `UPDATE order_items SET in_stock = $1 WHERE order_id = $2 AND product_id = $3`,
+    [inStock, orderId, productId]
+  );
 
   return NextResponse.json({ success: true });
 }

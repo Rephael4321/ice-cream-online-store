@@ -65,15 +65,16 @@ async function getOrder(
 
     const itemsResult = await pool.query<OrderItemRow>(
       `SELECT
-         product_id     AS "productId",
-         product_name   AS "productName",
-         quantity,
-         unit_price     AS "unitPrice",
-         sale_quantity  AS "saleQuantity",
-         sale_price     AS "salePrice",
-         product_image  AS "productImage",
-         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
-         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt"
+       product_id     AS "productId",
+       product_name   AS "productName",
+       quantity,
+       unit_price     AS "unitPrice",
+       sale_quantity  AS "saleQuantity",
+       sale_price     AS "salePrice",
+       product_image  AS "productImage",
+       in_stock       AS "inStock",
+       created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
+       updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt"
        FROM order_items
        WHERE order_id = $1`,
       [orderId]
