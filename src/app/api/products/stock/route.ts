@@ -25,4 +25,4 @@ async function getProductStock(req: NextRequest) {
   return NextResponse.json(stockMap);
 }
 
-export const POST = withMiddleware(getProductStock);
+export const POST = withMiddleware(getProductStock, { skipAuth: true });
