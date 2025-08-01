@@ -16,6 +16,7 @@ interface ProductDetail {
   image?: string;
   saleQuantity?: string | number;
   salePrice?: string | number;
+  inStock: boolean;
 }
 
 interface ParamsProps {
@@ -58,6 +59,7 @@ export default function EditProduct({ params }: ParamsProps) {
           image: displayName,
           saleQuantity: loaded.sale?.quantity ?? "",
           salePrice: loaded.sale?.price ?? "",
+          inStock: loaded.in_stock,
         });
 
         setImagePathMap({ [displayName]: loaded.image });
@@ -78,6 +80,31 @@ export default function EditProduct({ params }: ParamsProps) {
   const getDisplayName = (path: string) => {
     const file = path.split("/").pop() || "";
     return file.split(".")[0];
+  };
+
+  const handleToggleStock = async () => {
+    if (!product) return;
+
+    const newStock = !product.inStock;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/products/stock", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: Number(product.id),
+          inStock: newStock,
+        }),
+      });
+
+      if (!res.ok) throw new Error("שגיאה בעדכון מלאי");
+      setProduct({ ...product, inStock: newStock });
+    } catch (err) {
+      console.error(err);
+      alert("שגיאה בעדכון המלאי");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,6 +326,17 @@ export default function EditProduct({ params }: ParamsProps) {
               />
             </div>
           </div>
+
+          <Button
+            type="button"
+            className={`w-full mt-2 ${
+              product.inStock ? "bg-yellow-500" : "bg-green-600 text-white"
+            }`}
+            onClick={handleToggleStock}
+            disabled={saving}
+          >
+            {product.inStock ? "❌ סמן כחסר במלאי" : "✔️ החזר למלאי"}
+          </Button>
 
           <Button type="submit" className="w-full mt-4" disabled={saving}>
             {saving ? "שומר..." : "שמור"}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import { z } from "zod";
 
+/* ─── POST: Get stock status for multiple products ─── */
 async function getProductStock(req: NextRequest) {
   const { ids } = await req.json();
 
@@ -25,4 +27,39 @@ async function getProductStock(req: NextRequest) {
   return NextResponse.json(stockMap);
 }
 
-export const POST = withMiddleware(getProductStock, { skipAuth: true });
+/* ─── PATCH: Update stock status for a single product ─── */
+async function updateProductStock(req: NextRequest) {
+  const body = await req.json();
+
+  const schema = z.object({
+    productId: z.number().int(),
+    inStock: z.boolean(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const { productId, inStock } = parsed.data;
+
+  try {
+    const result = await db.query(
+      `UPDATE products SET in_stock = $1, updated_at = now() WHERE id = $2 RETURNING id, in_stock`,
+      [inStock, productId]
+    );
+
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ id: productId, inStock });
+  } catch (err) {
+    console.error("❌ Stock update error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+// ✅ Export both methods
+export const POST = withMiddleware(getProductStock, { skipAuth: true }); // public
+export const PATCH = withMiddleware(updateProductStock); // protected
