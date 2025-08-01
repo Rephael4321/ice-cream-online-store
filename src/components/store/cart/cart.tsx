@@ -2,6 +2,7 @@
 
 import { useCart } from "@/context/cart-context";
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import Cookies from "js-cookie";
 import CartSingleItem from "./ui/cart-single-item";
 import CartGroupItem from "./ui/cart-group-item";
@@ -125,23 +126,42 @@ export default function Cart() {
     const outOfStock = cartItems.some((item) => item.inStock === false);
     setHasOutOfStockAtSubmit(outOfStock);
 
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      body: JSON.stringify({ phone, items: getOrderItems() }),
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        body: JSON.stringify({ phone, items: getOrderItems() }),
+        headers: { "Content-Type": "application/json" },
+      });
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("Failed to create order:", text);
-      alert("שגיאה בשליחת ההזמנה");
-      return;
+      if (!res.ok) {
+        const data = await res.json();
+        if (
+          res.status === 400 &&
+          data.error?.includes("None of the products")
+        ) {
+          clearCart();
+          toast.error("ההזמנה לא נשלחה – כל המוצרים נמחקו מהמערכת");
+        } else {
+          toast.error("שגיאה בשליחת ההזמנה");
+        }
+        return;
+      }
+
+      const { orderId, warning } = await res.json();
+
+      if (warning) {
+        toast.warning("חלק מהמוצרים לא היו זמינים ונמחקו מההזמנה");
+      } else {
+        toast.success("ההזמנה נשלחה בהצלחה!");
+      }
+
+      setPendingOrderId(orderId);
+      setShowWhatsappConfirm(true);
+      clearCart();
+    } catch (err) {
+      console.error("❌ Order submission error:", err);
+      toast.error("שגיאה בשליחת ההזמנה");
     }
-
-    const { orderId } = await res.json();
-    setPendingOrderId(orderId);
-    setShowWhatsappConfirm(true);
-    clearCart();
   };
 
   const initiatePayment = () => {

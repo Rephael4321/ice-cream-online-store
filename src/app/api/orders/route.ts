@@ -34,13 +34,37 @@ async function createOrder(req: NextRequest) {
       clientId = insertClient.rows[0].id;
     }
 
+    // ✅ Get valid product IDs
+    const productIds = items.map((i) => i.productId);
+    const { rows: validRows } = await client.query<{ id: number }>(
+      `SELECT id FROM products WHERE id = ANY($1::int[])`,
+      [productIds]
+    );
+    const validIds = new Set(validRows.map((r) => r.id));
+
+    // ❌ If none are valid, abort
+    if (validIds.size === 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: "None of the products in your cart are available anymore." },
+        { status: 400 }
+      );
+    }
+
     const orderResult = await client.query<{ id: number }>(
       `INSERT INTO orders (client_id, is_notified) VALUES ($1, $2) RETURNING id`,
       [clientId, isNotified]
     );
     const orderId = orderResult.rows[0].id;
 
+    let missingCount = 0;
+
     for (const item of items) {
+      if (!validIds.has(item.productId)) {
+        missingCount++;
+        continue;
+      }
+
       const {
         productId,
         productName,
@@ -69,6 +93,17 @@ async function createOrder(req: NextRequest) {
     }
 
     await client.query("COMMIT");
+
+    if (missingCount > 0) {
+      return NextResponse.json(
+        {
+          orderId,
+          warning: `${missingCount} item(s) were not available and skipped.`,
+        },
+        { status: 200 }
+      );
+    }
+
     return NextResponse.json({ orderId });
   } catch (err: unknown) {
     await client.query("ROLLBACK");
@@ -79,6 +114,7 @@ async function createOrder(req: NextRequest) {
     client.release();
   }
 }
+
 
 // === GET /api/orders – List visible orders (public) ===
 async function listOrders(req: NextRequest) {
