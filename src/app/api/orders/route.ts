@@ -73,12 +73,13 @@ async function createOrder(req: NextRequest) {
         unitPrice,
         saleQuantity = null,
         salePrice = null,
+        inStock = true,
       } = item;
 
       await client.query(
         `INSERT INTO order_items
-         (order_id, product_id, product_name, product_image, quantity, unit_price, sale_quantity, sale_price)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+     (order_id, product_id, product_name, product_image, quantity, unit_price, sale_quantity, sale_price, in_stock)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           orderId,
           productId,
@@ -88,6 +89,7 @@ async function createOrder(req: NextRequest) {
           unitPrice,
           saleQuantity,
           salePrice,
+          inStock,
         ]
       );
     }
@@ -114,7 +116,6 @@ async function createOrder(req: NextRequest) {
     client.release();
   }
 }
-
 
 // === GET /api/orders – List visible orders (public) ===
 async function listOrders(req: NextRequest) {

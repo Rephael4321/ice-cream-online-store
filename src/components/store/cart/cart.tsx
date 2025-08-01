@@ -98,6 +98,7 @@ export default function Cart() {
         unitPrice: item.productPrice,
         saleQuantity: group.amount,
         salePrice: group.price,
+        inStock: item.inStock,
       }))
     );
 
@@ -109,6 +110,7 @@ export default function Cart() {
       unitPrice: item.productPrice,
       saleQuantity: item.sale?.fromCategory ? null : item.sale?.amount,
       salePrice: item.sale?.fromCategory ? null : item.sale?.price,
+      inStock: item.inStock,
     }));
 
     return [...groupedItems, ...singleSaleItems];
