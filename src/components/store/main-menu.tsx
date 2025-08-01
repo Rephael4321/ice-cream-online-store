@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Metadata } from "next";
+import { cookies } from "next/headers";
+import { verifyJWT } from "@/lib/jwt";
 
 interface Category {
   id: number;
@@ -26,14 +28,16 @@ export const metadata: Metadata = {
 };
 
 export default async function MainMenu() {
+  const cookie = cookies();
+  const token = (await cookie).get("token")?.value;
+  const isAdmin = !!(token && verifyJWT(token));
+
   let categories: Category[] = [];
 
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`,
-      {
-        cache: "no-store", // ✅ SSR - always fetch fresh data
-      }
+      { cache: "no-store" }
     );
 
     const contentType = res.headers.get("content-type") || "";
@@ -48,7 +52,6 @@ export default async function MainMenu() {
     categories = data.categories || [];
   } catch (err) {
     console.error("❌ Failed to load categories:", err);
-    // No fallback data
   }
 
   return (
@@ -58,37 +61,50 @@ export default async function MainMenu() {
           const slug = cat?.name?.replace(/\s+/g, "-").toLowerCase();
 
           return cat ? (
-            <Link
+            <div
               key={cat.id}
-              href={`/category-products/${slug}`}
-              className="hover:scale-105 transition-transform duration-200 text-center"
+              className="relative hover:scale-105 transition-transform duration-200 text-center"
             >
-              <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
-                <div className="w-[120px] h-[120px] relative rounded-md bg-gray-100">
-                  <Image
-                    src={
-                      cat.image || fallbackImageMap[cat.type] || "/default.png"
-                    }
-                    alt={cat.name}
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 768px) 100px, 120px"
-                  />
+              <Link href={`/category-products/${slug}`} className="block">
+                <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
+                  <div className="w-[120px] h-[120px] relative rounded-md bg-gray-100">
+                    <Image
+                      src={
+                        cat.image ||
+                        fallbackImageMap[cat.type] ||
+                        "/default.png"
+                      }
+                      alt={cat.name}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 100px, 120px"
+                    />
+                  </div>
+                  <h2
+                    className={`text-lg font-semibold ${
+                      colorMap[cat.type] || "text-gray-700"
+                    }`}
+                  >
+                    {cat.name}
+                  </h2>
+                  {cat.description && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      {cat.description}
+                    </p>
+                  )}
                 </div>
-                <h2
-                  className={`text-lg font-semibold ${
-                    colorMap[cat.type] || "text-gray-700"
-                  }`}
+              </Link>
+
+              {/* ✅ Admin-only Edit Button */}
+              {isAdmin && (
+                <Link
+                  href={`/categories/${cat.id}`}
+                  className="absolute top-2 left-2 px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 shadow"
                 >
-                  {cat.name}
-                </h2>
-                {cat.description && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    {cat.description}
-                  </p>
-                )}
-              </div>
-            </Link>
+                  ערוך
+                </Link>
+              )}
+            </div>
           ) : (
             <div
               key={i}
