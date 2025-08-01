@@ -2,6 +2,7 @@
 
 import { useCart } from "@/context/cart-context";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 
@@ -22,6 +23,7 @@ type SingleProductProps = {
     fromCategory?: boolean;
     category?: SaleCategoryInfo;
   };
+  isAdmin?: boolean;
 };
 
 export default function SingleProduct({
@@ -31,11 +33,11 @@ export default function SingleProduct({
   productPrice,
   inStock,
   sale,
+  isAdmin = false,
 }: SingleProductProps) {
   const { cartItems, addToCart, removeFromCart } = useCart();
   const router = useRouter();
   const pathname = usePathname();
-
   const [showModal, setShowModal] = useState(false);
 
   const cartItem = cartItems.find((item) => item.id === id);
@@ -74,10 +76,20 @@ export default function SingleProduct({
   return (
     <>
       <div
-        className={`w-full bg-white rounded-xl shadow-md p-4 ${
+        className={`relative w-full bg-white rounded-xl shadow-md p-4 ${
           !inStock ? "opacity-60" : ""
         }`}
       >
+        {/* ✅ Admin Edit Button */}
+        {isAdmin && (
+          <Link
+            href={`/products/${id}`}
+            className="absolute top-2 left-2 px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 shadow"
+          >
+            ערוך
+          </Link>
+        )}
+
         <div className="flex flex-row sm:flex-row lg:flex-col items-center gap-4">
           {/* Image */}
           <div
@@ -102,7 +114,7 @@ export default function SingleProduct({
             )}
           </div>
 
-          {/* Info + buttons */}
+          {/* Info + Buttons */}
           <div className="flex flex-1 flex-col lg:items-center lg:text-center sm:text-right text-sm">
             <div className="font-bold text-base text-gray-800">
               {productName}
@@ -136,7 +148,6 @@ export default function SingleProduct({
               </div>
             )}
 
-            {/* Controls */}
             <div className="flex items-center gap-2 mt-2 lg:justify-center">
               <button
                 onClick={handleAdd}

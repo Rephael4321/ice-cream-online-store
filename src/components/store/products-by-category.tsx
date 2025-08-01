@@ -2,6 +2,8 @@ import SingleProduct from "@/components/store/single-product";
 import Image from "next/image";
 import Link from "next/link";
 import { Metadata } from "next";
+import { cookies } from "next/headers";
+import { verifyJWT } from "@/lib/jwt";
 
 export interface Props {
   params: { category: string };
@@ -31,11 +33,10 @@ interface Product {
   name: string;
   price: number;
   image?: string;
-  inStock: boolean; // ✅ NEW
+  inStock: boolean;
   sale?: Sale;
 }
 
-// ✅ SSR: Only metadata generation is kept
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = decodeURIComponent(params.category);
   return {
@@ -43,11 +44,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// ✅ Main Component
 export default async function ProductsByCategory({ params }: Props) {
   const slug = decodeURIComponent(params.category);
 
-  // Step 1: Fetch subcategories
+  const cookie = cookies();
+  const token = (await cookie).get("token")?.value;
+
+  const isAdmin = !!(token && verifyJWT(token));
+
   const childrenRes = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
     { cache: "no-store" }
@@ -97,7 +101,6 @@ export default async function ProductsByCategory({ params }: Props) {
     );
   }
 
-  // Step 2: Fetch products if no children
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
     { cache: "no-store" }
@@ -130,8 +133,9 @@ export default async function ProductsByCategory({ params }: Props) {
             productImage={product.image || "/ice-scream.png"}
             productName={product.name}
             productPrice={product.price}
-            inStock={product.inStock} // ✅ pass prop
+            inStock={product.inStock}
             sale={product.sale}
+            isAdmin={isAdmin} // ✅ Pass admin flag
           />
         ))}
       </div>

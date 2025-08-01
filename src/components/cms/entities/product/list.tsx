@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Input } from "@/components/cms/ui/input";
 import Link from "next/link";
 import Image from "next/image";
-import { Input } from "@/components/cms/ui/input";
-import { useRouter, useSearchParams } from "next/navigation";
 
 interface Product {
   id: string;
