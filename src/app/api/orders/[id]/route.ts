@@ -192,6 +192,6 @@ async function deleteOrder(
 }
 
 // === Export handlers with middleware ===
-export const GET = withMiddleware(getOrder); // Public
-export const PATCH = withMiddleware(updateOrder); // Admin only
-export const DELETE = withMiddleware(deleteOrder); // Admin only
+export const GET = withMiddleware(getOrder);
+export const PATCH = withMiddleware(updateOrder);
+export const DELETE = withMiddleware(deleteOrder);

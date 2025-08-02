@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
 import SingleProduct from "@/components/store/single-product";
 import BackButton from "@/components/store/search-products/back-button";
 
@@ -16,14 +15,10 @@ type Product = {
 export const dynamic = "force-dynamic";
 
 async function getResults(query: string): Promise<Product[]> {
-  const headersList = await headers();
-  const host = headersList.get("host");
-  const protocol = host?.includes("localhost") ? "http" : "https";
-
   const res = await fetch(
-    `${protocol}://${host}/api/products/search?query=${encodeURIComponent(
-      query
-    )}`,
+    `${
+      process.env.NEXT_PUBLIC_SITE_URL
+    }/api/products/search?query=${encodeURIComponent(query)}`,
     { cache: "no-store" }
   );
 

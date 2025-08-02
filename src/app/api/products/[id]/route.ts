@@ -220,6 +220,6 @@ async function deleteProduct(
 }
 
 // ✅ Export routes using middleware
-export const GET = withMiddleware(getProduct); // Public
-export const PUT = withMiddleware(updateProduct); // 🔐 Admin required
-export const DELETE = withMiddleware(deleteProduct); // 🔐 Admin required
+export const GET = withMiddleware(getProduct);
+export const PUT = withMiddleware(updateProduct);
+export const DELETE = withMiddleware(deleteProduct);

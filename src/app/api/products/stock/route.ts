@@ -61,5 +61,5 @@ async function updateProductStock(req: NextRequest) {
 }
 
 // ✅ Export both methods
-export const POST = withMiddleware(getProductStock, { skipAuth: true }); // public
-export const PATCH = withMiddleware(updateProductStock); // protected
+export const POST = withMiddleware(getProductStock, { skipAuth: true });
+export const PATCH = withMiddleware(updateProductStock);
