@@ -127,13 +127,11 @@ async function listOrders(req: NextRequest) {
     let whereClause = `WHERE o.is_visible = true`;
 
     if (from && to) {
-      const fromUTC = new Date(`${from}T00:00:00+03:00`).toISOString();
-      const toUTC = new Date(`${to}T00:00:00+03:00`);
-      toUTC.setDate(toUTC.getDate() + 1);
-      const toUTCString = toUTC.toISOString();
+      const fromLocal = `${from}T00:00:00`;
+      const toLocal = `${to}T23:59:59`;
 
-      whereClause += ` AND o.created_at >= $1 AND o.created_at < $2`;
-      values.push(fromUTC, toUTCString);
+      whereClause += ` AND o.created_at >= $1 AND o.created_at <= $2`;
+      values.push(fromLocal, toLocal);
     }
 
     const result = await pool.query(
