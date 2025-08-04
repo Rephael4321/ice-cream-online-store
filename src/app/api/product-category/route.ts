@@ -132,5 +132,11 @@ async function unlinkProduct(req: NextRequest) {
 }
 
 // ✅ Use global middleware (protectAPI runs automatically for non-GETs)
-export const POST = withMiddleware(linkProduct);
-export const DELETE = withMiddleware(unlinkProduct);
+export const POST = withMiddleware(linkProduct, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});
+export const DELETE = withMiddleware(unlinkProduct, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

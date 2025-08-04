@@ -184,6 +184,15 @@ async function deleteCategory(
 }
 
 // ✅ Export all handlers with middleware
-export const GET = withMiddleware(getCategory);
-export const PUT = withMiddleware(updateCategory);
-export const DELETE = withMiddleware(deleteCategory);
+export const GET = withMiddleware(getCategory, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});
+export const PUT = withMiddleware(updateCategory, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});
+export const DELETE = withMiddleware(deleteCategory, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

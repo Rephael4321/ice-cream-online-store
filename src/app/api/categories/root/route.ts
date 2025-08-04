@@ -28,4 +28,7 @@ async function getRootCategories(_req: NextRequest) {
 }
 
 // ✅ Use middleware (harmless for GET, consistent for all)
-export const GET = withMiddleware(getRootCategories);
+export const GET = withMiddleware(getRootCategories, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

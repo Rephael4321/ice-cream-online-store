@@ -51,4 +51,7 @@ async function getCategoryChildren(
 }
 
 // ✅ Wrap with middleware (safe for GET)
-export const GET = withMiddleware(getCategoryChildren);
+export const GET = withMiddleware(getCategoryChildren, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

@@ -54,4 +54,7 @@ async function orderCategory(
 }
 
 // 🔒 Protect this PUT handler with your middleware
-export const PUT = withMiddleware(orderCategory);
+export const PUT = withMiddleware(orderCategory, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

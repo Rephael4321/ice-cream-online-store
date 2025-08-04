@@ -212,6 +212,15 @@ async function updateCategory(req: NextRequest) {
 }
 
 // ✅ Apply middleware
-export const GET = withMiddleware(getCategories);
-export const POST = withMiddleware(createCategory);
-export const PATCH = withMiddleware(updateCategory);
+export const GET = withMiddleware(getCategories, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});
+export const POST = withMiddleware(createCategory, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});
+export const PATCH = withMiddleware(updateCategory, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

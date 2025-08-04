@@ -27,4 +27,7 @@ async function getProductCategories(
   }
 }
 
-export const GET = withMiddleware(getProductCategories);
+export const GET = withMiddleware(getProductCategories, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

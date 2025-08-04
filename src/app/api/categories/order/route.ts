@@ -45,4 +45,7 @@ async function organizeCategories(req: NextRequest) {
 }
 
 // ✅ Secure with middleware
-export const PUT = withMiddleware(organizeCategories);
+export const PUT = withMiddleware(organizeCategories, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

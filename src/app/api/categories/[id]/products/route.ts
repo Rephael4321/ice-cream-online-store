@@ -45,4 +45,7 @@ async function getCategoryProducts(
 }
 
 // ✅ Use shared middleware (safe for GET)
-export const GET = withMiddleware(getCategoryProducts);
+export const GET = withMiddleware(getCategoryProducts, {
+  deprecated:
+    "This endpoint is going to be affected by new category items orders",
+});

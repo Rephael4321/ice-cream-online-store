@@ -9,13 +9,26 @@ type Middleware = (
 
 interface Options {
   middleware?: Middleware;
-  skipAuth?: boolean; // 👈 NEW: allow bypassing protectAPI
+  skipAuth?: boolean;
+  deprecated?: boolean | string; // 👈 NEW: mark API as deprecated
 }
 
 export function withMiddleware(handler: Handler, options?: Options): Handler {
   return async (req: NextRequest, context?: any) => {
     console.log("🛡️ [withMiddleware] Running middleware for:", req.url);
     console.log("🔍 Method:", req.method);
+
+    // 🚨 Log deprecation warning if API is marked as deprecated
+    if (options?.deprecated) {
+      const deprecationMessage =
+        typeof options.deprecated === "string"
+          ? options.deprecated
+          : "This API endpoint is deprecated and may be removed in a future version.";
+
+      console.warn(
+        `⚠️ [DEPRECATED] ${req.method} ${req.url} - ${deprecationMessage}`
+      );
+    }
 
     // 🚨 Always protect unless explicitly skipped
     if (!options?.skipAuth) {
@@ -43,6 +56,15 @@ export function withMiddleware(handler: Handler, options?: Options): Handler {
     console.log("📦 [withMiddleware] Calling route handler...");
     const response = await handler(req, context);
     console.log("✅ [withMiddleware] Handler completed.");
+
+    // 📨 Add deprecation header to response if API is deprecated
+    if (options?.deprecated) {
+      response.headers.set("Deprecation", "true");
+      if (typeof options.deprecated === "string") {
+        response.headers.set("X-Deprecation-Message", options.deprecated);
+      }
+    }
+
     return response;
   };
 }
