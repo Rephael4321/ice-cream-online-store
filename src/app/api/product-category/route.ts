@@ -2,25 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-// === Types ===
-type LinkProductToCategoryPayload = {
+type LinkPayload = {
   productId: number;
   categoryId: number;
+  type?: "product" | "category";
 };
 
-type CategoryRow = {
-  type: "collection" | "sale";
-};
-
-type ProductPriceRow = {
-  price: number;
-};
-
-// === POST /api/products/categories (🔐 admin only) ===
-async function linkProduct(req: NextRequest) {
+async function linkItem(req: NextRequest) {
   try {
-    const { productId, categoryId }: LinkProductToCategoryPayload =
-      await req.json();
+    const { productId, categoryId, type }: LinkPayload = await req.json();
 
     if (!productId || !categoryId) {
       return NextResponse.json(
@@ -29,13 +19,22 @@ async function linkProduct(req: NextRequest) {
       );
     }
 
-    // Step 1: Check category type
-    const categoryResult = await pool.query<CategoryRow>(
+    const targetType: "product" | "category" =
+      type ?? (await inferTargetType(productId)) ?? "product";
+
+    if (!["product", "category"].includes(targetType)) {
+      return NextResponse.json(
+        { error: "Invalid target type" },
+        { status: 400 }
+      );
+    }
+
+    const categoryResult = await pool.query(
       "SELECT type FROM categories WHERE id = $1",
       [categoryId]
     );
-
     const category = categoryResult.rows[0];
+
     if (!category) {
       return NextResponse.json(
         { error: "Category not found" },
@@ -43,100 +42,110 @@ async function linkProduct(req: NextRequest) {
       );
     }
 
-    if (category.type === "sale") {
-      // Step 2: Get new product price
-      const productResult = await pool.query<ProductPriceRow>(
+    if (category.type === "sale" && targetType === "product") {
+      const newProduct = await pool.query(
         "SELECT price FROM products WHERE id = $1",
         [productId]
       );
-      const newProduct = productResult.rows[0];
-      if (!newProduct) {
+      if (!newProduct.rows.length) {
         return NextResponse.json(
           { error: "Product not found" },
           { status: 404 }
         );
       }
 
-      // Step 3: Compare with existing products
-      const existingResult = await pool.query<ProductPriceRow>(
+      const existing = await pool.query(
         `SELECT p.price
-         FROM products p
-         JOIN product_categories pc ON pc.product_id = p.id
-         WHERE pc.category_id = $1
+         FROM category_multi_items cmi
+         JOIN products p ON p.id = cmi.target_id
+         WHERE cmi.category_id = $1 AND cmi.target_type = 'product'
          LIMIT 1`,
         [categoryId]
       );
-      const existing = existingResult.rows[0];
 
-      if (existing && existing.price !== newProduct.price) {
+      const existingPrice = existing.rows[0]?.price;
+      const newPrice = newProduct.rows[0].price;
+
+      if (existingPrice !== undefined && existingPrice !== newPrice) {
         return NextResponse.json(
           {
-            error:
-              "Cannot add product with a different price to a sale category. All products must have the same price.",
+            error: "All products in a sale category must have the same price.",
           },
           { status: 400 }
         );
       }
     }
 
-    // Step 4: Insert with incremental sort_order
     await pool.query(
-      `INSERT INTO product_categories (product_id, category_id, sort_order)
-       SELECT $1, $2, COALESCE(MAX(sort_order), -1) + 1
-       FROM product_categories
-       WHERE category_id = $2
-       ON CONFLICT (product_id, category_id) DO NOTHING`,
-      [productId, categoryId]
+      `INSERT INTO category_multi_items (category_id, target_type, target_id, sort_order)
+       SELECT $1, $2, $3, COALESCE(MAX(sort_order), -1) + 1
+       FROM category_multi_items
+       WHERE category_id = $1
+       ON CONFLICT DO NOTHING`,
+      [categoryId, targetType, productId]
     );
 
+    return NextResponse.json({ message: "Item linked" }, { status: 201 });
+  } catch (err: any) {
+    console.error("❌ Error linking item:", err);
     return NextResponse.json(
-      { message: "Product linked to category" },
-      { status: 201 }
+      { error: err.message || "Failed to link item" },
+      { status: 500 }
     );
-  } catch (err: unknown) {
-    console.error("❌ Error linking product to category:", err);
-    const error =
-      err instanceof Error ? err.message : "Failed to link product to category";
-    return NextResponse.json({ error }, { status: 500 });
   }
 }
 
-// === DELETE /api/products/categories (🔐 admin only) ===
-async function unlinkProduct(req: NextRequest) {
+async function unlinkItem(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const productId = Number(searchParams.get("productId"));
     const categoryId = Number(searchParams.get("categoryId"));
+    const targetType = searchParams.get("type") ?? "product";
 
-    if (!productId || !categoryId) {
+    if (
+      !productId ||
+      !categoryId ||
+      !["product", "category"].includes(targetType)
+    ) {
       return NextResponse.json(
-        { error: "Missing productId or categoryId" },
+        { error: "Missing or invalid parameters" },
         { status: 400 }
       );
     }
 
     await pool.query(
-      `DELETE FROM product_categories WHERE product_id = $1 AND category_id = $2`,
-      [productId, categoryId]
+      `DELETE FROM category_multi_items
+       WHERE category_id = $1 AND target_type = $2 AND target_id = $3`,
+      [categoryId, targetType, productId]
     );
 
     return NextResponse.json({ success: true });
-  } catch (err: unknown) {
-    console.error("❌ Error unlinking product from category:", err);
-    const error =
-      err instanceof Error
-        ? err.message
-        : "Failed to unlink product from category";
-    return NextResponse.json({ error }, { status: 500 });
+  } catch (err: any) {
+    console.error("❌ Error unlinking item:", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to unlink item" },
+      { status: 500 }
+    );
   }
 }
 
-// ✅ Use global middleware (protectAPI runs automatically for non-GETs)
-export const POST = withMiddleware(linkProduct, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
-export const DELETE = withMiddleware(unlinkProduct, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+async function inferTargetType(
+  id: number
+): Promise<"product" | "category" | null> {
+  const product = await pool.query(
+    "SELECT 1 FROM products WHERE id = $1 LIMIT 1",
+    [id]
+  );
+  if (product.rowCount) return "product";
+
+  const category = await pool.query(
+    "SELECT 1 FROM categories WHERE id = $1 LIMIT 1",
+    [id]
+  );
+  if (category.rowCount) return "category";
+
+  return null;
+}
+
+export const POST = withMiddleware(linkItem);
+export const DELETE = withMiddleware(unlinkItem);

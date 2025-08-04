@@ -95,7 +95,6 @@ export default async function MainMenu() {
                 </div>
               </Link>
 
-              {/* ✅ Admin-only Edit Button */}
               {isAdmin && (
                 <Link
                   href={`/categories/${cat.id}`}

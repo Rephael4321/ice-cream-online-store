@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { withMiddleware } from "@/lib/api/with-middleware";
 
 type Category = {
   id: number;
@@ -12,26 +11,33 @@ type Category = {
   show_in_menu: boolean;
   created_at: string;
   updated_at: string;
+  multi_item_sort_order?: number;
 };
 
-// === GET /api/categories (public) ===
 async function getCategories(req: NextRequest) {
   try {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
 
     const result = await pool.query<Category>(
-      `SELECT 
-         id, 
-         name, 
-         type, 
-         description, 
-         image, 
-         parent_id, 
-         show_in_menu, 
-         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
-       FROM categories
-       ${fullView ? "" : "WHERE show_in_menu = true"}`
+      `
+      SELECT 
+        c.id,
+        c.name,
+        c.type,
+        c.description,
+        c.image,
+        c.parent_id,
+        c.show_in_menu,
+        c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+        c.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+        cmi.sort_order AS multi_item_sort_order
+      FROM categories c
+      LEFT JOIN category_multi_items cmi
+        ON cmi.target_type = 'category'
+       AND cmi.target_id = c.id
+       AND cmi.category_id IS NULL
+      ${fullView ? "" : "WHERE c.show_in_menu = true"}
+      `
     );
 
     const sanitized = result.rows.map((cat) => ({
@@ -48,7 +54,6 @@ async function getCategories(req: NextRequest) {
   }
 }
 
-// === POST /api/categories (admin only) ===
 async function createCategory(req: NextRequest) {
   try {
     const {
@@ -78,43 +83,64 @@ async function createCategory(req: NextRequest) {
       );
     }
 
-    const parentIdOrNull = parent_id ? Number(parent_id) : null;
-    const visible = type === "collection" ? true : !!show_in_menu;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const result = await pool.query(
-      `INSERT INTO categories 
+      const parentIdOrNull = parent_id ? Number(parent_id) : null;
+      const visible = type === "collection" ? true : !!show_in_menu;
+
+      const result = await client.query(
+        `INSERT INTO categories 
          (name, type, image, description, parent_id, show_in_menu)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id`,
-      [name, type, image, description, parentIdOrNull, visible]
-    );
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [name, type, image, description, parentIdOrNull, visible]
+      );
 
-    const categoryId = result.rows[0].id;
+      const categoryId = result.rows[0].id;
+      await client.query(
+        `INSERT INTO category_multi_items (category_id, target_type, target_id, sort_order)
+         VALUES (NULL, 'category', $1, (
+           SELECT COALESCE(MAX(sort_order), -1) + 1
+           FROM category_multi_items
+           WHERE target_type = 'category' AND category_id IS NULL
+         ))`,
+        [categoryId]
+      );
 
-    if (type === "sale") {
-      const quantity = Number(saleQuantity);
-      const price = Number(salePrice);
+      if (type === "sale") {
+        const quantity = Number(saleQuantity);
+        const price = Number(salePrice);
 
-      if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Valid saleQuantity and salePrice are required for sale category",
-          },
-          { status: 400 }
+        if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Valid saleQuantity and salePrice are required for sale category",
+            },
+            { status: 400 }
+          );
+        }
+
+        await client.query(
+          "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
+          [categoryId, quantity, price]
         );
       }
 
-      await pool.query(
-        "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
-        [categoryId, quantity, price]
-      );
-    }
+      await client.query("COMMIT");
 
-    return NextResponse.json(
-      { message: "Category created", categoryId },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        { message: "Category created", categoryId },
+        { status: 201 }
+      );
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error("POST /categories error:", err);
     const error =
@@ -123,7 +149,6 @@ async function createCategory(req: NextRequest) {
   }
 }
 
-// === PATCH /api/categories (admin only) ===
 async function updateCategory(req: NextRequest) {
   try {
     const {
@@ -159,50 +184,62 @@ async function updateCategory(req: NextRequest) {
     const parentIdOrNull = parent_id ? Number(parent_id) : null;
     const visible = type === "collection" ? true : !!show_in_menu;
 
-    await pool.query(
-      `UPDATE categories
-       SET name = $1, type = $2, image = $3, description = $4, parent_id = $5, show_in_menu = $6
-       WHERE id = $7`,
-      [name, type, image, description, parentIdOrNull, visible, categoryId]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (type === "sale") {
-      const quantity = Number(saleQuantity);
-      const price = Number(salePrice);
-
-      if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Valid saleQuantity and salePrice are required for sale category",
-          },
-          { status: 400 }
-        );
-      }
-
-      const result = await pool.query(
-        "SELECT id FROM category_sales WHERE category_id = $1",
-        [categoryId]
+      await client.query(
+        `UPDATE categories
+         SET name = $1, type = $2, image = $3, description = $4, parent_id = $5, show_in_menu = $6
+         WHERE id = $7`,
+        [name, type, image, description, parentIdOrNull, visible, categoryId]
       );
 
-      if (result.rows.length > 0) {
-        await pool.query(
-          "UPDATE category_sales SET quantity = $1, sale_price = $2 WHERE category_id = $3",
-          [quantity, price, categoryId]
+      if (type === "sale") {
+        const quantity = Number(saleQuantity);
+        const price = Number(salePrice);
+
+        if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price < 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Valid saleQuantity and salePrice are required for sale category",
+            },
+            { status: 400 }
+          );
+        }
+
+        const result = await client.query(
+          "SELECT id FROM category_sales WHERE category_id = $1",
+          [categoryId]
         );
+
+        if (result.rows.length > 0) {
+          await client.query(
+            "UPDATE category_sales SET quantity = $1, sale_price = $2 WHERE category_id = $3",
+            [quantity, price, categoryId]
+          );
+        } else {
+          await client.query(
+            "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
+            [categoryId, quantity, price]
+          );
+        }
       } else {
-        await pool.query(
-          "INSERT INTO category_sales (category_id, quantity, sale_price) VALUES ($1, $2, $3)",
-          [categoryId, quantity, price]
+        await client.query(
+          "DELETE FROM category_sales WHERE category_id = $1",
+          [categoryId]
         );
       }
-    } else {
-      await pool.query("DELETE FROM category_sales WHERE category_id = $1", [
-        categoryId,
-      ]);
-    }
 
-    return NextResponse.json({ message: "Category updated" });
+      await client.query("COMMIT");
+      return NextResponse.json({ message: "Category updated" });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error("PATCH /categories error:", err);
     const error =
@@ -211,16 +248,6 @@ async function updateCategory(req: NextRequest) {
   }
 }
 
-// ✅ Apply middleware
-export const GET = withMiddleware(getCategories, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
-export const POST = withMiddleware(createCategory, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
-export const PATCH = withMiddleware(updateCategory, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const GET = getCategories;
+export const POST = createCategory;
+export const PATCH = updateCategory;

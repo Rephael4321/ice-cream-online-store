@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-async function orderCategory(
+async function orderCategoryNewSchema(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -27,10 +27,11 @@ async function orderCategory(
 
       for (let index = 0; index < productOrder.length; index++) {
         const productId = productOrder[index];
+
         await client.query(
-          `UPDATE product_categories
+          `UPDATE category_multi_items
            SET sort_order = $1
-           WHERE category_id = $2 AND product_id = $3`,
+           WHERE category_id = $2 AND target_type = 'product' AND target_id = $3`,
           [index, categoryId, productId]
         );
       }
@@ -39,9 +40,9 @@ async function orderCategory(
       return NextResponse.json({ success: true });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("❌ Failed to update product order:", err);
+      console.error("❌ Failed to update product order (new schema):", err);
       return NextResponse.json(
-        { error: "Failed to update order" },
+        { error: "Failed to update product order" },
         { status: 500 }
       );
     } finally {
@@ -53,8 +54,4 @@ async function orderCategory(
   }
 }
 
-// 🔒 Protect this PUT handler with your middleware
-export const PUT = withMiddleware(orderCategory, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const PUT = withMiddleware(orderCategoryNewSchema);

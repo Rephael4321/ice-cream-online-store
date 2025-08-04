@@ -135,7 +135,7 @@ export default async function ProductsByCategory({ params }: Props) {
             productPrice={product.price}
             inStock={product.inStock}
             sale={product.sale}
-            isAdmin={isAdmin} // ✅ Pass admin flag
+            isAdmin={isAdmin}
           />
         ))}
       </div>

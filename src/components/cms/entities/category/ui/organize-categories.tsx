@@ -19,6 +19,17 @@ import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
 import { Button } from "@/components/cms/ui/button";
 
+// Raw shape from API
+interface RawCategory {
+  id: number;
+  name: string;
+  image?: string;
+  type?: string;
+  sort_order?: number;
+  multi_item_sort_order?: number;
+}
+
+// Local UI shape
 interface Category {
   id: number;
   name: string;
@@ -45,12 +56,19 @@ export default function OrganizeCategories() {
     fetch("/api/categories?full=true")
       .then((res) => res.json())
       .then((data) => {
-        const parsed = data.categories.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          image: c.image,
-          sort_order: c.sort_order,
-        }));
+        const parsed: Category[] = data.categories
+          .filter(
+            (c: RawCategory) =>
+              c.type === "collection" || c.type === "sale" || !c.type
+          )
+          .map((c: RawCategory) => ({
+            id: c.id,
+            name: c.name,
+            image: c.image,
+            sort_order: c.multi_item_sort_order ?? c.sort_order ?? 0,
+          }))
+          .sort((a: Category, b: Category) => a.sort_order - b.sort_order);
+
         setCategories(parsed);
       })
       .finally(() => setLoading(false));

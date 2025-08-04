@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-// ✅ PUT /api/categories/organize (admin only)
-async function organizeCategories(req: NextRequest) {
+async function organizeCategoryItems(req: NextRequest) {
   try {
     const { categoryOrder } = await req.json();
 
@@ -19,22 +18,39 @@ async function organizeCategories(req: NextRequest) {
       await client.query("BEGIN");
 
       for (let i = 0; i < categoryOrder.length; i++) {
-        const id = categoryOrder[i];
-        await client.query(
-          "UPDATE categories SET sort_order = $1, updated_at = NOW() WHERE id = $2",
-          [i, id]
+        const categoryId = categoryOrder[i];
+
+        const res = await client.query(
+          `UPDATE category_multi_items
+           SET sort_order = $1, updated_at = NOW()
+           WHERE target_type = 'category' AND target_id = $2 AND category_id IS NULL`,
+          [i, categoryId]
         );
+
+        if (res.rowCount === 0) {
+          await client.query(
+            `INSERT INTO category_multi_items (
+               category_id, target_type, target_id, sort_order, created_at, updated_at
+             ) VALUES (
+               NULL, 'category', $1, $2, NOW(), NOW()
+             )`,
+            [categoryId, i]
+          );
+        }
       }
 
       await client.query("COMMIT");
+      return NextResponse.json({ success: true });
     } catch (err) {
       await client.query("ROLLBACK");
-      throw err;
+      console.error("❌ Transaction failed while saving category order:", err);
+      return NextResponse.json(
+        { error: "Failed to save order" },
+        { status: 500 }
+      );
     } finally {
       client.release();
     }
-
-    return NextResponse.json({ success: true });
   } catch (err) {
     console.error("❌ Failed to save category order:", err);
     return NextResponse.json(
@@ -44,8 +60,4 @@ async function organizeCategories(req: NextRequest) {
   }
 }
 
-// ✅ Secure with middleware
-export const PUT = withMiddleware(organizeCategories, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const PUT = withMiddleware(organizeCategoryItems);

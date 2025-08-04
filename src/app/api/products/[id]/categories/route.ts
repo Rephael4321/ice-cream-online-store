@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-async function getProductCategories(
+async function getProductCategoriesMulti(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -13,21 +13,19 @@ async function getProductCategories(
 
   try {
     const result = await pool.query(
-      `SELECT c.id, c.name, c.image
-       FROM categories c
-       JOIN product_categories pc ON pc.category_id = c.id
-       WHERE pc.product_id = $1`,
+      `SELECT c.id, c.name, c.image, c.type, c.description
+       FROM category_multi_items cmi
+       JOIN categories c ON c.id = cmi.category_id
+       WHERE cmi.target_type = 'product' AND cmi.target_id = $1
+       ORDER BY cmi.sort_order ASC NULLS LAST`,
       [productId]
     );
 
     return NextResponse.json({ categories: result.rows });
   } catch (err) {
-    console.error("Failed to fetch categories for product", err);
+    console.error("Failed to fetch multi categories for product", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-export const GET = withMiddleware(getProductCategories, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const GET = withMiddleware(getProductCategoriesMulti);

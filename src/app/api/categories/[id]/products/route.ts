@@ -13,19 +13,22 @@ async function getCategoryProducts(
 
   try {
     const result = await pool.query(
-      `SELECT 
+      `
+      SELECT 
         p.id, 
         p.name, 
         p.image, 
         p.price,
-        s.sale_price, 
-        s.quantity AS sale_quantity,
-        pc.sort_order
-      FROM products p
-      JOIN product_categories pc ON pc.product_id = p.id
-      LEFT JOIN sales s ON s.product_id = p.id
-      WHERE pc.category_id = $1
-      ORDER BY pc.sort_order ASC, p.name ASC`,
+        cs.sale_price, 
+        cs.quantity AS sale_quantity,
+        cmi.sort_order
+      FROM category_multi_items cmi
+      JOIN products p ON cmi.target_id = p.id
+      LEFT JOIN category_sales cs ON cs.category_id = cmi.category_id
+      WHERE cmi.category_id = $1
+        AND cmi.target_type = 'product'
+      ORDER BY cmi.sort_order ASC, p.name ASC
+      `,
       [categoryId]
     );
 
@@ -36,7 +39,7 @@ async function getCategoryProducts(
 
     return NextResponse.json({ products: sanitizedProducts });
   } catch (err) {
-    console.error("❌ Failed to fetch products:", err);
+    console.error("❌ Failed to fetch products (new schema):", err);
     return NextResponse.json(
       { error: "Failed to fetch products" },
       { status: 500 }
@@ -44,8 +47,4 @@ async function getCategoryProducts(
   }
 }
 
-// ✅ Use shared middleware (safe for GET)
-export const GET = withMiddleware(getCategoryProducts, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const GET = withMiddleware(getCategoryProducts);

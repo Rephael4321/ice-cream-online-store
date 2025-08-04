@@ -164,7 +164,6 @@ export default function EditProduct({ params }: ParamsProps) {
       (isValidQuantity && isSalePriceEmpty) ||
       (isValidSalePrice && isQuantityEmpty)
     ) {
-      // ignore invalid combo
     } else {
       setProduct((prev) =>
         prev ? { ...prev, saleQuantity: "", salePrice: "" } : prev
@@ -233,7 +232,6 @@ export default function EditProduct({ params }: ParamsProps) {
         }}
         className="relative flex flex-col md:flex-row gap-6 items-start"
       >
-        {/* LOCKING OVERLAY */}
         {saving && (
           <div className="absolute inset-0 bg-white/60 z-50 flex items-center justify-center rounded-md">
             <span className="text-xl font-semibold">שומר...</span>

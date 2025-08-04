@@ -20,14 +20,14 @@ interface Props {
   productId: string;
   initialCategories: Category[];
   onUpdate: (newCategories: Category[]) => void;
-  disabled?: boolean; // ✅ added
+  disabled?: boolean;
 }
 
 export default function CategorySelector({
   productId,
   initialCategories,
   onUpdate,
-  disabled = false, // ✅ default value
+  disabled = false,
 }: Props) {
   const [linked, setLinked] = useState<Category[]>(initialCategories);
   const [available, setAvailable] = useState<Category[]>([]);

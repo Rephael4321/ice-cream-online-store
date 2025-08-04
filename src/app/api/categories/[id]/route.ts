@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-// Types
 type Category = {
   id: number;
   name: string;
@@ -27,11 +26,17 @@ type CategorySale = {
   sale_price: number;
 };
 
-// ✅ GET /api/categories/[id] — public
 async function getCategory(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const id = Number(params.id);
+  if (isNaN(id)) {
+    return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
+  }
+
+  const withItems = req.nextUrl.searchParams.get("withItems") === "true";
+
   try {
     const result = await pool.query<CategoryWithSale>(
       `SELECT 
@@ -49,7 +54,7 @@ async function getCategory(
        FROM categories c
        LEFT JOIN category_sales cs ON cs.category_id = c.id
        WHERE c.id = $1`,
-      [params.id]
+      [id]
     );
 
     if (!result.rows.length) {
@@ -59,19 +64,69 @@ async function getCategory(
       );
     }
 
-    const sanitizedCategory = {
+    const category = {
       ...result.rows[0],
       name: result.rows[0].name.replace(/-/g, " "),
     };
 
-    return NextResponse.json({ category: sanitizedCategory });
+    if (!withItems) {
+      return NextResponse.json({ category });
+    }
+
+    const itemsResult = await pool.query(
+      `
+      SELECT 
+        cmi.target_type,
+        cmi.target_id,
+        cmi.sort_order,
+        cmi.color,
+        cmi.label,
+        p.name AS product_name,
+        p.image AS product_image,
+        p.price AS product_price,
+        cp.name AS category_name,
+        cp.image AS category_image
+      FROM category_multi_items cmi
+      LEFT JOIN products p ON cmi.target_type = 'product' AND p.id = cmi.target_id
+      LEFT JOIN categories cp ON cmi.target_type = 'category' AND cp.id = cmi.target_id
+      WHERE cmi.category_id = $1
+      ORDER BY cmi.sort_order ASC
+    `,
+      [id]
+    );
+
+    const items = itemsResult.rows.map((row) => {
+      const base = {
+        targetType: row.target_type,
+        targetId: row.target_id,
+        sortOrder: row.sort_order,
+        color: row.color,
+        label: row.label,
+      };
+
+      if (row.target_type === "product") {
+        return {
+          ...base,
+          name: row.product_name,
+          image: row.product_image,
+          price: row.product_price,
+        };
+      } else {
+        return {
+          ...base,
+          name: row.category_name,
+          image: row.category_image,
+        };
+      }
+    });
+
+    return NextResponse.json({ category, items });
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unexpected error";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
-// ✅ PUT /api/categories/[id] — admin only
 async function updateCategory(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -152,7 +207,6 @@ async function updateCategory(
   }
 }
 
-// ✅ DELETE /api/categories/[id] — admin only
 async function deleteCategory(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -183,16 +237,6 @@ async function deleteCategory(
   }
 }
 
-// ✅ Export all handlers with middleware
-export const GET = withMiddleware(getCategory, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
-export const PUT = withMiddleware(updateCategory, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
-export const DELETE = withMiddleware(deleteCategory, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const GET = withMiddleware(getCategory);
+export const PUT = withMiddleware(updateCategory);
+export const DELETE = withMiddleware(deleteCategory);

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-// GET /api/categories/root → public
 async function getRootCategories(_req: NextRequest) {
   try {
     const result = await pool.query(
@@ -27,8 +26,4 @@ async function getRootCategories(_req: NextRequest) {
   }
 }
 
-// ✅ Use middleware (harmless for GET, consistent for all)
-export const GET = withMiddleware(getRootCategories, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const GET = withMiddleware(getRootCategories);

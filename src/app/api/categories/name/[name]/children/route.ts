@@ -2,16 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-// GET /api/categories/name/[name]/children
 async function getCategoryChildren(
   _req: NextRequest,
   context: { params: { name: string } }
 ) {
   try {
     const { name } = context.params;
-    const slug = decodeURIComponent(name); // e.g. "ללא-גלוטן"
+    const slug = decodeURIComponent(name);
 
-    // Step 1: Get category ID by matching the slugified name
     const categoryRes = await pool.query<{ id: number }>(
       `SELECT id FROM categories 
        WHERE LOWER(REPLACE(name, ' ', '-')) = LOWER($1)`,
@@ -27,11 +25,14 @@ async function getCategoryChildren(
 
     const categoryId = categoryRes.rows[0].id;
 
-    // Step 2: Get children of the category
     const childrenRes = await pool.query(
-      `SELECT id, name, image, description, type 
-       FROM categories 
-       WHERE parent_id = $1`,
+      `
+      SELECT c.id, c.name, c.image, c.description, c.type, mi.sort_order
+      FROM category_multi_items mi
+      JOIN categories c ON mi.target_id = c.id
+      WHERE mi.category_id = $1 AND mi.target_type = 'category'
+      ORDER BY mi.sort_order ASC
+      `,
       [categoryId]
     );
 
@@ -50,8 +51,4 @@ async function getCategoryChildren(
   }
 }
 
-// ✅ Wrap with middleware (safe for GET)
-export const GET = withMiddleware(getCategoryChildren, {
-  deprecated:
-    "This endpoint is going to be affected by new category items orders",
-});
+export const GET = withMiddleware(getCategoryChildren);

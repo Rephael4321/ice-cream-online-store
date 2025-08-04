@@ -7,7 +7,7 @@ type ProductRow = {
   name: string;
   price: number;
   image: string;
-  in_stock: boolean; // ✅ added
+  in_stock: boolean;
   created_at: string;
   updated_at: string;
   productSaleQuantity: number | null;
@@ -29,9 +29,8 @@ async function getProductsByCategoryName(
 ) {
   try {
     const { name } = context.params;
-    const slug = decodeURIComponent(name); // e.g. 'חלב-מיוחדים'
+    const slug = decodeURIComponent(name);
 
-    // Step 0: Get category ID by exact match (slugified)
     const categoryRes = await pool.query<{ id: number }>(
       `SELECT id FROM categories WHERE name = $1`,
       [slug]
@@ -46,24 +45,23 @@ async function getProductsByCategoryName(
 
     const categoryId = categoryRes.rows[0].id;
 
-    // Step 1: Fetch products in the category (include in_stock!)
     const result = await pool.query<ProductRow>(
       `SELECT 
          p.id, 
          p.name, 
          p.price, 
          p.image,
-         p.in_stock, -- ✅ add in_stock field
+         p.in_stock,
          p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
          p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
          s.quantity AS "productSaleQuantity",
          s.sale_price AS "productSalePrice",
-         pc.sort_order
-       FROM products p
-       JOIN product_categories pc ON pc.product_id = p.id
+         mi.sort_order
+       FROM category_multi_items mi
+       JOIN products p ON mi.target_id = p.id
        LEFT JOIN sales s ON s.product_id = p.id
-       WHERE pc.category_id = $1
-       ORDER BY pc.sort_order ASC NULLS LAST, p.name ASC`,
+       WHERE mi.category_id = $1 AND mi.target_type = 'product'
+       ORDER BY mi.sort_order ASC NULLS LAST, p.name ASC`,
       [categoryId]
     );
 
@@ -72,21 +70,22 @@ async function getProductsByCategoryName(
       return NextResponse.json({ products: [] });
     }
 
-    // Step 2: Fetch sale prices from category_sales
     const productIds = products.map((p) => p.id);
     const placeholders = productIds.map((_, i) => `$${i + 1}`).join(", ");
 
     const categorySalesResult = await pool.query<CategorySaleRow>(
       `SELECT 
-         pc.product_id AS "productId",
+         mi.target_id AS "productId",
          c.id AS "categoryId",
          c.name AS "categoryName",
          cs.quantity,
          cs.sale_price
-       FROM product_categories pc
-       JOIN categories c ON c.id = pc.category_id
+       FROM category_multi_items mi
+       JOIN categories c ON c.id = mi.category_id
        JOIN category_sales cs ON cs.category_id = c.id
-       WHERE c.type = 'sale' AND pc.product_id IN (${placeholders})`,
+       WHERE mi.target_type = 'product'
+         AND mi.target_id IN (${placeholders})
+         AND c.type = 'sale'`,
       productIds
     );
 
@@ -113,7 +112,6 @@ async function getProductsByCategoryName(
       }
     }
 
-    // Step 3: Build final product list
     const finalProducts = products.map((product) => {
       const categorySale = saleMap.get(product.id);
       let sale = null;
@@ -141,7 +139,7 @@ async function getProductsByCategoryName(
         name: product.name,
         price: product.price,
         image: product.image,
-        inStock: product.in_stock, // ✅ return inStock
+        inStock: product.in_stock,
         created_at: product.created_at,
         updated_at: product.updated_at,
         sale,
@@ -158,5 +156,4 @@ async function getProductsByCategoryName(
   }
 }
 
-// ✅ Wrap with middleware (even if public GET)
 export const GET = withMiddleware(getProductsByCategoryName);
