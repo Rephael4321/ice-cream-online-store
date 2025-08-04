@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { protectAPI } from "@/lib/api/jwt-protect";
+import { notifyTelegramDeprecations } from "@/lib/utils/notify-telegram-deprecations-bot";
 
 type Handler = (req: NextRequest, context?: any) => Promise<NextResponse>;
 type Middleware = (
@@ -25,8 +26,13 @@ export function withMiddleware(handler: Handler, options?: Options): Handler {
           ? options.deprecated
           : "This API endpoint is deprecated and may be removed in a future version.";
 
-      console.warn(
-        `⚠️ [DEPRECATED] ${req.method} ${req.url} - ${deprecationMessage}`
+      const decodedUrl = decodeURIComponent(req.nextUrl.pathname);
+      const logMsg = `⚠️ [DEPRECATED] ${req.method} ${decodedUrl} - ${deprecationMessage}`;
+      console.warn(logMsg);
+
+      // 📬 Send Telegram alert with decoded path
+      notifyTelegramDeprecations(
+        `⚠️ DEPRECATED API CALLED:\n${req.method} ${decodedUrl}\n\n${deprecationMessage}`
       );
     }
 
