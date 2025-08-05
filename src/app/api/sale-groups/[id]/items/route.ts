@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
 type SaleGroupProduct = {
   id: number;
@@ -17,7 +17,6 @@ async function getSaleGroupProducts(
   context: { params: { id: string } }
 ) {
   const groupId = Number(context.params.id);
-
   if (isNaN(groupId)) {
     return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
   }
@@ -49,7 +48,6 @@ async function addProductsToGroup(
   context: { params: { id: string } }
 ) {
   const groupId = Number(context.params.id);
-
   if (isNaN(groupId)) {
     return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
   }
@@ -68,11 +66,55 @@ async function addProductsToGroup(
     }
 
     const client = await pool.connect();
-
     try {
       await client.query("BEGIN");
 
+      const existing = await client.query(
+        `
+        SELECT p.price
+        FROM products p
+        INNER JOIN product_sale_groups sg ON sg.product_id = p.id
+        WHERE sg.sale_group_id = $1
+        LIMIT 1
+        `,
+        [groupId]
+      );
+
+      let targetPrice: number | null = null;
+      if ((existing.rowCount ?? 0) > 0) {
+        targetPrice = Number(existing.rows[0].price);
+      }
+
       for (const productId of productIds) {
+        const res = await client.query(
+          `SELECT price FROM products WHERE id = $1`,
+          [productId]
+        );
+        if (res.rowCount === 0) {
+          throw new Error(`Product not found: ${productId}`);
+        }
+
+        const productPrice = Number(res.rows[0].price);
+
+        if (targetPrice !== null && productPrice !== targetPrice) {
+          throw new Error(
+            `Product ${productId} does not match group price (${productPrice} ≠ ${targetPrice})`
+          );
+        }
+
+        if (targetPrice === null) {
+          await client.query(
+            `
+            UPDATE sale_groups
+            SET quantity = 1,
+                sale_price = $1
+            WHERE id = $2
+            `,
+            [productPrice, groupId]
+          );
+          targetPrice = productPrice;
+        }
+
         await client.query(
           `
           INSERT INTO product_sale_groups (product_id, sale_group_id)
@@ -85,9 +127,10 @@ async function addProductsToGroup(
 
       await client.query("COMMIT");
       return NextResponse.json({ success: true });
-    } catch (err) {
+    } catch (err: any) {
       await client.query("ROLLBACK");
-      throw err;
+      console.error("❌ Add products failed:", err);
+      return NextResponse.json({ error: err.message }, { status: 400 });
     } finally {
       client.release();
     }

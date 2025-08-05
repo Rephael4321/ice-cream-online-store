@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { Input } from "../../ui/input";
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
-import ImageSelector from "../../ui/image-selector";
 import { images } from "@/data/images";
 import { showToast } from "../../ui/toast";
+import ImageSelector from "../../ui/image-selector";
+import Image from "next/image";
 
 type ProductForm = {
   name: string;
