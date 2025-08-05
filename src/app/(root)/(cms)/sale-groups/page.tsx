@@ -1,6 +1,12 @@
-// app/(cms)/sale-groups/page.tsx
-import SaleGroups from "@/components/cms/sale-groups";
+import { Metadata } from "next";
+import SaleGroupList from "@/components/cms/entities/sale-group/list";
+
+export const metadata: Metadata = {
+  title: "קבוצות מבצע",
+};
 
 export default function SaleGroupsPage() {
-  return <SaleGroups />;
+  return (
+      <SaleGroupList />
+  );
 }

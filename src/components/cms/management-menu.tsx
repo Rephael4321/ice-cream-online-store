@@ -44,6 +44,21 @@ const entityGroups = [
     ],
   },
   {
+    title: "מבצעים",
+    items: [
+      {
+        name: "קבוצה חדשה",
+        description: "צור קבוצת מבצע חדשה.",
+        slug: "sale-groups/new",
+      },
+      {
+        name: "קבוצות מבצע",
+        description: "צפה ונהל קבוצות מבצע קיימות.",
+        slug: "sale-groups",
+      },
+    ],
+  },
+  {
     title: "הזמנות",
     items: [
       {
@@ -60,16 +75,6 @@ const entityGroups = [
         name: "רשימת לקוחות",
         description: "ניהול וצפייה בפרטי לקוחות.",
         slug: "clients",
-      },
-    ],
-  },
-  {
-    title: "מכירות",
-    items: [
-      {
-        name: "קבוצות מבצע",
-        description: "צפה במוצרים לפי קבוצות מכירה.",
-        slug: "sale-groups",
       },
     ],
   },
