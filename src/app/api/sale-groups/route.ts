@@ -20,7 +20,9 @@ async function getSaleGroups(_req: NextRequest) {
       ORDER BY created_at DESC
     `);
 
-    return NextResponse.json(result.rows);
+    return NextResponse.json({
+      saleGroups: result.rows,
+    });
   } catch (error) {
     console.error("❌ Failed to fetch sale groups:", error);
     return NextResponse.json(

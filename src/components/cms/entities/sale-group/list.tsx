@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { SaleGroupCard } from "./ui/sale-group-card";
 import { showToast } from "@/components/cms/ui/toast";
-import Link from "next/link";
 import { Button } from "@/components/cms/ui/button";
+import Link from "next/link";
 
 type SaleGroup = {
   id: number;
   name: string | null;
+  image: string | null;
   quantity: number | null;
   sale_price: number | null;
   created_at: string;
@@ -26,7 +27,7 @@ export default function SaleGroupList() {
         if (!res.ok) throw new Error();
 
         const data = await res.json();
-        setGroups(data);
+        setGroups(data.saleGroups); // ✅ Only use the array
       } catch (err) {
         showToast("שגיאה בטעינת קבוצות מבצע", "error");
       } finally {
@@ -57,6 +58,7 @@ export default function SaleGroupList() {
               key={group.id}
               id={group.id}
               name={group.name}
+              image={group.image}
               quantity={group.quantity}
               salePrice={group.sale_price}
             />
