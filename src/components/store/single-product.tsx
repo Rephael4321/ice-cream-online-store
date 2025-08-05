@@ -56,6 +56,14 @@ export default function SingleProduct({
     addToCart({ id, productImage, productName, productPrice, sale }, 1);
   };
 
+  const handleAddSalePack = () => {
+    if (!inStock || !sale) return;
+    addToCart(
+      { id, productImage, productName, productPrice, sale },
+      sale.amount
+    );
+  };
+
   const handleRemove = () => {
     if (quantity <= 1) {
       removeFromCart(id);
@@ -177,6 +185,17 @@ export default function SingleProduct({
                 –
               </button>
             </div>
+
+            {/* ✅ Sale Pack Button */}
+            {sale && sale.amount > 1 && (
+              <button
+                onClick={handleAddSalePack}
+                disabled={!inStock}
+                className="mt-2 px-3 py-1 text-xs bg-green-100 text-green-700 border border-green-400 rounded hover:bg-green-200 transition"
+              >
+                הוסף חבילת מבצע ({sale.amount})
+              </button>
+            )}
           </div>
         </div>
       </div>
