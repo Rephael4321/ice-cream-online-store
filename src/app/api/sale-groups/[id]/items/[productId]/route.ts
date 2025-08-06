@@ -2,6 +2,78 @@ import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
 
+async function addProductToSaleGroup(
+  req: NextRequest,
+  context: { params: { id: string; productId: string } }
+) {
+  const groupId = Number(context.params.id);
+  const productId = Number(context.params.productId);
+
+  if (isNaN(groupId) || isNaN(productId)) {
+    return NextResponse.json(
+      { error: "Invalid sale group or product ID" },
+      { status: 400 }
+    );
+  }
+
+  const { label, color } = await req.json();
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const groupRes = await client.query(
+      `SELECT quantity, sale_price FROM sale_groups WHERE id = $1`,
+      [groupId]
+    );
+    const group = groupRes.rows[0];
+
+    const productRes = await client.query(
+      `SELECT sale_quantity, sale_price FROM products WHERE id = $1`,
+      [productId]
+    );
+    const product = productRes.rows[0];
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    if (group?.sale_price == null || group?.quantity == null) {
+      await client.query(
+        `UPDATE sale_groups SET quantity = $1, sale_price = $2 WHERE id = $3`,
+        [product.sale_quantity, product.sale_price, groupId]
+      );
+    } else {
+      if (
+        group.quantity !== product.sale_quantity ||
+        group.sale_price !== product.sale_price
+      ) {
+        throw new Error("Product sale info does not match group sale info");
+      }
+    }
+
+    await client.query(
+      `INSERT INTO product_sale_groups (product_id, sale_group_id, label, color)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (product_id, sale_group_id)
+       DO UPDATE SET label = EXCLUDED.label, color = EXCLUDED.color`,
+      [productId, groupId, label || null, color || null]
+    );
+
+    await client.query("COMMIT");
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    console.error("❌ Failed to add product to sale group:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to add product" },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
+  }
+}
+
 async function removeProductFromSaleGroup(
   _req: NextRequest,
   context: { params: { id: string; productId: string } }
@@ -59,4 +131,5 @@ async function removeProductFromSaleGroup(
   }
 }
 
+export const POST = withMiddleware(addProductToSaleGroup);
 export const DELETE = withMiddleware(removeProductFromSaleGroup);

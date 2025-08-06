@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/cms/ui/button";
 import { Input } from "@/components/cms/ui/input";
 import { showToast } from "@/components/cms/ui/toast";
@@ -38,7 +39,6 @@ export function SaleGroupEditor({
   const [image, setImage] = useState(getDisplayName(initialImage || ""));
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-
   const [categories, setCategories] = useState(initialCategories || []);
 
   const fullImagePath =
@@ -159,6 +159,19 @@ export function SaleGroupEditor({
           >
             מחק קבוצה
           </Button>
+
+          <Link
+            href={`/sale-groups/${id}/manage-items`}
+            className="block w-full"
+          >
+            <Button
+              type="button"
+              className="w-full bg-blue-600 text-white hover:bg-blue-700"
+              disabled={loading}
+            >
+              ניהול מוצרים בקבוצה
+            </Button>
+          </Link>
         </div>
 
         {/* Right Column - Image Preview */}
