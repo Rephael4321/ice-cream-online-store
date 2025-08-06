@@ -78,6 +78,16 @@ const entityGroups = [
       },
     ],
   },
+  {
+    title: "אחסון",
+    items: [
+      {
+        name: "ניהול אזורים",
+        description: "הגדר אזורי אחסון פיזיים למוצרים.",
+        slug: "storage-areas",
+      },
+    ],
+  },
 ];
 
 export default function ManagementMenu() {

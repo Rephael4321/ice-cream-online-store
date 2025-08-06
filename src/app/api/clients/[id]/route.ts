@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
-// === GET /api/clients/[id] – Public Access ===
 async function getClient(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -40,7 +39,6 @@ async function getClient(
   }
 }
 
-// === PUT /api/clients/[id] – Admin Only ===
 async function updateClient(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -72,7 +70,6 @@ async function updateClient(
   }
 }
 
-// === DELETE /api/clients/[id] – Admin Only ===
 async function deleteClient(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -114,7 +111,6 @@ async function deleteClient(
   }
 }
 
-// ✅ Export handlers with middleware
 export const GET = withMiddleware(getClient);
 export const PUT = withMiddleware(updateClient);
 export const DELETE = withMiddleware(deleteClient);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
 type ProductRow = {
   id: number;
@@ -14,7 +14,6 @@ type ProductRow = {
   saleUpdatedAt: string | null;
 };
 
-// === GET /api/products (🟢 public) ===
 async function listProducts() {
   try {
     const result = await pool.query<ProductRow>(
@@ -39,7 +38,6 @@ async function listProducts() {
   }
 }
 
-// === POST /api/products (🔐 protected by middleware) ===
 async function createProduct(req: NextRequest) {
   try {
     const body = await req.json();
@@ -52,7 +50,6 @@ async function createProduct(req: NextRequest) {
       );
     }
 
-    // 🚫 Prevent duplicate image
     const existing = await pool.query(
       "SELECT id FROM products WHERE image = $1 LIMIT 1",
       [image]
@@ -65,7 +62,6 @@ async function createProduct(req: NextRequest) {
       );
     }
 
-    // ✅ Insert product
     const insertResult = await pool.query<{ id: number }>(
       "INSERT INTO products (name, price, image) VALUES ($1, $2, $3) RETURNING id",
       [name, price, image]
@@ -100,6 +96,5 @@ async function createProduct(req: NextRequest) {
   }
 }
 
-// ✅ Export with automatic middleware (auth on POST, skip for GET)
 export const GET = withMiddleware(listProducts);
 export const POST = withMiddleware(createProduct);

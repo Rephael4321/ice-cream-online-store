@@ -2,7 +2,7 @@ import React from "react";
 import clsx from "clsx";
 
 type Variant = "default" | "outline" | "destructive";
-type Size = "default" | "sm" | "lg";
+type Size = "default" | "sm" | "lg" | "icon";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -29,6 +29,7 @@ const variants: Record<Variant, string> = {
     default: "px-4 py-2",
     sm: "px-3 py-1 text-sm",
     lg: "px-6 py-3 text-base",
+    icon: "p-2 w-9 h-9",
   };
 
   return (

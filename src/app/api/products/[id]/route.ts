@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
-// === Types ===
 type SaleCategory = {
   id: number;
   name: string;
@@ -19,6 +18,7 @@ type ProductRow = {
   updated_at: string;
   productSaleQuantity: number | null;
   productSalePrice: number | null;
+  storage_area_id: number | null;
 };
 
 type EffectiveSale =
@@ -34,7 +34,6 @@ type EffectiveSale =
       price: number;
     };
 
-// === GET /api/products/[id] – Public ===
 async function getProduct(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -57,9 +56,11 @@ async function getProduct(
          p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at, 
          p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
          s.quantity AS "productSaleQuantity", 
-         s.sale_price AS "productSalePrice"
+         s.sale_price AS "productSalePrice",
+         ps.storage_area_id
        FROM products p
        LEFT JOIN sales s ON s.product_id = p.id
+       LEFT JOIN product_storage ps ON ps.product_id = p.id
        WHERE p.id = $1`,
       [productId]
     );
@@ -116,6 +117,7 @@ async function getProduct(
         created_at: product.created_at,
         updated_at: product.updated_at,
         sale: effectiveSale,
+        storage_area_id: product.storage_area_id ?? null,
       },
     });
   } catch (err: unknown) {
@@ -126,7 +128,6 @@ async function getProduct(
   }
 }
 
-// === PUT /api/products/[id] – Admin only ===
 async function updateProduct(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -191,7 +192,6 @@ async function updateProduct(
   }
 }
 
-// === DELETE /api/products/[id] – Admin only ===
 async function deleteProduct(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -219,7 +219,6 @@ async function deleteProduct(
   }
 }
 
-// ✅ Export routes using middleware
 export const GET = withMiddleware(getProduct);
 export const PUT = withMiddleware(updateProduct);
 export const DELETE = withMiddleware(deleteProduct);

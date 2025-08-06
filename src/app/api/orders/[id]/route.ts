@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
 type OrderRow = {
   orderId: number;
@@ -27,7 +27,6 @@ type OrderItemRow = {
   updatedAt: string;
 };
 
-// === GET /api/orders/[id] (public view) ===
 async function getOrder(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -63,20 +62,31 @@ async function getOrder(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const itemsResult = await pool.query<OrderItemRow>(
+    const itemsResult = await pool.query<
+      OrderItemRow & {
+        storageName: string | null;
+        storageSort: number | null;
+      }
+    >(
       `SELECT
-       product_id     AS "productId",
-       product_name   AS "productName",
-       quantity,
-       unit_price     AS "unitPrice",
-       sale_quantity  AS "saleQuantity",
-       sale_price     AS "salePrice",
-       product_image  AS "productImage",
-       in_stock       AS "inStock",
-       created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
-       updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt"
-       FROM order_items
-       WHERE order_id = $1`,
+        oi.product_id     AS "productId",
+        oi.product_name   AS "productName",
+        oi.quantity,
+        oi.unit_price     AS "unitPrice",
+        oi.sale_quantity  AS "saleQuantity",
+        oi.sale_price     AS "salePrice",
+        oi.product_image  AS "productImage",
+        oi.in_stock       AS "inStock",
+        sa.name           AS "storageName",
+        sa.sort_order     AS "storageSort",
+        oi.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
+        oi.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt"
+       FROM order_items oi
+       LEFT JOIN product_storage ps ON oi.product_id = ps.product_id
+       LEFT JOIN storage_areas sa ON ps.storage_area_id = sa.id
+       WHERE oi.order_id = $1
+       ORDER BY sa.sort_order NULLS LAST, sa.name NULLS LAST, oi.product_name
+      `,
       [orderId]
     );
 
@@ -91,7 +101,6 @@ async function getOrder(
   }
 }
 
-// === PATCH /api/orders/[id] (admin only) ===
 async function updateOrder(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -166,7 +175,6 @@ async function updateOrder(
   }
 }
 
-// === DELETE /api/orders/[id] (admin only) ===
 async function deleteOrder(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -191,7 +199,6 @@ async function deleteOrder(
   }
 }
 
-// === Export handlers with middleware ===
 export const GET = withMiddleware(getOrder);
 export const PATCH = withMiddleware(updateOrder);
 export const DELETE = withMiddleware(deleteOrder);

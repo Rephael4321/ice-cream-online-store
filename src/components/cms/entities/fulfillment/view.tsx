@@ -28,7 +28,10 @@ type Item = {
   unitPrice: number;
   saleQuantity: number | null;
   salePrice: number | null;
+  storageName: string | null;
+  storageSort: number | null;
 };
+
 type ExtendedItem = Item & { inStock: boolean };
 
 export default function ViewOrder() {
@@ -47,14 +50,12 @@ export default function ViewOrder() {
 
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
-    console.log("📦 Marking as test:", flag);
     const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isTest: flag }),
     });
     const data = await r.json();
-    console.log("✅ MarkTest response:", data);
     setOrder((o) => (o ? { ...o, ...data } : o));
     toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
   };
@@ -74,24 +75,20 @@ export default function ViewOrder() {
 
     (async () => {
       try {
-        console.log("📦 Fetching order and items for ID:", id);
         const ordRes = await fetch(`/api/orders/${id}`);
         const { order: o, items: raw } = (await ordRes.json()) as {
           order: Order;
           items: Item[];
         };
 
-        console.log("✅ Order loaded:", o);
-        console.log("✅ Raw items:", raw);
-
         const enriched = raw.map((it: any) => ({
           ...it,
           unitPrice: +it.unitPrice,
           salePrice: it.salePrice !== null ? +it.salePrice : null,
-          inStock: it.inStock !== false, // fallback in case field is missing
+          inStock: it.inStock !== false,
+          storageName: it.storageName ?? null,
+          storageSort: it.storageSort ?? null,
         }));
-
-        console.log("✅ Final item state with stock info:", enriched);
 
         setOrder(o);
         setItems(enriched);
@@ -101,7 +98,7 @@ export default function ViewOrder() {
     })();
   }, [id]);
 
-  const handleNotifyAndWhatsApp = async () => {
+  const handleNotifyAndWhatsApp = async (): Promise<void> => {
     if (!order) return;
 
     const phone = order.clientPhone
@@ -113,19 +110,16 @@ export default function ViewOrder() {
     }
 
     try {
-      console.log("📦 Sending WhatsApp notification for order:", order.orderId);
       const r = await fetch(`/api/orders/${order.orderId}/notify`, {
         method: "PATCH",
       });
       if (!r.ok) throw new Error();
 
-      console.log("✅ Marked as notified");
       setOrder((prev) => (prev ? { ...prev, isNotified: true } : prev));
 
       const siteUrl =
         process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-        "http://localhost:3000"; // fallback in dev
-
+        "http://localhost:3000";
       const orderUrl = `${siteUrl}/order/${order.orderId}`;
 
       const msg = `שלום${
@@ -137,24 +131,22 @@ export default function ViewOrder() {
       const whatsappLink = `https://wa.me/${phone}?text=${encodeURIComponent(
         msg
       )}`;
-      console.log("📤 Redirecting to WhatsApp:", whatsappLink);
       window.location.href = whatsappLink;
-    } catch (err) {
-      console.error("❌ Failed to notify or redirect", err);
+    } catch {
       toast.error("❌ שגיאה בעדכון סטטוס וואטסאפ");
     }
+
+    return;
   };
 
   const flipOrderBool = async (field: "isPaid" | "isReady") => {
     if (!order) return;
-    console.log(`📦 Toggling ${field} for order #${order.orderId}`);
     const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !order[field] }),
     });
     const data = await r.json();
-    console.log("✅ Updated order field:", data);
     setOrder((o) =>
       o
         ? {
@@ -170,13 +162,11 @@ export default function ViewOrder() {
   };
 
   const toggleStock = async (productId: number) => {
-    console.log("📦 Toggling stock for product:", productId);
     setItems((prev) => {
       const nextState = prev.map((it) =>
         it.productId === productId ? { ...it, inStock: !it.inStock } : it
       );
       const justToggled = nextState.find((it) => it.productId === productId)!;
-      console.log("✅ Stock state updated:", justToggled);
       fetch(`/api/orders/${order?.orderId}/stock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -216,10 +206,6 @@ export default function ViewOrder() {
 
   const handleUpdateClient = async () => {
     if (!order) return;
-    console.log("📦 Updating client info:", {
-      name: newName.trim(),
-      address: newAddr.trim(),
-    });
     const r = await fetch(`/api/orders/${order.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -229,7 +215,6 @@ export default function ViewOrder() {
       }),
     });
     const data = await r.json();
-    console.log("✅ Client update response:", data);
     setOrder((o) =>
       o
         ? {

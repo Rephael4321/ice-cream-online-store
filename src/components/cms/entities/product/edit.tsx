@@ -8,6 +8,7 @@ import { images } from "@/data/images";
 import Image from "next/image";
 import ImageSelector from "@/components/cms/ui/image-selector";
 import Category from "@/components/cms/entities/product/ui/category";
+import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 
 interface ProductDetail {
   id: string;
@@ -17,6 +18,7 @@ interface ProductDetail {
   saleQuantity?: string | number;
   salePrice?: string | number;
   inStock: boolean;
+  storage_area_id?: number | null;
 }
 
 interface ParamsProps {
@@ -60,6 +62,7 @@ export default function EditProduct({ params }: ParamsProps) {
           saleQuantity: loaded.sale?.quantity ?? "",
           salePrice: loaded.sale?.price ?? "",
           inStock: loaded.in_stock,
+          storage_area_id: loaded.storage_area_id ?? null,
         });
 
         setImagePathMap({ [displayName]: loaded.image });
@@ -257,6 +260,12 @@ export default function EditProduct({ params }: ParamsProps) {
                 }));
               }
             }}
+            disabled={saving}
+          />
+
+          <ProductStorageSelector
+            productId={Number(product.id)}
+            initialStorageAreaId={product.storage_area_id}
             disabled={saving}
           />
 
