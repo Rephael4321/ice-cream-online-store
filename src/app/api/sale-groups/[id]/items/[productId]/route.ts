@@ -22,28 +22,34 @@ async function addProductToSaleGroup(
   try {
     await client.query("BEGIN");
 
+    // Get existing sale group info
     const groupRes = await client.query(
       `SELECT quantity, sale_price FROM sale_groups WHERE id = $1`,
       [groupId]
     );
     const group = groupRes.rows[0];
 
+    // Get sale info from sales table (correct table)
     const productRes = await client.query(
-      `SELECT sale_quantity, sale_price FROM products WHERE id = $1`,
+      `SELECT quantity AS sale_quantity, sale_price
+       FROM sales
+       WHERE product_id = $1`,
       [productId]
     );
     const product = productRes.rows[0];
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error("Sale info not found for product");
     }
 
+    // First product being added → set sale group quantity & price
     if (group?.sale_price == null || group?.quantity == null) {
       await client.query(
         `UPDATE sale_groups SET quantity = $1, sale_price = $2 WHERE id = $3`,
         [product.sale_quantity, product.sale_price, groupId]
       );
     } else {
+      // Validate new product matches existing group rules
       if (
         group.quantity !== product.sale_quantity ||
         group.sale_price !== product.sale_price
@@ -52,6 +58,7 @@ async function addProductToSaleGroup(
       }
     }
 
+    // Insert or update product link in product_sale_groups
     await client.query(
       `INSERT INTO product_sale_groups (product_id, sale_group_id, label, color)
        VALUES ($1, $2, $3, $4)
@@ -93,12 +100,14 @@ async function removeProductFromSaleGroup(
   try {
     await client.query("BEGIN");
 
+    // Remove the product from the sale group
     await client.query(
       `DELETE FROM product_sale_groups
        WHERE sale_group_id = $1 AND product_id = $2`,
       [groupId, productId]
     );
 
+    // Check how many products are left in the group
     const remaining = await client.query<{ count: string }>(
       `SELECT COUNT(*)::int AS count
        FROM product_sale_groups
@@ -108,6 +117,7 @@ async function removeProductFromSaleGroup(
 
     const remainingCount = Number(remaining.rows[0]?.count ?? 0);
 
+    // If none left, reset group's quantity and price
     if (remainingCount === 0) {
       await client.query(
         `UPDATE sale_groups
