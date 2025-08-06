@@ -11,7 +11,7 @@ type Product = {
   name: string;
   price: number;
   image: string;
-  sale: { quantity: number; sale_price: number } | null; // ✅ FIXED
+  sale: { quantity: number; sale_price: number } | null;
   label?: string;
   color?: string;
   alreadyLinked: boolean;
@@ -41,18 +41,6 @@ export default function ProductRow({
 
   async function addProduct() {
     setLoading(true);
-
-    if (
-      groupSaleInfo.sale_price != null &&
-      groupSaleInfo.quantity != null &&
-      (product.sale?.sale_price !== groupSaleInfo.sale_price ||
-        product.sale?.quantity !== groupSaleInfo.quantity)
-    ) {
-      showToast("❌ מחיר או כמות מבצע לא תואמים את הקבוצה", "error");
-      setLoading(false);
-      return;
-    }
-
     try {
       const res = await fetch(
         `/api/sale-groups/${saleGroupId}/items/${product.id}`,
@@ -62,13 +50,17 @@ export default function ProductRow({
         }
       );
 
-      if (!res.ok) throw new Error();
-      showToast("✔️ המוצר נוסף בהצלחה");
-      await onChange();
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.error || "❌ שגיאה בהוספת המוצר", "error");
+      } else {
+        showToast("✔️ המוצר נוסף בהצלחה");
+        await onChange();
+      }
     } catch {
       showToast("❌ שגיאה בהוספת המוצר", "error");
     }
-
     setLoading(false);
   }
 
@@ -82,9 +74,14 @@ export default function ProductRow({
         }
       );
 
-      if (!res.ok) throw new Error();
-      showToast("🗑️ המוצר הוסר מהקבוצה");
-      await onChange();
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.error || "❌ שגיאה בהסרת המוצר", "error");
+      } else {
+        showToast("🗑️ המוצר הוסר מהקבוצה");
+        await onChange();
+      }
     } catch {
       showToast("❌ שגיאה בהסרת המוצר", "error");
     }
@@ -93,7 +90,7 @@ export default function ProductRow({
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 border rounded-md p-3 w-full shadow-sm bg-white">
-      {/* Nicer Image Box */}
+      {/* Image */}
       <div className="relative w-[60px] h-[60px] shrink-0 rounded-md overflow-hidden shadow-inner bg-gray-100 border border-gray-200">
         <Image
           src={product.image}
@@ -104,8 +101,8 @@ export default function ProductRow({
         />
       </div>
 
+      {/* Content */}
       <div className="flex flex-col sm:flex-row flex-1 w-full sm:items-center gap-2 sm:gap-6">
-        {/* Name + Price */}
         <div className="flex-1 min-w-0">
           <div className="font-semibold truncate">
             #{product.id} - {product.name}

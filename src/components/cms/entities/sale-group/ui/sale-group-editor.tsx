@@ -137,7 +137,8 @@ export function SaleGroupEditor({
           <div>
             <Label>פרטי מבצע</Label>
             <div className="border px-3 py-2 rounded-md bg-gray-100">
-              {initialQuantity && initialSalePrice != null ? (
+              {typeof initialQuantity === "number" &&
+              typeof initialSalePrice === "number" ? (
                 <>
                   {initialQuantity} ב־ {initialSalePrice.toFixed(2)} ₪
                 </>

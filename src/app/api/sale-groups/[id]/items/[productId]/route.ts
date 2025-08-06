@@ -22,14 +22,14 @@ async function addProductToSaleGroup(
   try {
     await client.query("BEGIN");
 
-    // Get existing sale group info
+    // Get sale group info
     const groupRes = await client.query(
       `SELECT quantity, sale_price FROM sale_groups WHERE id = $1`,
       [groupId]
     );
     const group = groupRes.rows[0];
 
-    // Get sale info from sales table (correct table)
+    // Get product sale info
     const productRes = await client.query(
       `SELECT quantity AS sale_quantity, sale_price
        FROM sales
@@ -42,23 +42,24 @@ async function addProductToSaleGroup(
       throw new Error("Sale info not found for product");
     }
 
-    // First product being added → set sale group quantity & price
+    // First product → set group's sale info
     if (group?.sale_price == null || group?.quantity == null) {
       await client.query(
         `UPDATE sale_groups SET quantity = $1, sale_price = $2 WHERE id = $3`,
         [product.sale_quantity, product.sale_price, groupId]
       );
     } else {
-      // Validate new product matches existing group rules
-      if (
-        group.quantity !== product.sale_quantity ||
-        group.sale_price !== product.sale_price
-      ) {
-        throw new Error("Product sale info does not match group sale info");
+      const groupQuantity = Number(group.quantity);
+      const groupPrice = Number(group.sale_price);
+      const productQuantity = Number(product.sale_quantity);
+      const productPrice = Number(product.sale_price);
+
+      if (groupQuantity !== productQuantity || groupPrice !== productPrice) {
+        throw new Error("מחיר או כמות מבצע לא תואמים את הקבוצה");
       }
     }
 
-    // Insert or update product link in product_sale_groups
+    // Link product to sale group
     await client.query(
       `INSERT INTO product_sale_groups (product_id, sale_group_id, label, color)
        VALUES ($1, $2, $3, $4)
@@ -71,9 +72,8 @@ async function addProductToSaleGroup(
     return NextResponse.json({ success: true });
   } catch (error: any) {
     await client.query("ROLLBACK");
-    console.error("❌ Failed to add product to sale group:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to add product" },
+      { error: error.message || "Failed to add product to sale group" },
       { status: 500 }
     );
   } finally {
@@ -100,14 +100,12 @@ async function removeProductFromSaleGroup(
   try {
     await client.query("BEGIN");
 
-    // Remove the product from the sale group
     await client.query(
       `DELETE FROM product_sale_groups
        WHERE sale_group_id = $1 AND product_id = $2`,
       [groupId, productId]
     );
 
-    // Check how many products are left in the group
     const remaining = await client.query<{ count: string }>(
       `SELECT COUNT(*)::int AS count
        FROM product_sale_groups
@@ -117,7 +115,6 @@ async function removeProductFromSaleGroup(
 
     const remainingCount = Number(remaining.rows[0]?.count ?? 0);
 
-    // If none left, reset group's quantity and price
     if (remainingCount === 0) {
       await client.query(
         `UPDATE sale_groups
@@ -131,7 +128,6 @@ async function removeProductFromSaleGroup(
     return NextResponse.json({ success: true });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("❌ Failed to remove product from sale group:", error);
     return NextResponse.json(
       { error: "Failed to remove product from sale group" },
       { status: 500 }

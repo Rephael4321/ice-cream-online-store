@@ -11,15 +11,14 @@ type Middleware = (
 interface Options {
   middleware?: Middleware;
   skipAuth?: boolean;
-  deprecated?: boolean | string; // 👈 NEW: mark API as deprecated
+  deprecated?: boolean | string;
 }
 
 export function withMiddleware(handler: Handler, options?: Options): Handler {
   return async (req: NextRequest, context?: any) => {
-    console.log("🛡️ [withMiddleware] Running middleware for:", req.url);
-    console.log("🔍 Method:", req.method);
+    // console.log("🛡️ [withMiddleware] Running middleware for:", req.url);
+    // console.log("🔍 Method:", req.method);
 
-    // 🚨 Log deprecation warning if API is marked as deprecated
     if (options?.deprecated) {
       const deprecationMessage =
         typeof options.deprecated === "string"
@@ -30,13 +29,11 @@ export function withMiddleware(handler: Handler, options?: Options): Handler {
       const logMsg = `⚠️ [DEPRECATED] ${req.method} ${decodedUrl} - ${deprecationMessage}`;
       console.warn(logMsg);
 
-      // 📬 Send Telegram alert with decoded path
       notifyTelegramDeprecations(
         `⚠️ DEPRECATED API CALLED:\n${req.method} ${decodedUrl}\n\n${deprecationMessage}`
       );
     }
 
-    // 🚨 Always protect unless explicitly skipped
     if (!options?.skipAuth) {
       const protectResult = await protectAPI(req);
       if (protectResult instanceof NextResponse) {
@@ -44,10 +41,9 @@ export function withMiddleware(handler: Handler, options?: Options): Handler {
         return protectResult;
       }
     } else {
-      console.log("🔓 [withMiddleware] Skipping protectAPI due to skipAuth.");
+      // console.log("🔓 [withMiddleware] Skipping protectAPI due to skipAuth.");
     }
 
-    // ✅ Run custom middleware if provided
     if (options?.middleware) {
       const result = await options.middleware(req, context);
       if (result instanceof NextResponse) {
@@ -56,12 +52,12 @@ export function withMiddleware(handler: Handler, options?: Options): Handler {
         );
         return result;
       }
-      console.log("✅ [withMiddleware] Custom middleware passed.");
+      // console.log("✅ [withMiddleware] Custom middleware passed.");
     }
 
-    console.log("📦 [withMiddleware] Calling route handler...");
+    // console.log("📦 [withMiddleware] Calling route handler...");
     const response = await handler(req, context);
-    console.log("✅ [withMiddleware] Handler completed.");
+    // console.log("✅ [withMiddleware] Handler completed.");
 
     // 📨 Add deprecation header to response if API is deprecated
     if (options?.deprecated) {
