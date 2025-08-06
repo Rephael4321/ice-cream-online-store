@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
+
+type AllowedTargetType = "product" | "category" | "sale_group";
 
 type LinkPayload = {
-  productId: number;
+  targetId: number;
   categoryId: number;
-  type?: "product" | "category";
+  type: AllowedTargetType;
 };
 
 async function linkItem(req: NextRequest) {
   try {
-    const { productId, categoryId, type }: LinkPayload = await req.json();
+    const { targetId, categoryId, type }: LinkPayload = await req.json();
 
-    if (!productId || !categoryId) {
+    if (
+      !targetId ||
+      !categoryId ||
+      !["product", "category", "sale_group"].includes(type)
+    ) {
       return NextResponse.json(
-        { error: "Both productId and categoryId are required" },
-        { status: 400 }
-      );
-    }
-
-    const targetType: "product" | "category" =
-      type ?? (await inferTargetType(productId)) ?? "product";
-
-    if (!["product", "category"].includes(targetType)) {
-      return NextResponse.json(
-        { error: "Invalid target type" },
+        { error: "targetId, categoryId, and valid type are required" },
         { status: 400 }
       );
     }
@@ -42,10 +38,10 @@ async function linkItem(req: NextRequest) {
       );
     }
 
-    if (category.type === "sale" && targetType === "product") {
+    if (category.type === "sale" && type === "product") {
       const newProduct = await pool.query(
         "SELECT price FROM products WHERE id = $1",
-        [productId]
+        [targetId]
       );
       if (!newProduct.rows.length) {
         return NextResponse.json(
@@ -82,7 +78,7 @@ async function linkItem(req: NextRequest) {
        FROM category_multi_items
        WHERE category_id = $1
        ON CONFLICT DO NOTHING`,
-      [categoryId, targetType, productId]
+      [categoryId, type, targetId]
     );
 
     return NextResponse.json({ message: "Item linked" }, { status: 201 });
@@ -98,17 +94,17 @@ async function linkItem(req: NextRequest) {
 async function unlinkItem(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const productId = Number(searchParams.get("productId"));
+    const targetId = Number(searchParams.get("targetId"));
     const categoryId = Number(searchParams.get("categoryId"));
-    const targetType = searchParams.get("type") ?? "product";
+    const targetType = searchParams.get("type");
 
     if (
-      !productId ||
+      !targetId ||
       !categoryId ||
-      !["product", "category"].includes(targetType)
+      !["product", "category", "sale_group"].includes(targetType || "")
     ) {
       return NextResponse.json(
-        { error: "Missing or invalid parameters" },
+        { error: "targetId, categoryId, and valid type are required" },
         { status: 400 }
       );
     }
@@ -116,7 +112,7 @@ async function unlinkItem(req: NextRequest) {
     await pool.query(
       `DELETE FROM category_multi_items
        WHERE category_id = $1 AND target_type = $2 AND target_id = $3`,
-      [categoryId, targetType, productId]
+      [categoryId, targetType, targetId]
     );
 
     return NextResponse.json({ success: true });
@@ -127,24 +123,6 @@ async function unlinkItem(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function inferTargetType(
-  id: number
-): Promise<"product" | "category" | null> {
-  const product = await pool.query(
-    "SELECT 1 FROM products WHERE id = $1 LIMIT 1",
-    [id]
-  );
-  if (product.rowCount) return "product";
-
-  const category = await pool.query(
-    "SELECT 1 FROM categories WHERE id = $1 LIMIT 1",
-    [id]
-  );
-  if (category.rowCount) return "category";
-
-  return null;
 }
 
 export const POST = withMiddleware(linkItem);

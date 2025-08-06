@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { Label } from "@/components/cms/ui/label";
-import ImageSelector from "@/components/cms/ui/image-selector";
 import { images } from "@/data/images";
 import Image from "next/image";
+import ImageSelector from "@/components/cms/ui/image-selector";
 import Category from "@/components/cms/entities/product/ui/category";
 
 interface ProductDetail {

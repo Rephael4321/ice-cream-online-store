@@ -99,15 +99,17 @@ async function createCategory(req: NextRequest) {
       );
 
       const categoryId = result.rows[0].id;
-      await client.query(
-        `INSERT INTO category_multi_items (category_id, target_type, target_id, sort_order)
-         VALUES (NULL, 'category', $1, (
-           SELECT COALESCE(MAX(sort_order), -1) + 1
-           FROM category_multi_items
-           WHERE target_type = 'category' AND category_id IS NULL
-         ))`,
-        [categoryId]
-      );
+      if (parent_id) {
+        await client.query(
+          `INSERT INTO category_multi_items (category_id, target_type, target_id, sort_order)
+     VALUES ($1, 'category', $2, (
+       SELECT COALESCE(MAX(sort_order), -1) + 1
+       FROM category_multi_items
+       WHERE target_type = 'category' AND category_id = $1
+     ))`,
+          [parent_id, categoryId]
+        );
+      }
 
       if (type === "sale") {
         const quantity = Number(saleQuantity);

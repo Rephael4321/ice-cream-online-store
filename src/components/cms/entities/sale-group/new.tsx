@@ -21,8 +21,9 @@ export default function NewSaleGroupForm() {
     fetch("/api/sale-groups")
       .then((res) => res.json())
       .then((data) => {
+        const groups = Array.isArray(data.saleGroups) ? data.saleGroups : [];
         const used = new Set<string>();
-        data.forEach((group: { image: string }) => {
+        groups.forEach((group: { image: string }) => {
           if (group.image) used.add(group.image);
         });
         setUsedImages(used);

@@ -5,6 +5,7 @@ import pool from "@/lib/db";
 type SaleGroup = {
   id: number;
   name: string | null;
+  image: string | null;
   quantity: number | null;
   sale_price: number | null;
   created_at: string;
@@ -23,7 +24,8 @@ async function getSaleGroup(
 
   try {
     const result = await pool.query<SaleGroup>(
-      `SELECT id, name, quantity, sale_price, created_at, updated_at FROM sale_groups WHERE id = $1`,
+      `SELECT id, name, image, quantity, sale_price, created_at, updated_at
+       FROM sale_groups WHERE id = $1`,
       [id]
     );
 
@@ -55,26 +57,39 @@ async function updateSaleGroup(
   }
 
   try {
-    const { name, quantity, sale_price } = await req.json();
+    const body = await req.json();
+    const { name, image } = body;
 
-    const result = await pool.query<SaleGroup>(
-      `
-      UPDATE sale_groups
-      SET name = $1, quantity = $2, sale_price = $3, updated_at = now()
-      WHERE id = $4
-      RETURNING id, name, quantity, sale_price, created_at, updated_at
-      `,
-      [name ?? null, quantity ?? null, sale_price ?? null, id]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Sale group not found" },
-        { status: 404 }
+      const result = await client.query<SaleGroup>(
+        `
+        UPDATE sale_groups
+        SET name = $1, image = $2, updated_at = now()
+        WHERE id = $3
+        RETURNING id, name, image, quantity, sale_price, created_at, updated_at
+        `,
+        [name ?? null, image ?? null, id]
       );
-    }
 
-    return NextResponse.json(result.rows[0]);
+      if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          { error: "Sale group not found" },
+          { status: 404 }
+        );
+      }
+
+      await client.query("COMMIT");
+      return NextResponse.json(result.rows[0]);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error("❌ Failed to update sale group:", error);
     return NextResponse.json(

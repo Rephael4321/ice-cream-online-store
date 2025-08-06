@@ -179,7 +179,7 @@ export default function NewCategory() {
                 [item.name]: item.image || "",
               }));
             }}
-            placeholder="טיפוח"
+            placeholder="ארטיקים"
             label="שם תמונה"
           />
 

@@ -48,10 +48,12 @@ export default function CategorySelector({
 
   const unlink = async (categoryId: number) => {
     if (disabled) return;
+
     await fetch(
-      `/api/product-category?productId=${productId}&categoryId=${categoryId}`,
+      `/api/product-category?targetId=${productId}&categoryId=${categoryId}&type=product`,
       { method: "DELETE" }
     );
+
     const updated = linked.filter((c) => c.id !== categoryId);
     setLinked(updated);
     onUpdate(updated);
@@ -59,10 +61,15 @@ export default function CategorySelector({
 
   const link = async () => {
     if (!selectedId || disabled) return;
+
     await fetch("/api/product-category", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, categoryId: selectedId }),
+      body: JSON.stringify({
+        targetId: Number(productId),
+        categoryId: selectedId,
+        type: "product",
+      }),
     });
 
     const newCat = available.find((c) => c.id === selectedId);
