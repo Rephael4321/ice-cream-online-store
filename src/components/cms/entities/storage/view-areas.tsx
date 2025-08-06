@@ -5,6 +5,7 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -32,7 +33,15 @@ export default function ViewStorageAreas() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    })
+  );
 
   useEffect(() => {
     fetchAreas();
@@ -210,7 +219,7 @@ function SortableAreaItem({
       <div className="flex items-center gap-2 w-full">
         <span
           {...listeners}
-          className="cursor-grab select-none text-gray-400"
+          className="cursor-grab select-none text-gray-400 active:cursor-grabbing touch-none"
           title="גרור לשינוי סדר"
         >
           <GripVertical className="w-5 h-5" />
@@ -226,6 +235,7 @@ function SortableAreaItem({
               setOriginalName(area.name);
             }
           }}
+          onTouchStart={(e) => e.stopPropagation()}
         />
 
         {hasChanged && (
