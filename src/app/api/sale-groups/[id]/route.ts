@@ -11,6 +11,7 @@ type SaleGroup = {
   price: number | null;
   created_at: string;
   updated_at: string;
+  categories: { id: number; name: string }[];
 };
 
 async function getSaleGroup(
@@ -24,20 +25,38 @@ async function getSaleGroup(
   }
 
   try {
-    const result = await pool.query<SaleGroup>(
-      `SELECT id, name, image, quantity, sale_price, price, created_at, updated_at
-       FROM sale_groups WHERE id = $1`,
+    const groupResult = await pool.query<SaleGroup>(
+      `
+      SELECT 
+        id, name, image, quantity, sale_price, price, created_at, updated_at
+      FROM sale_groups
+      WHERE id = $1
+      `,
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (groupResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Sale group not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(result.rows[0]);
+    const group = groupResult.rows[0];
+
+    const categoryResult = await pool.query(
+      `
+      SELECT c.id, c.name
+      FROM category_multi_items cmi
+      JOIN categories c ON c.id = cmi.category_id
+      WHERE cmi.target_type = 'sale_group' AND cmi.target_id = $1
+      `,
+      [id]
+    );
+
+    const categories = categoryResult.rows;
+
+    return NextResponse.json({ ...group, categories });
   } catch (error) {
     console.error("❌ Failed to get sale group:", error);
     return NextResponse.json(

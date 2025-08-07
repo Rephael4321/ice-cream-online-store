@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Button } from "@/components/cms/ui/button";
 import { Input } from "@/components/cms/ui/input";
 import { showToast } from "@/components/cms/ui/toast";
 import { images } from "@/data/images";
 import { Label } from "@/components/cms/ui/label";
+import Link from "next/link";
 import Image from "next/image";
 import ImageSelector from "@/components/cms/ui/image-selector";
 import CategoryLinker from "@/components/cms/entities/sale-group/ui/category-linker";
@@ -14,9 +14,9 @@ import CategoryLinker from "@/components/cms/entities/sale-group/ui/category-lin
 interface SaleGroupEditorProps {
   id: number;
   initialName: string | null;
-  initialPrice: number | null;
+  initialPrice: number | null; // regular unit price
   initialQuantity: number | null;
-  initialSalePrice: number | null;
+  initialSalePrice: number | null; // sale price per unit
   initialImage: string | null;
   initialCategories: { id: number; name: string }[];
 }
@@ -135,17 +135,36 @@ export function SaleGroupEditor({
           </div>
 
           <div>
-            <Label>פרטי מבצע</Label>
+            <Label>מחיר ליחידה</Label>
             <div className="border px-3 py-2 rounded-md bg-gray-100">
-              {typeof initialQuantity === "number" &&
-              typeof initialSalePrice === "number" ? (
-                <>
-                  {initialQuantity} ב־ {initialSalePrice.toFixed(2)} ₪
-                </>
-              ) : (
-                "לא הוגדר"
-              )}
+              {typeof initialPrice === "number"
+                ? `${initialPrice.toFixed(2)} ₪`
+                : "לא הוגדר"}
             </div>
+          </div>
+
+          <div>
+            <Label>פרטי מבצע</Label>
+            {typeof initialQuantity === "number" &&
+            typeof initialSalePrice === "number" ? (
+              <>
+                <div className="flex gap-2">
+                  <div className="flex-1 border px-3 py-2 rounded-md bg-gray-100 text-center">
+                    {initialQuantity} ב־
+                  </div>
+                  <div className="flex-1 border px-3 py-2 rounded-md bg-gray-100 text-center">
+                    {initialSalePrice.toFixed(2)} ₪
+                  </div>
+                </div>
+                <div className="mt-2 text-sm text-center text-gray-600">
+                  סה"כ: {(initialQuantity * initialSalePrice).toFixed(2)} ₪
+                </div>
+              </>
+            ) : (
+              <div className="border px-3 py-2 rounded-md bg-gray-100 text-center text-gray-500">
+                לא הוגדר
+              </div>
+            )}
           </div>
 
           <Button type="submit" className="w-full mt-4" disabled={loading}>

@@ -8,8 +8,9 @@ import { SaleGroupEditor } from "./ui/sale-group-editor";
 type SaleGroup = {
   id: number;
   name: string | null;
-  quantity: number | null;
-  sale_price: number | null;
+  quantity: number | string | null;
+  sale_price: number | string | null;
+  price: number | string | null;
   image: string | null;
   created_at: string;
   updated_at: string;
@@ -55,14 +56,14 @@ export default function ViewSaleGroup() {
           <SaleGroupEditor
             id={group.id}
             initialName={group.name}
-            initialQuantity={group.quantity}
-            initialSalePrice={group.sale_price}
-            initialImage={group.image}
-            initialPrice={
-              group.sale_price != null && group.quantity != null
-                ? group.sale_price * group.quantity
-                : null
+            initialQuantity={
+              group.quantity !== null ? Number(group.quantity) : null
             }
+            initialSalePrice={
+              group.sale_price !== null ? Number(group.sale_price) : null
+            }
+            initialPrice={group.price !== null ? Number(group.price) : null}
+            initialImage={group.image}
             initialCategories={group.categories || []}
           />
         </div>
