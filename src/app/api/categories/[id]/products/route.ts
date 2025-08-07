@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
 async function getCategoryProducts(
   req: NextRequest,

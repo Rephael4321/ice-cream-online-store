@@ -17,8 +17,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { Button } from "@/components/cms/ui/button";
+import Image from "next/image";
 
 type Product = {
   id: number;
@@ -73,7 +73,7 @@ export default function OrganizeProducts({ id }: { id: string }) {
       const res = await fetch(`/api/categories/${id}/products/order`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ send cookies!
+        credentials: "include",
         body: JSON.stringify({ productOrder }),
       });
 

@@ -53,7 +53,6 @@ async function addProductToSaleGroup(
       group?.quantity == null ||
       group?.price == null
     ) {
-      // First product sets the group's pricing info
       await client.query(
         `UPDATE sale_groups
          SET quantity = $1, sale_price = $2, price = $3

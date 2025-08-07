@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/cms/ui/button";
 import ViewProducts from "./ui/view-products";
 import OrganizeProducts from "./ui/organize-products";
-import { Button } from "@/components/cms/ui/button";
 
 export default function ProductsByCategory({ id }: { id: string }) {
   const [mode, setMode] = useState<"view" | "organize">("view");
