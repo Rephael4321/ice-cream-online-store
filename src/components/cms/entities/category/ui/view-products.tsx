@@ -4,35 +4,58 @@ import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Input } from "@/components/cms/ui/input";
+import SaleGroupCard from "./ui/sale-group-card";
 
-type Product = {
+type ProductItem = {
+  type: "product";
   id: number;
   name: string;
-  image: string;
-  price: number | string;
-  sale_price: number | string | null;
+  image: string | null;
+  price: number;
+  sale_price: number | null;
   sale_quantity: number | null;
+  sort_order: number;
 };
 
+type SaleGroupItem = {
+  type: "sale_group";
+  id: number;
+  name: string;
+  image: string | null;
+  price: number;
+  sale_price: number;
+  quantity: number;
+  sort_order: number;
+  products: {
+    id: number;
+    name: string;
+    image: string;
+    label: string;
+    color: string;
+  }[];
+};
+
+type Item = ProductItem | SaleGroupItem;
+
 export default function ViewProducts({ id }: { id: string }) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch(`/api/categories/${id}/products`, { cache: "no-store" })
       .then((res) => res.json())
-      .then((data) => setProducts(data.products))
+      .then((data) => setItems(data.items))
       .finally(() => setLoading(false));
   }, [id]);
 
   const filtered = useMemo(() => {
-    return products.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase())
+    return items.filter((item) =>
+      item.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [products, search]);
+  }, [items, search]);
 
-  if (loading) return <p>טוען מוצרים...</p>;
+  if (loading) return <p>טוען פריטים...</p>;
 
   return (
     <div className="space-y-6">
@@ -40,7 +63,7 @@ export default function ViewProducts({ id }: { id: string }) {
         <h1 className="text-2xl font-bold">מוצרים מקטגוריה</h1>
         <Input
           type="text"
-          placeholder="חפש מוצר לפי שם..."
+          placeholder="חפש מוצר או קבוצה..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
@@ -48,34 +71,40 @@ export default function ViewProducts({ id }: { id: string }) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-gray-500 p-4">לא נמצאו מוצרים.</p>
+        <p className="text-gray-500 p-4">לא נמצאו תוצאות.</p>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((product) => (
-            <Link
-              key={product.id}
-              href={`/products/${product.id}`}
-              className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02]"
-            >
-              <Image
-                src={product.image}
-                alt={product.name}
-                width={120}
-                height={120}
-                className="rounded-xl object-contain w-24 h-24"
-              />
-              <div className="mt-2 font-bold text-center">{product.name}</div>
-              <div className="text-gray-700 text-sm text-center">
-                ₪{Number(product.price).toFixed(2)}
-              </div>
-              {product.sale_price !== null && (
-                <div className="text-green-600 font-semibold text-sm text-center">
-                  מבצע: ₪{Number(product.sale_price).toFixed(2)} (
-                  {product.sale_quantity} יח')
+          {filtered.map((item) =>
+            item.type === "product" ? (
+              <Link
+                key={`product-${item.id}`}
+                href={`/products/${item.id}`}
+                className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02]"
+              >
+                {item.image ? (
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    width={120}
+                    height={120}
+                    className="rounded-xl object-contain w-24 h-24"
+                  />
+                ) : null}
+                <div className="mt-2 font-bold text-center">{item.name}</div>
+                <div className="text-gray-700 text-sm text-center">
+                  ₪{Number(item.price).toFixed(2)}
                 </div>
-              )}
-            </Link>
-          ))}
+                {item.sale_price !== null && (
+                  <div className="text-green-600 font-semibold text-sm text-center">
+                    מבצע: ₪{Number(item.sale_price).toFixed(2)} (
+                    {item.sale_quantity} יח')
+                  </div>
+                )}
+              </Link>
+            ) : (
+              <SaleGroupCard key={`group-${item.id}`} group={item} />
+            )
+          )}
         </div>
       )}
     </div>

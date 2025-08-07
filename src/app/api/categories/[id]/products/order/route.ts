@@ -12,11 +12,19 @@ async function orderCategoryNewSchema(
   }
 
   try {
-    const { productOrder } = await req.json();
+    const { order } = await req.json();
 
-    if (!Array.isArray(productOrder)) {
+    if (
+      !Array.isArray(order) ||
+      !order.every(
+        (item) =>
+          typeof item === "object" &&
+          typeof item.id === "number" &&
+          (item.type === "product" || item.type === "sale_group")
+      )
+    ) {
       return NextResponse.json(
-        { error: "Invalid product order" },
+        { error: "Invalid order format" },
         { status: 400 }
       );
     }
@@ -25,14 +33,16 @@ async function orderCategoryNewSchema(
     try {
       await client.query("BEGIN");
 
-      for (let index = 0; index < productOrder.length; index++) {
-        const productId = productOrder[index];
+      for (let index = 0; index < order.length; index++) {
+        const { id, type } = order[index];
 
         await client.query(
-          `UPDATE category_multi_items
-           SET sort_order = $1
-           WHERE category_id = $2 AND target_type = 'product' AND target_id = $3`,
-          [index, categoryId, productId]
+          `
+          UPDATE category_multi_items
+          SET sort_order = $1
+          WHERE category_id = $2 AND target_type = $3 AND target_id = $4
+          `,
+          [index, categoryId, type, id]
         );
       }
 
@@ -40,16 +50,16 @@ async function orderCategoryNewSchema(
       return NextResponse.json({ success: true });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("❌ Failed to update product order (new schema):", err);
+      console.error("❌ Failed to update item order:", err);
       return NextResponse.json(
-        { error: "Failed to update product order" },
+        { error: "Failed to update item order" },
         { status: 500 }
       );
     } finally {
       client.release();
     }
   } catch (err) {
-    console.error("❌ Invalid request:", err);
+    console.error("❌ Invalid request body:", err);
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
