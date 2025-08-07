@@ -144,22 +144,24 @@ export function SaleGroupEditor({
           </div>
 
           <div>
-            <Label>פרטי מבצע</Label>
+            <Label>מבצע:</Label>
             {typeof initialQuantity === "number" &&
             typeof initialSalePrice === "number" ? (
-              <>
-                <div className="flex gap-2">
-                  <div className="flex-1 border px-3 py-2 rounded-md bg-gray-100 text-center">
-                    {initialQuantity} ב־
-                  </div>
-                  <div className="flex-1 border px-3 py-2 rounded-md bg-gray-100 text-center">
-                    {initialSalePrice.toFixed(2)} ₪
-                  </div>
-                </div>
-                <div className="mt-2 text-sm text-center text-gray-600">
-                  סה"כ: {(initialQuantity * initialSalePrice).toFixed(2)} ₪
-                </div>
-              </>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={initialQuantity}
+                  readOnly
+                  className="w-1/2 bg-gray-100 text-center cursor-default"
+                />
+                <span className="text-sm">ב־</span>
+                <Input
+                  type="number"
+                  value={initialSalePrice.toFixed(2)}
+                  readOnly
+                  className="w-1/2 bg-gray-100 text-center cursor-default"
+                />
+              </div>
             ) : (
               <div className="border px-3 py-2 rounded-md bg-gray-100 text-center text-gray-500">
                 לא הוגדר
