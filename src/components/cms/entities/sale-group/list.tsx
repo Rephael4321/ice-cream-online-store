@@ -12,6 +12,7 @@ type SaleGroup = {
   image: string | null;
   quantity: number | null;
   sale_price: number | null;
+  price: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -27,7 +28,7 @@ export default function SaleGroupList() {
         if (!res.ok) throw new Error();
 
         const data = await res.json();
-        setGroups(data.saleGroups); // ✅ Only use the array
+        setGroups(data.saleGroups);
       } catch (err) {
         showToast("שגיאה בטעינת קבוצות מבצע", "error");
       } finally {
@@ -61,6 +62,7 @@ export default function SaleGroupList() {
               image={group.image}
               quantity={group.quantity}
               salePrice={group.sale_price}
+              price={group.price}
             />
           ))}
         </div>

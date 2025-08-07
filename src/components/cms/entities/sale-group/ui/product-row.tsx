@@ -18,8 +18,9 @@ type Product = {
 };
 
 type SaleGroupInfo = {
-  quantity: number | null;
-  sale_price: number | null;
+  quantity: number | string | null;
+  sale_price: number | string | null;
+  price: number | string | null;
 };
 
 type Props = {
@@ -39,7 +40,53 @@ export default function ProductRow({
   const [color, setColor] = useState(product.color || "#000000");
   const [loading, setLoading] = useState(false);
 
+  // Normalize group values to numbers
+  const priceNumber =
+    groupSaleInfo.price !== null ? Number(groupSaleInfo.price) : null;
+  const salePriceNumber =
+    groupSaleInfo.sale_price !== null ? Number(groupSaleInfo.sale_price) : null;
+  const quantityNumber =
+    groupSaleInfo.quantity !== null ? Number(groupSaleInfo.quantity) : null;
+
+  const groupHasBase =
+    priceNumber !== null && salePriceNumber !== null && quantityNumber !== null;
+
+  const unitPriceMismatch =
+    groupHasBase &&
+    Number(product.price.toFixed(2)) !== Number(priceNumber.toFixed(2));
+
+  const saleMismatch =
+    groupHasBase &&
+    (!product.sale ||
+      product.sale.quantity !== quantityNumber ||
+      Number(product.sale.sale_price.toFixed(2)) !==
+        Number(salePriceNumber.toFixed(2)));
+
+  const productMismatch =
+    !product.alreadyLinked && (unitPriceMismatch || saleMismatch);
+
+  // Debug log
+  console.log(`🧪 Product #${product.id} validation`, {
+    "→ Group has base?": groupHasBase,
+    "→ Product already linked?": product.alreadyLinked,
+    "→ Product price": product.price,
+    "→ Group price": priceNumber,
+    "→ Price mismatch": unitPriceMismatch,
+    "→ Product sale": product.sale,
+    "→ Group sale": {
+      quantity: quantityNumber,
+      sale_price: salePriceNumber,
+    },
+    "→ Sale mismatch": saleMismatch,
+    "→ Overall mismatch": productMismatch,
+  });
+
   async function addProduct() {
+    if (productMismatch) {
+      showToast("❌ מחיר המוצר או פרטי המבצע לא תואמים לקבוצה", "error");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(
@@ -90,7 +137,6 @@ export default function ProductRow({
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 border rounded-md p-3 w-full shadow-sm bg-white">
-      {/* Image */}
       <div className="relative w-[60px] h-[60px] shrink-0 rounded-md overflow-hidden shadow-inner bg-gray-100 border border-gray-200">
         <Image
           src={product.image}
@@ -101,7 +147,6 @@ export default function ProductRow({
         />
       </div>
 
-      {/* Content */}
       <div className="flex flex-col sm:flex-row flex-1 w-full sm:items-center gap-2 sm:gap-6">
         <div className="flex-1 min-w-0">
           <div className="font-semibold truncate">
@@ -114,10 +159,14 @@ export default function ProductRow({
                 מבצע: ₪{product.sale.sale_price} × {product.sale.quantity}
               </span>
             )}
+            {productMismatch && (
+              <span className="text-red-600 ms-2 font-semibold">
+                ⚠️ מחיר או מבצע לא תואמים לקבוצה
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Inputs */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Input
             placeholder="תווית"
@@ -133,7 +182,6 @@ export default function ProductRow({
           />
         </div>
 
-        {/* Buttons */}
         <div className="w-full sm:w-auto">
           {product.alreadyLinked ? (
             <Button
@@ -147,7 +195,12 @@ export default function ProductRow({
           ) : (
             <Button
               onClick={addProduct}
-              disabled={loading}
+              disabled={loading || productMismatch}
+              title={
+                productMismatch
+                  ? "המוצר לא תואם למחיר או מבצע הקבוצה"
+                  : "הוסף מוצר לקבוצה"
+              }
               className="w-full sm:w-auto"
             >
               הוסף

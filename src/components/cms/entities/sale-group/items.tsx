@@ -10,6 +10,9 @@ type Product = {
   name: string;
   price: number;
   image: string | null;
+  in_stock?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export default function SaleGroupItemManager() {

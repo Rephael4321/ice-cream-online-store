@@ -13,7 +13,7 @@ type SaleGroup = {
   image: string | null;
   created_at: string;
   updated_at: string;
-  categories: { id: number; name: string }[]; // 👈 include categories
+  categories: { id: number; name: string }[];
 };
 
 export default function ViewSaleGroup() {
@@ -63,7 +63,7 @@ export default function ViewSaleGroup() {
                 ? group.sale_price * group.quantity
                 : null
             }
-            initialCategories={group.categories || []} // ✅ important
+            initialCategories={group.categories || []}
           />
         </div>
       )}

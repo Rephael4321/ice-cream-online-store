@@ -9,6 +9,7 @@ interface SaleGroupCardProps {
   image?: string | null;
   quantity: number | null;
   salePrice: number | null;
+  price: number | null; // ✅ NEW
 }
 
 export function SaleGroupCard({
@@ -17,6 +18,7 @@ export function SaleGroupCard({
   image,
   quantity,
   salePrice,
+  price,
 }: SaleGroupCardProps) {
   return (
     <Link
@@ -42,6 +44,12 @@ export function SaleGroupCard({
           ? `${quantity} ב־₪${Number(salePrice).toFixed(2)}`
           : "פרטי מבצע לא הוגדרו"}
       </div>
+
+      {price != null && (
+        <div className="text-xs text-gray-500 mt-1">
+          מחיר ליחידה: ₪{Number(price).toFixed(2)}
+        </div>
+      )}
     </Link>
   );
 }

@@ -8,6 +8,7 @@ type SaleGroup = {
   image: string | null;
   quantity: number | null;
   sale_price: number | null;
+  price: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -15,7 +16,7 @@ type SaleGroup = {
 async function getSaleGroups(_req: NextRequest) {
   try {
     const result = await pool.query<SaleGroup>(`
-      SELECT id, name, image, quantity, sale_price, created_at, updated_at
+      SELECT id, name, image, quantity, sale_price, price, created_at, updated_at
       FROM sale_groups
       ORDER BY created_at DESC
     `);
@@ -34,15 +35,21 @@ async function getSaleGroups(_req: NextRequest) {
 
 async function createSaleGroup(req: NextRequest) {
   try {
-    const { name, quantity, sale_price, image } = await req.json();
+    const { name, quantity, sale_price, price, image } = await req.json();
 
     const result = await pool.query<SaleGroup>(
       `
-      INSERT INTO sale_groups (name, quantity, sale_price, image)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, name, image, quantity, sale_price, created_at, updated_at
+      INSERT INTO sale_groups (name, quantity, sale_price, price, image)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, name, image, quantity, sale_price, price, created_at, updated_at
       `,
-      [name ?? null, quantity ?? null, sale_price ?? null, image ?? null]
+      [
+        name ?? null,
+        quantity ?? null,
+        sale_price ?? null,
+        price ?? null,
+        image ?? null,
+      ]
     );
 
     return NextResponse.json(result.rows[0]);

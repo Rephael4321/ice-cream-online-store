@@ -22,14 +22,18 @@ async function addProductToSaleGroup(
   try {
     await client.query("BEGIN");
 
-    // Get sale group info
     const groupRes = await client.query(
-      `SELECT quantity, sale_price FROM sale_groups WHERE id = $1`,
+      `SELECT quantity, sale_price, price FROM sale_groups WHERE id = $1`,
       [groupId]
     );
     const group = groupRes.rows[0];
 
-    // Get product sale info
+    const productPriceRes = await client.query<{ price: number }>(
+      `SELECT price FROM products WHERE id = $1`,
+      [productId]
+    );
+    const productBasePrice = productPriceRes.rows[0]?.price;
+
     const productRes = await client.query(
       `SELECT quantity AS sale_quantity, sale_price
        FROM sales
@@ -38,28 +42,45 @@ async function addProductToSaleGroup(
     );
     const product = productRes.rows[0];
 
-    if (!product) {
-      throw new Error("Sale info not found for product");
+    if (!product || productBasePrice == null) {
+      throw new Error("Sale or price info not found for product");
     }
 
-    // First product → set group's sale info
-    if (group?.sale_price == null || group?.quantity == null) {
+    const { sale_quantity, sale_price } = product;
+
+    if (
+      group?.sale_price == null ||
+      group?.quantity == null ||
+      group?.price == null
+    ) {
+      // First product sets the group's pricing info
       await client.query(
-        `UPDATE sale_groups SET quantity = $1, sale_price = $2 WHERE id = $3`,
-        [product.sale_quantity, product.sale_price, groupId]
+        `UPDATE sale_groups
+         SET quantity = $1, sale_price = $2, price = $3
+         WHERE id = $4`,
+        [sale_quantity, sale_price, productBasePrice, groupId]
       );
     } else {
       const groupQuantity = Number(group.quantity);
-      const groupPrice = Number(group.sale_price);
-      const productQuantity = Number(product.sale_quantity);
-      const productPrice = Number(product.sale_price);
+      const groupSalePrice = Number(group.sale_price);
+      const groupBasePrice = Number(group.price);
 
-      if (groupQuantity !== productQuantity || groupPrice !== productPrice) {
-        throw new Error("מחיר או כמות מבצע לא תואמים את הקבוצה");
+      const saleMatches =
+        groupQuantity === Number(sale_quantity) &&
+        Number(groupSalePrice.toFixed(2)) ===
+          Number(Number(sale_price).toFixed(2));
+
+      const unitPriceMatches =
+        Number(groupBasePrice.toFixed(2)) ===
+        Number(Number(productBasePrice).toFixed(2));
+
+      if (!saleMatches && !unitPriceMatches) {
+        throw new Error(
+          "❌ המחיר או פרטי המבצע של המוצר אינם תואמים את הקבוצה"
+        );
       }
     }
 
-    // Link product to sale group
     await client.query(
       `INSERT INTO product_sale_groups (product_id, sale_group_id, label, color)
        VALUES ($1, $2, $3, $4)
@@ -118,7 +139,7 @@ async function removeProductFromSaleGroup(
     if (remainingCount === 0) {
       await client.query(
         `UPDATE sale_groups
-         SET quantity = NULL, sale_price = NULL
+         SET quantity = NULL, sale_price = NULL, price = NULL
          WHERE id = $1`,
         [groupId]
       );

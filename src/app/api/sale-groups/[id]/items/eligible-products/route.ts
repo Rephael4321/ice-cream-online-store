@@ -36,21 +36,23 @@ async function getEligibleProducts(
     const data = result.rows.map((row) => ({
       id: row.id,
       name: row.name,
-      price: Number(row.price),
+      price: row.price ? Number(row.price) : null,
       image: row.image,
-      sale: row.sale_quantity
-        ? {
-            quantity: row.sale_quantity,
-            sale_price: Number(row.sale_price),
-          }
-        : null,
+      sale:
+        row.sale_quantity != null && row.sale_price != null
+          ? {
+              quantity: Number(row.sale_quantity),
+              sale_price: Number(row.sale_price),
+            }
+          : null,
       label: row.label,
       color: row.color,
-      alreadyLinked: row.already_linked,
+      alreadyLinked: !!row.already_linked,
     }));
 
     return NextResponse.json(data);
-  } catch {
+  } catch (err) {
+    console.error("❌ Failed to fetch eligible products:", err);
     return NextResponse.json(
       { error: "Failed to fetch eligible products" },
       { status: 500 }

@@ -8,6 +8,7 @@ type SaleGroup = {
   image: string | null;
   quantity: number | null;
   sale_price: number | null;
+  price: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -24,7 +25,7 @@ async function getSaleGroup(
 
   try {
     const result = await pool.query<SaleGroup>(
-      `SELECT id, name, image, quantity, sale_price, created_at, updated_at
+      `SELECT id, name, image, quantity, sale_price, price, created_at, updated_at
        FROM sale_groups WHERE id = $1`,
       [id]
     );
@@ -69,7 +70,7 @@ async function updateSaleGroup(
         UPDATE sale_groups
         SET name = $1, image = $2, updated_at = now()
         WHERE id = $3
-        RETURNING id, name, image, quantity, sale_price, created_at, updated_at
+        RETURNING id, name, image, quantity, sale_price, price, created_at, updated_at
         `,
         [name ?? null, image ?? null, id]
       );

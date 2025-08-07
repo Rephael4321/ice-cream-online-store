@@ -19,6 +19,7 @@ type Product = {
 type SaleGroupInfo = {
   quantity: number | null;
   sale_price: number | null;
+  price: number | null;
 };
 
 export default function ManageSaleGroupItems() {
@@ -27,6 +28,7 @@ export default function ManageSaleGroupItems() {
   const [groupSaleInfo, setGroupSaleInfo] = useState<SaleGroupInfo>({
     quantity: null,
     sale_price: null,
+    price: null,
   });
   const [query, setQuery] = useState("");
 
@@ -46,6 +48,7 @@ export default function ManageSaleGroupItems() {
       setGroupSaleInfo({
         quantity: groupData.quantity,
         sale_price: groupData.sale_price,
+        price: groupData.price,
       });
     } catch {
       // Fail silently
@@ -86,6 +89,21 @@ export default function ManageSaleGroupItems() {
   return (
     <div className="p-4 space-y-4">
       <h1 className="text-xl font-bold">ניהול קבוצת מבצע #{id}</h1>
+
+      {groupSaleInfo.price !== null && (
+        <div className="text-sm text-gray-700 border p-2 rounded-md bg-white shadow-sm">
+          <p>
+            מחיר יחידה: <strong>₪{groupSaleInfo.price}</strong>
+          </p>
+          {groupSaleInfo.quantity !== null &&
+            groupSaleInfo.sale_price !== null && (
+              <p>
+                מבצע: <strong>₪{groupSaleInfo.sale_price}</strong> עבור{" "}
+                <strong>{groupSaleInfo.quantity}</strong> יחידות
+              </p>
+            )}
+        </div>
+      )}
 
       <Input
         placeholder="חיפוש לפי שם או מזהה"

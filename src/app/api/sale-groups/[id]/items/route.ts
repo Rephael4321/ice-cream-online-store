@@ -69,50 +69,60 @@ async function addProductsToGroup(
     try {
       await client.query("BEGIN");
 
-      const existing = await client.query(
-        `
-        SELECT p.price
-        FROM products p
-        INNER JOIN product_sale_groups sg ON sg.product_id = p.id
-        WHERE sg.sale_group_id = $1
-        LIMIT 1
-        `,
+      const groupRes = await client.query(
+        `SELECT price, sale_price, quantity FROM sale_groups WHERE id = $1`,
         [groupId]
       );
+      const group = groupRes.rows[0] ?? {};
 
-      let targetPrice: number | null = null;
-      if ((existing.rowCount ?? 0) > 0) {
-        targetPrice = Number(existing.rows[0].price);
-      }
+      let targetPrice = group.price != null ? Number(group.price) : null;
+      let targetSalePrice =
+        group.sale_price != null ? Number(group.sale_price) : null;
+      let targetQuantity =
+        group.quantity != null ? Number(group.quantity) : null;
 
       for (const productId of productIds) {
-        const res = await client.query(
+        const productRes = await client.query(
           `SELECT price FROM products WHERE id = $1`,
           [productId]
         );
-        if (res.rowCount === 0) {
+        if (productRes.rowCount === 0) {
           throw new Error(`Product not found: ${productId}`);
         }
 
-        const productPrice = Number(res.rows[0].price);
+        const saleRes = await client.query(
+          `SELECT quantity, sale_price FROM sales WHERE product_id = $1`,
+          [productId]
+        );
+        if (saleRes.rowCount === 0) {
+          throw new Error(`Sale not defined for product: ${productId}`);
+        }
 
-        if (targetPrice !== null && productPrice !== targetPrice) {
-          throw new Error(
-            `Product ${productId} does not match group price (${productPrice} ≠ ${targetPrice})`
-          );
+        const productPrice = Number(productRes.rows[0].price);
+        const productSalePrice = Number(saleRes.rows[0].sale_price);
+        const productSaleQty = Number(saleRes.rows[0].quantity);
+
+        if (
+          targetPrice !== null &&
+          (productPrice !== targetPrice ||
+            productSalePrice !== targetSalePrice ||
+            productSaleQty !== targetQuantity)
+        ) {
+          throw new Error(`Product ${productId} does not match group pricing`);
         }
 
         if (targetPrice === null) {
           await client.query(
             `
             UPDATE sale_groups
-            SET quantity = 1,
-                sale_price = $1
-            WHERE id = $2
+            SET price = $1, sale_price = $2, quantity = $3
+            WHERE id = $4
             `,
-            [productPrice, groupId]
+            [productPrice, productSalePrice, productSaleQty, groupId]
           );
           targetPrice = productPrice;
+          targetSalePrice = productSalePrice;
+          targetQuantity = productSaleQty;
         }
 
         await client.query(
