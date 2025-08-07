@@ -1,8 +1,8 @@
-import Image from "next/image";
-import Link from "next/link";
 import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { verifyJWT } from "@/lib/jwt";
+import Image from "next/image";
+import Link from "next/link";
 
 interface Category {
   id: number;

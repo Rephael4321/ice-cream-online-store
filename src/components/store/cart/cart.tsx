@@ -5,16 +5,13 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import CartSingleItem from "./ui/cart-single-item";
-import CartGroupItem from "./ui/cart-group-item";
 import ConfirmOrderModal from "./ui/confirm-order-modal";
 
 export default function Cart() {
   const {
     cartItems,
     removeFromCart,
-    removeGroupedCategory,
     clearCart,
-    getGroupedCart,
     increaseQuantity,
     decreaseQuantity,
     updateStockStatus,
@@ -28,28 +25,18 @@ export default function Cart() {
   const [hasOutOfStockAtSubmit, setHasOutOfStockAtSubmit] = useState(false);
   const hasFetchedOnOpen = useRef(false);
 
-  const grouped = getGroupedCart();
-  const singleItems = cartItems.filter(
-    (item) => !item.sale?.fromCategory || !item.sale.category?.id
-  );
-
   const hasOutOfStock = cartItems.some((item) => item.inStock === false);
 
-  const total = [
-    ...grouped
-      .filter((g) => g.items.every((item) => item.inStock !== false))
-      .map((g) => g.totalPrice),
-    ...singleItems
-      .filter((item) => item.inStock !== false)
-      .map((item) => {
-        if (!item.sale) return item.productPrice * item.quantity;
-        const bundles = Math.floor(item.quantity / item.sale.amount);
-        const remainder = item.quantity % item.sale.amount;
-        return bundles * item.sale.price + remainder * item.productPrice;
-      }),
-  ].reduce((a, b) => a + b, 0);
+  const total = cartItems
+    .filter((item) => item.inStock !== false)
+    .map((item) => {
+      if (!item.sale) return item.productPrice * item.quantity;
+      const bundles = Math.floor(item.quantity / item.sale.amount);
+      const remainder = item.quantity % item.sale.amount;
+      return bundles * item.sale.price + remainder * item.productPrice;
+    })
+    .reduce((a, b) => a + b, 0);
 
-  // ✅ STOCK SYNC ON OPEN AND FOCUS
   useEffect(() => {
     async function fetchStock() {
       if (cartItems.length === 0) return;
@@ -79,9 +66,8 @@ export default function Cart() {
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [isOpen]); // ✅ ONLY isOpen
+  }, [isOpen]);
 
-  // ✅ RESET FLAG ON CLOSE
   useEffect(() => {
     if (!isOpen) {
       hasFetchedOnOpen.current = false;
@@ -89,31 +75,16 @@ export default function Cart() {
   }, [isOpen]);
 
   function getOrderItems() {
-    const groupedItems = grouped.flatMap((group) =>
-      group.items.map((item) => ({
-        productId: item.id,
-        productName: item.productName,
-        productImage: item.productImage,
-        quantity: item.quantity,
-        unitPrice: item.productPrice,
-        saleQuantity: group.amount,
-        salePrice: group.price,
-        inStock: item.inStock,
-      }))
-    );
-
-    const singleSaleItems = singleItems.map((item) => ({
+    return cartItems.map((item) => ({
       productId: item.id,
       productName: item.productName,
       productImage: item.productImage,
       quantity: item.quantity,
       unitPrice: item.productPrice,
-      saleQuantity: item.sale?.fromCategory ? null : item.sale?.amount,
-      salePrice: item.sale?.fromCategory ? null : item.sale?.price,
+      saleQuantity: item.sale?.amount ?? null,
+      salePrice: item.sale?.price ?? null,
       inStock: item.inStock,
     }));
-
-    return [...groupedItems, ...singleSaleItems];
   }
 
   const isValidPhone = (phone: string) => {
@@ -192,7 +163,6 @@ export default function Cart() {
       });
     } catch (err) {
       console.error("Failed to mark order as notified:", err);
-      // Optional: You could toast an error here if needed
     }
 
     const phoneNumber = (process.env.NEXT_PUBLIC_PHONE || "").replace(
@@ -232,19 +202,7 @@ export default function Cart() {
             <p className="text-gray-500 text-center mt-10">העגלה ריקה</p>
           ) : (
             <ul className="flex flex-col gap-4 overflow-y-auto flex-grow">
-              {grouped.map((group) => (
-                <CartGroupItem
-                  key={group.categoryId}
-                  categoryId={group.categoryId}
-                  categoryName={group.categoryName}
-                  items={group.items}
-                  totalPrice={group.totalPrice}
-                  discount={group.discount}
-                  onRemove={() => removeGroupedCategory(group.categoryId)}
-                />
-              ))}
-
-              {singleItems.map((item) => (
+              {cartItems.map((item) => (
                 <CartSingleItem
                   key={item.id}
                   item={item}

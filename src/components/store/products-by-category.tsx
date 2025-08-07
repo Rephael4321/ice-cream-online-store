@@ -1,9 +1,9 @@
-import SingleProduct from "@/components/store/single-product";
-import Image from "next/image";
-import Link from "next/link";
 import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { verifyJWT } from "@/lib/jwt";
+import SingleProduct from "@/components/store/single-product";
+import Image from "next/image";
+import Link from "next/link";
 
 export interface Props {
   params: { category: string };

@@ -1,10 +1,10 @@
 "use client";
 
 import { useCart } from "@/context/cart-context";
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 
 type SaleCategoryInfo = {
   id: number;

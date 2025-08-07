@@ -8,8 +8,6 @@ import {
   useEffect,
 } from "react";
 
-// === Types ===
-
 type SaleInfo = {
   amount: number;
   price: number;
@@ -26,88 +24,25 @@ type Product = {
   productName: string;
   productPrice: number;
   sale?: SaleInfo;
-  inStock?: boolean; // ✅ Fix: Add inStock to Product type
+  inStock?: boolean;
 };
 
 type CartItem = Product & { quantity: number };
 
 export type { CartItem };
 
-type GroupedCartItem = {
-  categoryId: number;
-  categoryName: string;
-  amount: number;
-  price: number;
-  items: CartItem[];
-  totalQty: number;
-  totalPrice: number;
-  fullPrice: number;
-  discount: number;
-};
-
 type CartContextType = {
   cartItems: CartItem[];
   addToCart: (product: Product, quantity: number) => void;
   removeFromCart: (productId: number) => void;
   clearCart: () => void;
-  removeGroupedCategory: (categoryId: number) => void;
-  getGroupedCart: () => GroupedCartItem[];
   increaseQuantity: (productId: number) => void;
   decreaseQuantity: (productId: number) => void;
   refreshStockStatus: () => void;
   updateStockStatus: (productId: number, inStock: boolean) => void;
 };
 
-// === Context Setup ===
-
 const CartContext = createContext<CartContextType | undefined>(undefined);
-
-// === Logic Helpers ===
-
-function groupCartItems(cart: CartItem[]): GroupedCartItem[] {
-  const map = new Map<number, GroupedCartItem>();
-
-  for (const item of cart) {
-    const { sale } = item;
-
-    if (sale?.fromCategory && sale.category?.id != null) {
-      const categoryId = sale.category.id;
-      const existing = map.get(categoryId);
-
-      if (existing) {
-        existing.items.push(item);
-        existing.totalQty += item.quantity;
-        existing.fullPrice += item.productPrice * item.quantity;
-      } else {
-        map.set(categoryId, {
-          categoryId,
-          categoryName: sale.category.name,
-          amount: sale.amount,
-          price: sale.price,
-          items: [item],
-          totalQty: item.quantity,
-          fullPrice: item.productPrice * item.quantity,
-          totalPrice: 0,
-          discount: 0,
-        });
-      }
-    }
-  }
-
-  for (const group of map.values()) {
-    const bundles = Math.floor(group.totalQty / group.amount);
-    const discountedQty = bundles * group.amount;
-    const remainingQty = group.totalQty - discountedQty;
-    const basePrice = group.items[0].productPrice;
-
-    group.totalPrice = bundles * group.price + remainingQty * basePrice;
-    group.discount = group.fullPrice - group.totalPrice;
-  }
-
-  return Array.from(map.values());
-}
-
-// === Provider ===
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -175,15 +110,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
   }
 
-  function removeGroupedCategory(categoryId: number) {
-    setCartItems((prev) =>
-      prev.filter(
-        (item) =>
-          !item.sale?.fromCategory || item.sale.category?.id !== categoryId
-      )
-    );
-  }
-
   function clearCart() {
     setCartItems([]);
   }
@@ -243,8 +169,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeFromCart,
         clearCart,
-        removeGroupedCategory,
-        getGroupedCart: () => groupCartItems(cartItems),
         increaseQuantity,
         decreaseQuantity,
         refreshStockStatus,
@@ -261,8 +185,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     </CartContext.Provider>
   );
 }
-
-// === Hook ===
 
 export function useCart() {
   const context = useContext(CartContext);
