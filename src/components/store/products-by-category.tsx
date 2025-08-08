@@ -122,7 +122,6 @@ export default async function ProductsByCategory({ params }: Props) {
     );
   }
 
-  // 🔹 Fetch products & sale groups for this category
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${displayName}/products`,
     { cache: "no-store" }
