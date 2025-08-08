@@ -63,19 +63,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductsByCategory({ params }: Props) {
   const raw = decodeURIComponent(params.category);
+
+  // slug = what the API expects (hyphenated)
   const slug = raw
     .trim()
     .replace(/[\s\u05BE\u2012\u2013\u2014\u2015\u2212]+/g, "-")
     .replace(/-+/g, "-");
 
+  // displayName = for UI (spaces)
   const displayName = raw.replace(/-/g, " ");
 
   const cookie = cookies();
   const token = (await cookie).get("token")?.value;
   const isAdmin = !!(token && verifyJWT(token));
 
+  // ✅ Use slug here
   const childrenRes = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${displayName}/children`,
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
     { cache: "no-store" }
   );
   const childrenData = await childrenRes.json();
@@ -122,8 +126,9 @@ export default async function ProductsByCategory({ params }: Props) {
     );
   }
 
+  // ✅ Use slug here too
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${displayName}/products`,
+    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
     { cache: "no-store" }
   );
 
