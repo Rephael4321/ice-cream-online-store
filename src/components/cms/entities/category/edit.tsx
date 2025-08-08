@@ -110,8 +110,6 @@ export default function EditCategory({ id }: Props) {
     if (!category) return;
 
     const sanitizedName = category.name.trim().replace(/\s+/g, "-");
-    console.log("44444444444444444444444444");
-    console.log(sanitizedName);
 
     const payload: UpdateCategoryPayload = {
       name: sanitizedName,
@@ -301,7 +299,6 @@ export default function EditCategory({ id }: Props) {
           </Button>
         </div>
 
-        {/* תצוגה מקדימה */}
         <div className="w-full md:w-1/2">
           {previewSrc && (
             <Image

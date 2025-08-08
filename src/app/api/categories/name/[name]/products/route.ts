@@ -1,34 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
-type ProductRow = {
+type ItemRow = {
   id: number;
-  name: string;
-  price: number;
-  image: string;
-  in_stock: boolean;
-  created_at: string;
-  updated_at: string;
+  name: string | null;
+  price: number | string | null;
+  image: string | null;
+  in_stock: boolean | null;
   productSaleQuantity: number | null;
-  productSalePrice: number | null;
+  productSalePrice: number | string | null;
   sort_order: number | null;
-};
-
-type CategorySaleRow = {
-  productId: number;
-  categoryId: number;
-  categoryName: string;
-  quantity: number;
-  sale_price: number;
+  type: "product" | "sale_group";
 };
 
 async function getProductsByCategoryName(
   _req: NextRequest,
-  context: { params: { name: string } }
+  context: { params: Promise<{ name: string }> }
 ) {
   try {
-    const { name } = context.params;
+    const { name } = await context.params;
     const slug = decodeURIComponent(name);
 
     const categoryRes = await pool.query<{ id: number }>(
@@ -38,56 +29,131 @@ async function getProductsByCategoryName(
 
     if (categoryRes.rowCount === 0) {
       return NextResponse.json(
-        { error: "Category not found" },
-        { status: 404 }
+        { products: [], saleGroups: [] },
+        { status: 200 }
       );
     }
 
     const categoryId = categoryRes.rows[0].id;
 
-    const result = await pool.query<ProductRow>(
-      `SELECT 
-         p.id, 
-         p.name, 
-         p.price, 
-         p.image,
-         p.in_stock,
-         p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-         p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
-         s.quantity AS "productSaleQuantity",
-         s.sale_price AS "productSalePrice",
-         mi.sort_order
-       FROM category_multi_items mi
-       JOIN products p ON mi.target_id = p.id
-       LEFT JOIN sales s ON s.product_id = p.id
-       WHERE mi.category_id = $1 AND mi.target_type = 'product'
-       ORDER BY mi.sort_order ASC NULLS LAST, p.name ASC`,
+    const itemsResult = await pool.query<ItemRow>(
+      `
+      SELECT 
+        mi.target_id AS id,
+        mi.sort_order,
+        mi.target_type AS type,
+        p.name,
+        p.price,
+        p.image,
+        p.in_stock,
+        s.quantity AS "productSaleQuantity",
+        s.sale_price AS "productSalePrice"
+      FROM category_multi_items mi
+      LEFT JOIN products p ON mi.target_type = 'product' AND p.id = mi.target_id
+      LEFT JOIN sales s ON s.product_id = p.id
+      WHERE mi.category_id = $1
+      ORDER BY mi.sort_order ASC NULLS LAST, p.name ASC
+      `,
       [categoryId]
     );
 
-    const products = result.rows;
-    if (!products.length) {
-      return NextResponse.json({ products: [] });
+    const products: ItemRow[] = [];
+    const saleGroupIds: number[] = [];
+
+    for (const item of itemsResult.rows) {
+      if (item.type === "product") {
+        products.push(item);
+      } else if (item.type === "sale_group") {
+        saleGroupIds.push(item.id);
+      }
+    }
+
+    const saleGroupsRaw =
+      saleGroupIds.length > 0
+        ? await pool.query(
+            `SELECT 
+               sg.id, sg.name, sg.image, sg.price, sg.quantity, sg.sale_price
+             FROM sale_groups sg
+             WHERE sg.id = ANY($1::int[])`,
+            [saleGroupIds]
+          )
+        : { rows: [] as any[] };
+    
+    const saleGroupItemsResult =
+      saleGroupIds.length > 0
+        ? await pool.query(
+            `SELECT 
+               p.id,
+               p.name,
+               p.image,
+               psg.label,
+               psg.color,
+               psg.sale_group_id
+             FROM product_sale_groups psg
+             JOIN products p ON p.id = psg.product_id
+             WHERE psg.sale_group_id = ANY($1::int[])`,
+            [saleGroupIds]
+          )
+        : { rows: [] as any[] };
+
+    const groupItemsMap = new Map<
+      number,
+      {
+        id: number;
+        name: string;
+        image: string;
+        label: string | null;
+        color: string | null;
+      }[]
+    >();
+
+    for (const row of saleGroupItemsResult.rows) {
+      if (!groupItemsMap.has(row.sale_group_id)) {
+        groupItemsMap.set(row.sale_group_id, []);
+      }
+      groupItemsMap.get(row.sale_group_id)!.push({
+        id: row.id,
+        name: row.name,
+        image: row.image,
+        label: row.label,
+        color: row.color,
+      });
+    }
+
+    const saleGroupMap = new Map<number, any>();
+    for (const sg of saleGroupsRaw.rows) {
+      saleGroupMap.set(sg.id, {
+        id: sg.id,
+        name: sg.name,
+        image: sg.image,
+        price: sg.price != null ? Number(sg.price) : null,
+        quantity: sg.quantity != null ? Number(sg.quantity) : null,
+        salePrice: sg.sale_price != null ? Number(sg.sale_price) : null,
+        items: groupItemsMap.get(sg.id) || [],
+      });
     }
 
     const productIds = products.map((p) => p.id);
     const placeholders = productIds.map((_, i) => `$${i + 1}`).join(", ");
 
-    const categorySalesResult = await pool.query<CategorySaleRow>(
-      `SELECT 
-         mi.target_id AS "productId",
-         c.id AS "categoryId",
-         c.name AS "categoryName",
-         cs.quantity,
-         cs.sale_price
-       FROM category_multi_items mi
-       JOIN categories c ON c.id = mi.category_id
-       JOIN category_sales cs ON cs.category_id = c.id
-       WHERE mi.target_type = 'product'
-         AND mi.target_id IN (${placeholders})
-         AND c.type = 'sale'`,
-      productIds
-    );
+    const categorySalesResult =
+      productIds.length > 0
+        ? await pool.query(
+            `SELECT 
+               mi.target_id AS "productId",
+               c.id AS "categoryId",
+               c.name AS "categoryName",
+               cs.quantity,
+               cs.sale_price
+             FROM category_multi_items mi
+             JOIN categories c ON c.id = mi.category_id
+             JOIN category_sales cs ON cs.category_id = c.id
+             WHERE mi.target_type = 'product'
+               AND mi.target_id IN (${placeholders})
+               AND c.type = 'sale'`,
+            productIds
+          )
+        : { rows: [] as any[] };
 
     const saleMap = new Map<
       number,
@@ -99,14 +165,16 @@ async function getProductsByCategoryName(
     >();
 
     for (const row of categorySalesResult.rows) {
+      const priceNum =
+        row.sale_price != null ? Number(row.sale_price) : undefined;
       const existing = saleMap.get(row.productId);
-      if (!existing || row.sale_price < existing.price) {
+      if (!existing || (priceNum !== undefined && priceNum < existing.price)) {
         saleMap.set(row.productId, {
-          amount: row.quantity,
-          price: row.sale_price,
+          amount: Number(row.quantity),
+          price: priceNum as number,
           category: {
             id: row.categoryId,
-            name: row.categoryName.replace(/-/g, " "),
+            name: String(row.categoryName).replace(/-/g, " "),
           },
         });
       }
@@ -114,7 +182,12 @@ async function getProductsByCategoryName(
 
     const finalProducts = products.map((product) => {
       const categorySale = saleMap.get(product.id);
-      let sale = null;
+      let sale: null | {
+        amount: number;
+        price: number;
+        fromCategory: boolean;
+        category?: { id: number; name: string };
+      } = null;
 
       if (categorySale) {
         sale = {
@@ -128,8 +201,8 @@ async function getProductsByCategoryName(
         product.productSalePrice != null
       ) {
         sale = {
-          amount: product.productSaleQuantity,
-          price: product.productSalePrice,
+          amount: Number(product.productSaleQuantity),
+          price: Number(product.productSalePrice),
           fromCategory: false,
         };
       }
@@ -139,20 +212,36 @@ async function getProductsByCategoryName(
         name: product.name,
         price: product.price,
         image: product.image,
-        inStock: product.in_stock,
-        created_at: product.created_at,
-        updated_at: product.updated_at,
+        inStock: product.in_stock ?? true,
         sale,
-        sort_order: product.sort_order,
       };
     });
 
-    return NextResponse.json({ products: finalProducts });
+    const combinedItems = itemsResult.rows.map((item) => {
+      if (item.type === "product") {
+        return finalProducts.find((p) => p.id === item.id);
+      } else if (item.type === "sale_group") {
+        return saleGroupMap.get(item.id);
+      }
+    });
+
+    const productsToReturn = combinedItems.filter(
+      (item): item is any => item && "inStock" in item
+    );
+    const saleGroupsToReturn = combinedItems.filter(
+      (item): item is any => item && "items" in item
+    );
+
+    return NextResponse.json({
+      products: productsToReturn,
+      saleGroups: saleGroupsToReturn,
+    });
   } catch (err) {
     console.error("❌ Error in /api/categories/name/[name]/products:", err);
-    const error =
-      err instanceof Error ? err.message : "Unexpected error occurred";
-    return NextResponse.json({ error }, { status: 500 });
+    return NextResponse.json(
+      { products: [], saleGroups: [], error: "Server error" },
+      { status: 200 }
+    );
   }
 }
 
