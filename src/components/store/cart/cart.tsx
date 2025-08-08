@@ -7,6 +7,21 @@ import Cookies from "js-cookie";
 import CartSingleItem from "./ui/cart-single-item";
 import ConfirmOrderModal from "./ui/confirm-order-modal";
 
+const normalizePhoneForDB = (input: string) => {
+  let d = (input || "").replace(/\D/g, "");
+  if (d.startsWith("972")) d = "0" + d.slice(3);
+  if (d.length === 9 && d.startsWith("5")) d = "0" + d;
+  return d;
+};
+const isValidMobile = (input: string) =>
+  /^05\d{8}$/.test(normalizePhoneForDB(input));
+const formatPhonePretty = (input: string) => {
+  const d = normalizePhoneForDB(input);
+  return d.length === 10
+    ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
+    : d;
+};
+
 export default function Cart() {
   const {
     cartItems,
@@ -18,12 +33,26 @@ export default function Cart() {
   } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
+
+  // Phone & confirmation modals
   const [phoneModal, setPhoneModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
-  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+  const [confirmPhoneModal, setConfirmPhoneModal] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+
+  // Post-order WhatsApp confirm
   const [showWhatsappConfirm, setShowWhatsappConfirm] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [hasOutOfStockAtSubmit, setHasOutOfStockAtSubmit] = useState(false);
+
+  // Submission guard
+  const [submitting, setSubmitting] = useState(false);
+
   const hasFetchedOnOpen = useRef(false);
+  const latestIdsRef = useRef<number[]>([]);
+  useEffect(() => {
+    latestIdsRef.current = cartItems.map((i) => i.id);
+  }, [cartItems]);
 
   const hasOutOfStock = cartItems.some((item) => item.inStock === false);
 
@@ -38,13 +67,13 @@ export default function Cart() {
     .reduce((a, b) => a + b, 0);
 
   useEffect(() => {
-    async function fetchStock() {
-      if (cartItems.length === 0) return;
+    async function fetchStock(ids: number[]) {
+      if (!ids.length) return;
 
       const res = await fetch("/api/products/stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: cartItems.map((item) => item.id) }),
+        body: JSON.stringify({ ids }),
       });
 
       if (!res.ok) return;
@@ -56,22 +85,20 @@ export default function Cart() {
     }
 
     if (isOpen && !hasFetchedOnOpen.current) {
-      fetchStock();
+      fetchStock(latestIdsRef.current);
       hasFetchedOnOpen.current = true;
     }
 
     const handleFocus = () => {
-      if (isOpen) fetchStock();
+      if (isOpen) fetchStock(latestIdsRef.current);
     };
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [isOpen]);
+  }, [isOpen, updateStockStatus]);
 
   useEffect(() => {
-    if (!isOpen) {
-      hasFetchedOnOpen.current = false;
-    }
+    if (!isOpen) hasFetchedOnOpen.current = false;
   }, [isOpen]);
 
   function getOrderItems() {
@@ -87,14 +114,66 @@ export default function Cart() {
     }));
   }
 
-  const isValidPhone = (phone: string) => {
-    const clean = phone.replace(/\D/g, "");
-    return /^05\d{8}$/.test(clean) || /^0(?!5)\d{8}$/.test(clean);
+  // === Entry point now always leads to a confirm step ===
+  const initiatePayment = () => {
+    if (cartItems.length === 0) return;
+
+    const allOOS = cartItems.every((i) => i.inStock === false);
+    if (allOOS) {
+      toast.error("כל המוצרים אזלו מהמלאי — לא ניתן לשלוח הזמנה");
+      return;
+    }
+
+    const cookiePhone = Cookies.get("phoneNumber");
+    if (cookiePhone) {
+      const normalized = normalizePhoneForDB(cookiePhone);
+      setPendingPhone(normalized);
+      setConfirmPhoneModal(true);
+    } else {
+      setPhoneModal(true);
+    }
+  };
+
+  // When user types a phone for the first time
+  const savePhoneNumber = () => {
+    const normalized = normalizePhoneForDB(phoneInput);
+    if (!isValidMobile(normalized)) {
+      alert("נא להזין מספר נייד תקין בפורמט 05XXXXXXXX.");
+      return;
+    }
+    // Persist & move to confirm step
+    Cookies.set("phoneNumber", normalized, { expires: 3650, sameSite: "Lax" });
+    setPhoneModal(false);
+    setPendingPhone(normalized);
+    setConfirmPhoneModal(true);
+  };
+
+  // If user edits phone during confirm step (free text; we normalize on confirm)
+  const updatePendingPhone = (newVal: string) => {
+    setPendingPhone(newVal);
+  };
+
+  const confirmPhoneAndSend = async () => {
+    const normalized = normalizePhoneForDB(pendingPhone || "");
+    if (!isValidMobile(normalized)) {
+      alert("נא לאשר מספר נייד תקין בפורמט 05XXXXXXXX.");
+      return;
+    }
+    // keep cookie in sync in case user edited here
+    Cookies.set("phoneNumber", normalized, { expires: 3650, sameSite: "Lax" });
+    setConfirmPhoneModal(false);
+    await finalizeOrder(normalized); // ⬅️ always 05XXXXXXXX to DB
   };
 
   const finalizeOrder = async (phone: string) => {
+    if (submitting) return;
+    setSubmitting(true);
     const businessPhone = process.env.NEXT_PUBLIC_PHONE;
-    if (!businessPhone) return;
+    if (!businessPhone) {
+      setSubmitting(false);
+      toast.error("חסר מספר וואטסאפ של העסק");
+      return;
+    }
 
     const outOfStock = cartItems.some((item) => item.inStock === false);
     setHasOutOfStockAtSubmit(outOfStock);
@@ -107,7 +186,7 @@ export default function Cart() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (
           res.status === 400 &&
           data.error?.includes("None of the products")
@@ -131,36 +210,20 @@ export default function Cart() {
       setPendingOrderId(orderId);
       setShowWhatsappConfirm(true);
       clearCart();
+      setIsOpen(false);
     } catch (err) {
       console.error("❌ Order submission error:", err);
       toast.error("שגיאה בשליחת ההזמנה");
+    } finally {
+      setSubmitting(false);
     }
-  };
-
-  const initiatePayment = () => {
-    const phone = Cookies.get("phoneNumber");
-    if (!phone) setPhoneModal(true);
-    else finalizeOrder(phone);
-  };
-
-  const savePhoneNumber = () => {
-    const trimmed = phoneInput.trim().replace(/\D/g, "");
-    if (!isValidPhone(trimmed)) {
-      alert("נא להזין מספר נייד או טלפון תקין.");
-      return;
-    }
-    Cookies.set("phoneNumber", trimmed, { expires: 3650, sameSite: "Lax" });
-    setPhoneModal(false);
-    finalizeOrder(trimmed);
   };
 
   const confirmAndRedirectToWhatsapp = async () => {
     if (!pendingOrderId) return;
 
     try {
-      await fetch(`/api/orders/${pendingOrderId}/notify`, {
-        method: "PATCH",
-      });
+      await fetch(`/api/orders/${pendingOrderId}/notify`, { method: "PATCH" });
     } catch (err) {
       console.error("Failed to mark order as notified:", err);
     }
@@ -227,9 +290,10 @@ export default function Cart() {
               </p>
               <button
                 onClick={initiatePayment}
-                className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition cursor-pointer"
+                disabled={submitting || cartItems.length === 0}
+                className="w-full bg-green-500 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2 rounded hover:bg-green-600 transition cursor-pointer"
               >
-                צור הזמנה
+                {submitting ? "שולח..." : "צור הזמנה"}
               </button>
               <button
                 onClick={clearCart}
@@ -243,16 +307,25 @@ export default function Cart() {
       )}
 
       <ConfirmOrderModal
+        // Step 1: request phone (if not in cookie)
         phoneModal={phoneModal}
         phoneInput={phoneInput}
         onPhoneChange={(e) => setPhoneInput(e.target.value)}
         onPhoneClose={() => setPhoneModal(false)}
         onPhoneSave={savePhoneNumber}
+        // Step 2: confirm phone number before sending
+        confirmPhoneModal={confirmPhoneModal}
+        pendingPhone={pendingPhone || ""}
+        onPendingPhoneChange={updatePendingPhone}
+        onConfirmPhoneClose={() => setConfirmPhoneModal(false)}
+        onConfirmPhoneSend={confirmPhoneAndSend}
+        // Post-order WhatsApp confirm
         showWhatsappConfirm={showWhatsappConfirm}
         onCancelWhatsapp={() => setShowWhatsappConfirm(false)}
         onConfirmWhatsapp={confirmAndRedirectToWhatsapp}
         orderId={pendingOrderId || 0}
         hasOutOfStock={hasOutOfStockAtSubmit}
+        formatPhone={formatPhonePretty}
       />
     </>
   );
