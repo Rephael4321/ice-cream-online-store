@@ -10,6 +10,7 @@ async function handler(
 ) {
   const { orderId, phone } = context;
 
+  // Order header incl. snapshot totals
   const orderResult = await pool.query(
     `SELECT 
       o.id AS "orderId",
@@ -18,10 +19,14 @@ async function handler(
       o.is_ready AS "isReady",
       c.name AS "clientName",
       c.address AS "clientAddress",
-      c.phone AS "clientPhone"
+      c.phone AS "clientPhone",
+      o.pre_group_total AS "preGroupTotal",
+      o.group_discount_total AS "groupDiscountTotal",
+      o.total AS "total"
     FROM orders o
     JOIN clients c ON o.client_id = c.id
-    WHERE o.id = $1 AND o.is_visible = true AND c.phone = $2`,
+    WHERE o.id = $1 AND o.is_visible = true AND c.phone = $2
+    LIMIT 1`,
     [orderId, phone]
   );
 
@@ -31,50 +36,94 @@ async function handler(
 
   const order = orderResult.rows[0];
 
-  const itemsResult = await pool.query(
-    `SELECT 
-      product_name, 
-      product_image, 
-      quantity, 
-      unit_price, 
-      sale_quantity, 
-      sale_price
-     FROM order_items
-     WHERE order_id = $1`,
+  // Items: include group snapshot columns
+  const itemsRes = await pool.query(
+    `SELECT
+      oi.product_name,
+      oi.product_image,
+      oi.quantity,
+      oi.unit_price,
+      oi.sale_quantity,
+      oi.sale_price,
+      oi.in_stock,
+      oi.group_id,
+      oi.group_bundle_qty,
+      oi.group_sale_price,
+      oi.group_unit_price,
+      oi.group_discount
+     FROM order_items oi
+     WHERE oi.order_id = $1
+     ORDER BY oi.product_name`,
     [orderId]
   );
 
-  const items = itemsResult.rows.map((item) => {
-    const quantity = item.quantity;
-    const unitPrice = Number(item.unit_price);
-    const saleQuantity = item.sale_quantity;
-    const salePrice = item.sale_price !== null ? Number(item.sale_price) : null;
+  // Compute payable from snapshot (no re-fetch of products table)
+  const items = itemsRes.rows.map((row: any) => {
+    const quantity = Number(row.quantity || 0);
+    const unitPrice = row.unit_price != null ? Number(row.unit_price) : 0;
+    const saleQuantity =
+      row.sale_quantity != null ? Number(row.sale_quantity) : null;
+    const salePrice = row.sale_price != null ? Number(row.sale_price) : null;
 
-    let total = unitPrice * quantity;
+    const inGroup = row.group_id != null;
+    const groupDiscount =
+      row.group_discount != null ? Number(row.group_discount) : 0;
+
+    const base = unitPrice * quantity;
+
+    let afterItemSale = base;
+    // IMPORTANT: do not apply per-item sale if item is part of a sale group
     if (
-      saleQuantity !== null &&
-      salePrice !== null &&
+      !inGroup &&
+      saleQuantity &&
+      salePrice != null &&
       quantity >= saleQuantity
     ) {
       const bundles = Math.floor(quantity / saleQuantity);
       const rest = quantity % saleQuantity;
-      total = bundles * salePrice + rest * unitPrice;
+      afterItemSale = bundles * salePrice + rest * unitPrice;
     }
 
+    const total = Math.max(0, afterItemSale - groupDiscount);
+
     return {
-      ...item,
+      product_name: row.product_name,
+      product_image: row.product_image,
+      quantity,
       unit_price: unitPrice,
+      sale_quantity: saleQuantity,
       sale_price: salePrice,
+      in_stock: row.in_stock,
+
+      group_id: row.group_id,
+      group_bundle_qty:
+        row.group_bundle_qty != null ? Number(row.group_bundle_qty) : null,
+      group_sale_price:
+        row.group_sale_price != null ? Number(row.group_sale_price) : null,
+      group_unit_price:
+        row.group_unit_price != null ? Number(row.group_unit_price) : null,
+      group_discount: groupDiscount,
+
       total,
     };
   });
 
-  const finalTotal = items.reduce((sum, item) => sum + item.total, 0);
+  // Prefer the stored total; fallback to recompute from items
+  const finalTotal =
+    order.total != null
+      ? Number(order.total)
+      : items.reduce((sum: number, it: any) => sum + Number(it.total || 0), 0);
 
   return NextResponse.json({
-    order,
+    order: {
+      ...order,
+      preGroupTotal:
+        order.preGroupTotal != null ? Number(order.preGroupTotal) : null,
+      groupDiscountTotal:
+        order.groupDiscountTotal != null ? Number(order.groupDiscountTotal) : 0,
+      total: finalTotal,
+    },
     items,
-    finalTotal,
   });
 }
 

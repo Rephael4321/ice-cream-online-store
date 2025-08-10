@@ -4,10 +4,43 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 
+type OrderHeader = {
+  orderId: number;
+  clientName: string | null;
+  clientAddress: string | null;
+  clientPhone: string | null;
+  createdAt: string;
+  isPaid: boolean;
+  isReady: boolean;
+  preGroupTotal?: number | null;
+  groupDiscountTotal?: number | null;
+  total?: number | null;
+};
+
+type OrderItemRow = {
+  product_name: string;
+  product_image: string | null;
+  quantity: number;
+  unit_price: number;
+  sale_quantity: number | null;
+  sale_price: number | null;
+  in_stock?: boolean;
+
+  // group snapshot (might be null for legacy or non-group items)
+  group_id?: number | null;
+  group_bundle_qty?: number | null;
+  group_sale_price?: number | null;
+  group_unit_price?: number | null;
+  group_discount?: number | null;
+
+  // server-computed
+  total?: number;
+};
+
 export default function Order() {
-  const { id } = useParams();
-  const [order, setOrder] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const { id } = useParams<{ id: string }>();
+  const [order, setOrder] = useState<OrderHeader | null>(null);
+  const [items, setItems] = useState<OrderItemRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,21 +52,17 @@ export default function Order() {
     })
       .then((res) => {
         if (res.status === 307 || res.redirected) {
-          // Redirect manually in browser
           window.location.href = res.url;
-          return;
+          return null;
         }
-
         return res.json();
       })
       .then((data) => {
-        if (!data) return; // Already redirected
-
-        if (data.error) {
-          setError(data.error);
-        } else {
+        if (!data) return;
+        if (data.error) setError(data.error);
+        else {
           setOrder(data.order);
-          setItems(data.items);
+          setItems(data.items || []);
         }
       })
       .catch((err) => {
@@ -45,46 +74,78 @@ export default function Order() {
     return () => controller.abort();
   }, [id]);
 
-  if (error)
+  if (error) {
     return (
       <div className="p-4 text-red-600 text-right rtl">⚠️ שגיאה: {error}</div>
     );
+  }
 
-  if (!order)
+  if (!order) {
     return <div className="p-4 text-right rtl">📦 טוען את פרטי ההזמנה...</div>;
+  }
 
+  // Build view-model from snapshot
   let totalBeforeDiscount = 0;
-  let finalTotal = 0;
+  let finalTotalFromItems = 0;
 
-  const processedItems = items.map((item) => {
-    const qty = item.quantity;
-    const unitPrice = Number(item.unit_price);
-    const saleQty = item.sale_quantity;
-    const salePrice = item.sale_price !== null ? Number(item.sale_price) : null;
+  const processed = items.map((raw) => {
+    const qty = Number(raw.quantity || 0);
+    const unitPrice = Number(raw.unit_price || 0);
+    const saleQty = raw.sale_quantity ?? null;
+    const salePrice = raw.sale_price != null ? Number(raw.sale_price) : null;
 
-    totalBeforeDiscount += qty * unitPrice;
+    const inGroup = raw.group_id != null;
+    const perItemGroupDiscount = Number(raw.group_discount || 0);
 
-    let productTotal = 0;
-    if (saleQty && salePrice !== null && qty >= saleQty) {
+    // Base (no discounts)
+    const base = qty * unitPrice;
+    totalBeforeDiscount += base;
+
+    // Per-item sale applies ONLY if not in a sale group (matches cart rule)
+    let afterItemSale = base;
+    if (!inGroup && saleQty && salePrice != null && qty >= saleQty) {
       const bundles = Math.floor(qty / saleQty);
       const rest = qty % saleQty;
-      productTotal = bundles * salePrice + rest * unitPrice;
-    } else {
-      productTotal = qty * unitPrice;
+      afterItemSale = bundles * salePrice + rest * unitPrice;
     }
 
-    finalTotal += productTotal;
+    // Apply recorded per-item group discount snapshot
+    const payable = Math.max(0, afterItemSale - perItemGroupDiscount);
+    finalTotalFromItems += payable;
+
+    const saved =
+      Math.max(0, base - afterItemSale) + Math.max(0, perItemGroupDiscount);
 
     return {
-      ...item,
+      ...raw,
       unitPrice,
       saleQty,
       salePrice,
-      productTotal,
+      base,
+      afterItemSale,
+      perItemGroupDiscount,
+      payable,
+      saved,
+      inGroup,
     };
   });
 
-  const totalSavings = totalBeforeDiscount - finalTotal;
+  // Prefer server snapshot totals; fallback to our derived totals
+  const preGroupTotal =
+    order.preGroupTotal != null
+      ? Number(order.preGroupTotal)
+      : finalTotalFromItems + 0; // harmless fallback
+  const groupDiscountTotal =
+    order.groupDiscountTotal != null
+      ? Number(order.groupDiscountTotal)
+      : Math.max(
+          0,
+          processed.reduce((s, it) => s + (it.perItemGroupDiscount || 0), 0)
+        );
+  const finalTotal =
+    order.total != null ? Number(order.total) : finalTotalFromItems;
+
+  const totalSavings = Math.max(0, totalBeforeDiscount - finalTotal);
 
   return (
     <div className="max-w-2xl mx-auto p-6 text-right rtl">
@@ -99,7 +160,7 @@ export default function Order() {
 
       <h2 className="mt-6 font-semibold text-lg">📋 פרטי המוצרים:</h2>
       <ul className="space-y-6 mt-2">
-        {processedItems.map((item, i) => (
+        {processed.map((item, i) => (
           <li
             key={i}
             className="border rounded p-4 shadow-sm flex items-center gap-4"
@@ -111,7 +172,7 @@ export default function Order() {
                   alt={item.product_name}
                   width={64}
                   height={64}
-                  className="rounded"
+                  className="rounded object-cover"
                 />
               ) : (
                 <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-sm">
@@ -119,20 +180,35 @@ export default function Order() {
                 </div>
               )}
             </div>
+
             <div className="flex-1 space-y-1 text-right rtl">
               <p className="font-semibold">{item.product_name}</p>
-              <p>{item.product_name}</p>
               <p>כמות: {item.quantity}</p>
               <p>מחיר רגיל: ₪{item.unitPrice.toFixed(2)}</p>
-              {item.saleQty &&
-                item.salePrice !== null &&
+
+              {/* Per-item sale (only if not a group item) */}
+              {!item.inGroup &&
+                item.saleQty &&
+                item.salePrice != null &&
                 item.quantity >= item.saleQty && (
                   <p>
-                    מחיר מבצע: ₪{item.salePrice.toFixed(2)} ל‑{item.saleQty}
+                    מחיר מבצע: ₪{item.salePrice.toFixed(2)} ל-{item.saleQty}
                   </p>
                 )}
-              <p>סה״כ למוצר: ₪{item.productTotal.toFixed(2)}</p>
-              <p className="text-green-700">✔️ במלאי</p>
+
+              {/* Group discount snapshot (allocated part for this item) */}
+              {item.inGroup && item.perItemGroupDiscount > 0 && (
+                <p className="text-green-700">
+                  הנחת קבוצה: −₪{item.perItemGroupDiscount.toFixed(2)}
+                </p>
+              )}
+
+              <p>סה״כ למוצר: ₪{item.payable.toFixed(2)}</p>
+              <p className="text-green-700">
+                {item.saved > 0
+                  ? `✔️ חסכת: ₪${item.saved.toFixed(2)}`
+                  : "✔️ במחיר מלא"}
+              </p>
             </div>
           </li>
         ))}
@@ -143,6 +219,15 @@ export default function Order() {
           <p className="text-green-700">🎁 חסכת: ₪{totalSavings.toFixed(2)}</p>
         )}
         <p>💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}</p>
+
+        {/* Optional: show snapshot internals if present */}
+        {order.preGroupTotal != null && (
+          <p className="text-sm text-gray-500">
+            (לפני הנחת קבוצה: ₪{Number(order.preGroupTotal).toFixed(2)} · הנחת
+            קבוצה מצטברת: −₪
+            {Number(order.groupDiscountTotal || 0).toFixed(2)})
+          </p>
+        )}
       </div>
     </div>
   );
