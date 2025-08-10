@@ -8,6 +8,7 @@ interface Props {
   onDecrease: () => void;
   onIncrease: () => void;
   onRemove: () => void;
+  perItemGroupDiscount?: number;
 }
 
 export default function CartSingleItem({
@@ -15,17 +16,25 @@ export default function CartSingleItem({
   onDecrease,
   onIncrease,
   onRemove,
+  perItemGroupDiscount = 0,
 }: Props) {
   const baseTotal = item.productPrice * item.quantity;
-  let finalPrice = baseTotal;
-  let discount = 0;
 
-  if (item.sale && !item.sale.fromCategory) {
+  // Do NOT apply per-item sale if item participates in a sale group (to avoid double-discount).
+  const inGroup = Boolean((item as any).saleGroup);
+
+  let afterItemSale = baseTotal;
+  if (item.sale && !item.sale.fromCategory && !inGroup) {
     const bundles = Math.floor(item.quantity / item.sale.amount);
     const remainder = item.quantity % item.sale.amount;
-    finalPrice = bundles * item.sale.price + remainder * item.productPrice;
-    discount = baseTotal - finalPrice;
+    afterItemSale = bundles * item.sale.price + remainder * item.productPrice;
   }
+
+  const payable = Math.max(0, afterItemSale - perItemGroupDiscount);
+  const discount = Math.max(
+    0,
+    baseTotal - afterItemSale + perItemGroupDiscount
+  );
 
   return (
     <li
@@ -74,7 +83,7 @@ export default function CartSingleItem({
           </button>
         </div>
 
-        <p>מחיר: {finalPrice.toFixed(2)} ש״ח</p>
+        <p>מחיר: {payable.toFixed(2)} ש״ח</p>
         {discount > 0 && (
           <p className="text-green-600 text-xs">
             חסכת: {discount.toFixed(2)} ש״ח

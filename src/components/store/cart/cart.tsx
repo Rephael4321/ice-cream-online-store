@@ -7,6 +7,7 @@ import Cookies from "js-cookie";
 import CartSingleItem from "./ui/cart-single-item";
 import ConfirmOrderModal from "./ui/confirm-order-modal";
 
+// ---------- utils ----------
 const normalizePhoneForDB = (input: string) => {
   let d = (input || "").replace(/\D/g, "");
   if (d.startsWith("972")) d = "0" + d.slice(3);
@@ -22,6 +23,83 @@ const formatPhonePretty = (input: string) => {
     : d;
 };
 
+// ---------- group discount allocator ----------
+function allocateGroupDiscounts(
+  items: {
+    id: number;
+    quantity: number;
+    productPrice: number;
+    inStock?: boolean;
+    // @ts-ignore – provided by context on the item
+    saleGroup?: {
+      id: number;
+      quantity: number;
+      salePrice: number;
+      unitPrice: number | null;
+    } | null;
+  }[]
+) {
+  const perItem = new Map<number, number>();
+  let total = 0;
+
+  const groups = new Map<
+    number,
+    {
+      unitPrice: number;
+      bundleQty: number;
+      bundlePrice: number;
+      members: typeof items;
+    }
+  >();
+
+  for (const it of items) {
+    const g = (it as any).saleGroup;
+    if (!g || !g.id || !g.quantity || !g.salePrice) continue;
+    const unitPrice = g.unitPrice ?? it.productPrice;
+    if (!groups.has(g.id)) {
+      groups.set(g.id, {
+        unitPrice,
+        bundleQty: g.quantity,
+        bundlePrice: g.salePrice,
+        members: [],
+      });
+    }
+    groups.get(g.id)!.members.push(it);
+  }
+
+  for (const [, grp] of groups) {
+    const members = grp.members.filter(
+      (m) => m.inStock !== false && m.quantity > 0
+    );
+    const totalQty = members.reduce((a, b) => a + b.quantity, 0);
+    const bundles = Math.floor(totalQty / grp.bundleQty);
+    if (bundles <= 0) continue;
+
+    const regular = bundles * grp.bundleQty * grp.unitPrice;
+    const onSale = bundles * grp.bundlePrice;
+    let discount = Math.max(0, regular - onSale);
+    if (discount <= 0) continue;
+
+    total += discount;
+
+    // proportional split by quantity; reconcile rounding to last item
+    const sumQ = totalQty || 1;
+    let allocated = 0;
+    for (let i = 0; i < members.length; i++) {
+      const isLast = i === members.length - 1;
+      const m = members[i];
+      const raw = (m.quantity / sumQ) * discount;
+      const part = isLast
+        ? Math.max(0, discount - allocated)
+        : Math.round(raw * 100) / 100;
+      allocated = Math.round((allocated + part) * 100) / 100;
+      perItem.set(m.id, (perItem.get(m.id) || 0) + part);
+    }
+  }
+
+  return { perItem, total };
+}
+
 export default function Cart() {
   const {
     cartItems,
@@ -30,6 +108,8 @@ export default function Cart() {
     increaseQuantity,
     decreaseQuantity,
     updateStockStatus,
+    refreshStockStatus,
+    refreshSaleGroups, // ⬅️ from context
   } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -56,52 +136,77 @@ export default function Cart() {
 
   const hasOutOfStock = cartItems.some((item) => item.inStock === false);
 
-  const total = cartItems
+  // ---------- totals: item-sale first, then group allocation ----------
+  // IMPORTANT: if item participates in a sale group, DO NOT apply per-item sale here.
+  const preGroupTotal = cartItems
     .filter((item) => item.inStock !== false)
     .map((item) => {
-      if (!item.sale) return item.productPrice * item.quantity;
+      const inGroup = Boolean((item as any).saleGroup);
+      if (!item.sale || inGroup) {
+        return item.productPrice * item.quantity;
+      }
       const bundles = Math.floor(item.quantity / item.sale.amount);
       const remainder = item.quantity % item.sale.amount;
       return bundles * item.sale.price + remainder * item.productPrice;
     })
     .reduce((a, b) => a + b, 0);
 
-  useEffect(() => {
-    async function fetchStock(ids: number[]) {
-      if (!ids.length) return;
+  const pricingItems = cartItems.map((i) => ({
+    id: i.id,
+    quantity: i.quantity,
+    productPrice: i.productPrice,
+    inStock: i.inStock,
+    // @ts-ignore – populated by context after fetch
+    saleGroup: (i as any).saleGroup ?? null,
+  }));
 
+  const { perItem: perItemGroupDiscount, total: groupDiscountTotal } =
+    allocateGroupDiscounts(pricingItems);
+
+  const total = preGroupTotal - groupDiscountTotal;
+
+  // ---------- background fetches on open/focus ----------
+  useEffect(() => {
+    async function run(ids: number[]) {
+      if (!ids.length) return;
+      // stock
       const res = await fetch("/api/products/stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });
-
-      if (!res.ok) return;
-
-      const stockMap: Record<number, boolean> = await res.json();
-      Object.entries(stockMap).forEach(([id, inStock]) =>
-        updateStockStatus(Number(id), inStock)
-      );
+      if (res.ok) {
+        const stockMap: Record<number, boolean> = await res.json();
+        Object.entries(stockMap).forEach(([id, inStock]) =>
+          updateStockStatus(Number(id), inStock)
+        );
+      }
+      // sale-groups for any missing
+      await refreshSaleGroups();
     }
 
     if (isOpen && !hasFetchedOnOpen.current) {
-      fetchStock(latestIdsRef.current);
+      run(latestIdsRef.current);
       hasFetchedOnOpen.current = true;
     }
 
     const handleFocus = () => {
-      if (isOpen) fetchStock(latestIdsRef.current);
+      if (isOpen) {
+        refreshStockStatus();
+        refreshSaleGroups();
+      }
     };
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [isOpen, updateStockStatus]);
+  }, [isOpen, updateStockStatus, refreshStockStatus, refreshSaleGroups]);
 
   useEffect(() => {
     if (!isOpen) hasFetchedOnOpen.current = false;
   }, [isOpen]);
 
   function getOrderItems() {
+    // server is authoritative; we still send current client snapshot for UX
     return cartItems.map((item) => ({
       productId: item.id,
       productName: item.productName,
@@ -134,24 +239,19 @@ export default function Cart() {
     }
   };
 
-  // When user types a phone for the first time
   const savePhoneNumber = () => {
     const normalized = normalizePhoneForDB(phoneInput);
     if (!isValidMobile(normalized)) {
       alert("נא להזין מספר נייד תקין בפורמט 05XXXXXXXX.");
       return;
     }
-    // Persist & move to confirm step
     Cookies.set("phoneNumber", normalized, { expires: 3650, sameSite: "Lax" });
     setPhoneModal(false);
     setPendingPhone(normalized);
     setConfirmPhoneModal(true);
   };
 
-  // If user edits phone during confirm step (free text; we normalize on confirm)
-  const updatePendingPhone = (newVal: string) => {
-    setPendingPhone(newVal);
-  };
+  const updatePendingPhone = (newVal: string) => setPendingPhone(newVal);
 
   const confirmPhoneAndSend = async () => {
     const normalized = normalizePhoneForDB(pendingPhone || "");
@@ -159,10 +259,9 @@ export default function Cart() {
       alert("נא לאשר מספר נייד תקין בפורמט 05XXXXXXXX.");
       return;
     }
-    // keep cookie in sync in case user edited here
     Cookies.set("phoneNumber", normalized, { expires: 3650, sameSite: "Lax" });
     setConfirmPhoneModal(false);
-    await finalizeOrder(normalized); // ⬅️ always 05XXXXXXXX to DB
+    await finalizeOrder(normalized);
   };
 
   const finalizeOrder = async (phone: string) => {
@@ -201,11 +300,8 @@ export default function Cart() {
 
       const { orderId, warning } = await res.json();
 
-      if (warning) {
-        toast.warning("חלק מהמוצרים לא היו זמינים ונמחקו מההזמנה");
-      } else {
-        toast.success("ההזמנה נשלחה בהצלחה!");
-      }
+      if (warning) toast.warning("חלק מהמוצרים לא היו זמינים ונמחקו מההזמנה");
+      else toast.success("ההזמנה נשלחה בהצלחה!");
 
       setPendingOrderId(orderId);
       setShowWhatsappConfirm(true);
@@ -221,7 +317,6 @@ export default function Cart() {
 
   const confirmAndRedirectToWhatsapp = async () => {
     if (!pendingOrderId) return;
-
     try {
       await fetch(`/api/orders/${pendingOrderId}/notify`, { method: "PATCH" });
     } catch (err) {
@@ -269,6 +364,9 @@ export default function Cart() {
                 <CartSingleItem
                   key={item.id}
                   item={item}
+                  perItemGroupDiscount={Number(
+                    perItemGroupDiscount.get(item.id) || 0
+                  )}
                   onDecrease={() => decreaseQuantity(item.id)}
                   onIncrease={() => increaseQuantity(item.id)}
                   onRemove={() => removeFromCart(item.id)}
@@ -307,19 +405,16 @@ export default function Cart() {
       )}
 
       <ConfirmOrderModal
-        // Step 1: request phone (if not in cookie)
         phoneModal={phoneModal}
         phoneInput={phoneInput}
         onPhoneChange={(e) => setPhoneInput(e.target.value)}
         onPhoneClose={() => setPhoneModal(false)}
         onPhoneSave={savePhoneNumber}
-        // Step 2: confirm phone number before sending
         confirmPhoneModal={confirmPhoneModal}
         pendingPhone={pendingPhone || ""}
         onPendingPhoneChange={updatePendingPhone}
         onConfirmPhoneClose={() => setConfirmPhoneModal(false)}
         onConfirmPhoneSend={confirmPhoneAndSend}
-        // Post-order WhatsApp confirm
         showWhatsappConfirm={showWhatsappConfirm}
         onCancelWhatsapp={() => setShowWhatsappConfirm(false)}
         onConfirmWhatsapp={confirmAndRedirectToWhatsapp}
