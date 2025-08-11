@@ -19,6 +19,7 @@ type ProductRow = {
   productSaleQuantity: number | null;
   productSalePrice: number | null;
   storage_area_id: number | null;
+  in_stock: boolean | number | string;
 };
 
 type EffectiveSale =
@@ -34,6 +35,13 @@ type EffectiveSale =
       price: number;
     };
 
+function toBool(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") return /^(1|true|t|yes|y)$/i.test(v);
+  return false;
+}
+
 async function getProduct(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -48,20 +56,23 @@ async function getProduct(
     }
 
     const productResult = await pool.query<ProductRow>(
-      `SELECT 
-         p.id, 
-         p.name, 
-         p.price, 
-         p.image, 
-         p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at, 
-         p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
-         s.quantity AS "productSaleQuantity", 
-         s.sale_price AS "productSalePrice",
-         ps.storage_area_id
-       FROM products p
-       LEFT JOIN sales s ON s.product_id = p.id
-       LEFT JOIN product_storage ps ON ps.product_id = p.id
-       WHERE p.id = $1`,
+      `
+      SELECT 
+        p.id, 
+        p.name, 
+        p.price, 
+        p.image, 
+        p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at, 
+        p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+        s.quantity AS "productSaleQuantity", 
+        s.sale_price AS "productSalePrice",
+        ps.storage_area_id,
+        p.in_stock AS "in_stock"                -- <-- include in_stock
+      FROM products p
+      LEFT JOIN sales s ON s.product_id = p.id
+      LEFT JOIN product_storage ps ON ps.product_id = p.id
+      WHERE p.id = $1
+      `,
       [productId]
     );
 
@@ -72,12 +83,14 @@ async function getProduct(
     const product = productResult.rows[0];
 
     const saleCategoriesResult = await pool.query<SaleCategory>(
-      `SELECT 
-         c.id, c.name, cs.quantity, cs.sale_price
-       FROM categories c
-       JOIN product_categories pc ON pc.category_id = c.id
-       JOIN category_sales cs ON cs.category_id = c.id
-       WHERE c.type = 'sale' AND pc.product_id = $1`,
+      `
+      SELECT 
+        c.id, c.name, cs.quantity, cs.sale_price
+      FROM categories c
+      JOIN product_categories pc ON pc.category_id = c.id
+      JOIN category_sales cs ON cs.category_id = c.id
+      WHERE c.type = 'sale' AND pc.product_id = $1
+      `,
       [productId]
     );
 
@@ -92,10 +105,7 @@ async function getProduct(
         fromCategory: true,
         quantity: best.quantity,
         price: best.sale_price,
-        category: {
-          id: best.id,
-          name: best.name,
-        },
+        category: { id: best.id, name: best.name },
       };
     } else if (
       product.productSaleQuantity != null &&
@@ -118,6 +128,7 @@ async function getProduct(
         updated_at: product.updated_at,
         sale: effectiveSale,
         storage_area_id: product.storage_area_id ?? null,
+        in_stock: toBool(product.in_stock),
       },
     });
   } catch (err: unknown) {
