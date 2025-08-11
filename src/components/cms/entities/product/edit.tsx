@@ -9,6 +9,7 @@ import Image from "next/image";
 import ImageSelector from "@/components/cms/ui/image-selector";
 import Category from "@/components/cms/entities/product/ui/category";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
+import SaleGroupPriceConflictModal from "@/components/cms/entities/sale-group/ui/sale-group-price-conflict-modal";
 
 interface ProductDetail {
   id: string;
@@ -33,6 +34,26 @@ interface ProductUpdatePayload {
   salePrice?: number | null;
 }
 
+type ConflictState = null | {
+  group: {
+    id: number;
+    name: string;
+    price: number | null;
+    quantity: number | null;
+    sale_price: number | null;
+  };
+  items: {
+    id: number;
+    name: string;
+    price: number | null;
+    sale_quantity: number | null;
+    sale_price: number | null;
+  }[];
+  nextPrice: number | null;
+  nextSaleQty: number | null;
+  nextSalePrice: number | null;
+};
+
 export default function EditProduct({ params }: ParamsProps) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +63,9 @@ export default function EditProduct({ params }: ParamsProps) {
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     []
   );
+  // NEW: modal + busy state
+  const [conflict, setConflict] = useState<ConflictState>(null);
+  const [modalBusy, setModalBusy] = useState(false);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -116,27 +140,24 @@ export default function EditProduct({ params }: ParamsProps) {
     setProduct({ ...product, [name]: value });
   };
 
-  const handleSave = async () => {
-    if (!product) return;
+  // --- helpers to compute payload (+ normalized numbers) ---
+  function computeUpdatePayload(p: ProductDetail): {
+    payload: ProductUpdatePayload;
+    nextPrice: number;
+    nextSaleQty: number | null;
+    nextSalePrice: number | null;
+  } {
+    const fullImagePath =
+      imagePathMap[p.image || ""] ||
+      images.find((img) => getDisplayName(img) === (p.image || "")) ||
+      "";
 
-    const {
-      name,
-      price,
-      saleQuantity,
-      salePrice,
-      id,
-      image: displayImage,
-    } = product;
+    const priceNum = Number(p.price);
 
-    if (!name.trim() || isNaN(Number(price))) {
-      alert("חובה למלא שם ומחיר");
-      return;
-    }
-
-    const quantity = Number(saleQuantity);
-    const sale = Number(salePrice);
-    const isQuantityEmpty = saleQuantity === "";
-    const isSalePriceEmpty = salePrice === "";
+    const quantity = Number(p.saleQuantity);
+    const sale = Number(p.salePrice);
+    const isQuantityEmpty = p.saleQuantity === "";
+    const isSalePriceEmpty = p.salePrice === "";
 
     const isValidQuantity =
       !isQuantityEmpty &&
@@ -146,44 +167,108 @@ export default function EditProduct({ params }: ParamsProps) {
 
     const isValidSalePrice = !isSalePriceEmpty && !isNaN(sale) && sale >= 0;
 
-    const fullImagePath =
-      imagePathMap[displayImage || ""] ||
-      images.find((img) => getDisplayName(img) === (displayImage || "")) ||
-      "";
-
-    const updatedProduct: ProductUpdatePayload = {
-      name,
-      price: Number(price),
+    const payload: ProductUpdatePayload = {
+      name: p.name,
+      price: priceNum,
       image: fullImagePath || null,
     };
 
+    let nextSaleQty: number | null | undefined = undefined;
+    let nextSalePrice: number | null | undefined = undefined;
+
     if (isQuantityEmpty && isSalePriceEmpty) {
-      updatedProduct.saleQuantity = null;
-      updatedProduct.salePrice = null;
+      payload.saleQuantity = null;
+      payload.salePrice = null;
+      nextSaleQty = null;
+      nextSalePrice = null;
     } else if (isValidQuantity && isValidSalePrice) {
-      updatedProduct.saleQuantity = quantity;
-      updatedProduct.salePrice = sale;
+      payload.saleQuantity = quantity;
+      payload.salePrice = sale;
+      nextSaleQty = quantity;
+      nextSalePrice = sale;
     } else if (
       (isValidQuantity && isSalePriceEmpty) ||
       (isValidSalePrice && isQuantityEmpty)
     ) {
+      // ignore inconsistent half-filled sale (keep existing in DB)
+      // don't attach sale fields to payload
+      nextSaleQty = undefined;
+      nextSalePrice = undefined;
     } else {
+      // invalid -> reset UI + clear sale
       setProduct((prev) =>
         prev ? { ...prev, saleQuantity: "", salePrice: "" } : prev
       );
-      updatedProduct.saleQuantity = null;
-      updatedProduct.salePrice = null;
+      payload.saleQuantity = null;
+      payload.salePrice = null;
+      nextSaleQty = null;
+      nextSalePrice = null;
     }
+
+    return {
+      payload,
+      nextPrice: priceNum,
+      nextSaleQty: nextSaleQty ?? null, // normalize undefined→null for validate/propagate
+      nextSalePrice: nextSalePrice ?? null,
+    };
+  }
+
+  async function saveNormally(
+    productId: string,
+    payload: ProductUpdatePayload
+  ) {
+    const res = await fetch(`/api/products/${productId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("ארעה תקלה בשמירת מוצר");
+  }
+
+  // --- NEW: main save flow with validate + modal ---
+  const handleSave = async () => {
+    if (!product) return;
+
+    const { name, id } = product;
+    if (!name.trim() || isNaN(Number(product.price))) {
+      alert("חובה למלא שם ומחיר");
+      return;
+    }
+
+    const { payload, nextPrice, nextSaleQty, nextSalePrice } =
+      computeUpdatePayload(product);
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: "PUT",
+      // 1) ask backend if change conflicts with a sale group lock
+      const vRes = await fetch(`/api/products/${id}/price-change/validate`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedProduct),
+        body: JSON.stringify({
+          price: nextPrice,
+          saleQuantity: nextSaleQty,
+          salePrice: nextSalePrice,
+        }),
       });
-      if (!res.ok) throw new Error("ארעה תקלה בשמירת מוצר");
-      alert("מוצר נשמר!");
+
+      if (!vRes.ok) throw new Error("תקלה בבדיקת קונפליקט קבוצה");
+      const v = await vRes.json();
+
+      if (!v.inGroup || !v.conflicts?.any) {
+        // No conflict → proceed normally
+        await saveNormally(id, payload);
+        alert("מוצר נשמר!");
+        return;
+      }
+
+      // Conflict → open modal
+      setConflict({
+        group: v.group,
+        items: v.items,
+        nextPrice,
+        nextSaleQty,
+        nextSalePrice,
+      });
     } catch (err) {
       console.error(err);
       alert("תקלה בשמירת מוצר!");
@@ -192,26 +277,54 @@ export default function EditProduct({ params }: ParamsProps) {
     }
   };
 
-  const handleDelete = async () => {
-    if (!product) return;
-    if (!confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) return;
-
-    setSaving(true);
+  // --- modal actions ---
+  async function doDetach() {
+    if (!product || !conflict) return;
+    setModalBusy(true);
     try {
-      const res = await fetch(`/api/products/${product.id}`, {
-        method: "DELETE",
+      await fetch(`/api/products/${product.id}/price-change`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "detach",
+          price: conflict.nextPrice,
+          saleQuantity: conflict.nextSaleQty,
+          salePrice: conflict.nextSalePrice,
+        }),
       });
-      if (!res.ok) throw new Error("ארעה תקלה במחיקת המוצר");
-
-      alert("מוצר נמחק!");
-      window.location.href = "/products";
-    } catch (err) {
-      console.error(err);
-      alert("תקלה במחיקת מוצר");
+      setConflict(null);
+      alert("הוסר מהקבוצה ועודכן בהצלחה");
+    } catch (e) {
+      console.error(e);
+      alert("תקלה בעדכון");
     } finally {
-      setSaving(false);
+      setModalBusy(false);
     }
-  };
+  }
+
+  async function doPropagate() {
+    if (!product || !conflict) return;
+    setModalBusy(true);
+    try {
+      await fetch(`/api/products/${product.id}/price-change`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "propagate",
+          price: conflict.nextPrice,
+          saleQuantity: conflict.nextSaleQty,
+          salePrice: conflict.nextSalePrice,
+        }),
+      });
+      setConflict(null);
+      alert("עודכן לכלל מוצרי הקבוצה + נתוני הקבוצה");
+    } catch (e) {
+      console.error(e);
+      alert("תקלה בעדכון");
+    } finally {
+      setModalBusy(false);
+    }
+  }
 
   const previewSrc =
     imagePathMap[product?.image || ""] ||
@@ -342,7 +455,7 @@ export default function EditProduct({ params }: ParamsProps) {
             onClick={handleToggleStock}
             disabled={saving}
           >
-            {product.inStock ? "❌ סמן כחסר במלאי" : "✔️ החזר למלאי"}
+            {product.inStock ? "❌ סמן כחסר במלאי" : "✔️ החזר למלאי"}
           </Button>
 
           <Button type="submit" className="w-full mt-4" disabled={saving}>
@@ -352,7 +465,24 @@ export default function EditProduct({ params }: ParamsProps) {
           <Button
             type="button"
             className="w-full mt-2 bg-red-600 text-white hover:bg-red-700"
-            onClick={handleDelete}
+            onClick={async () => {
+              if (!product) return;
+              if (!confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) return;
+              setSaving(true);
+              try {
+                const res = await fetch(`/api/products/${product.id}`, {
+                  method: "DELETE",
+                });
+                if (!res.ok) throw new Error("ארעה תקלה במחיקת המוצר");
+                alert("מוצר נמחק!");
+                window.location.href = "/products";
+              } catch (err) {
+                console.error(err);
+                alert("תקלה במחיקת מוצר");
+              } finally {
+                setSaving(false);
+              }
+            }}
             disabled={saving}
           >
             מחק מוצר
@@ -373,6 +503,20 @@ export default function EditProduct({ params }: ParamsProps) {
           )}
         </div>
       </form>
+
+      {conflict && (
+        <SaleGroupPriceConflictModal
+          group={conflict.group}
+          items={conflict.items}
+          nextPrice={conflict.nextPrice}
+          nextSaleQty={conflict.nextSaleQty}
+          nextSalePrice={conflict.nextSalePrice}
+          busy={modalBusy}
+          onClose={() => setConflict(null)}
+          onDetach={doDetach}
+          onPropagate={doPropagate}
+        />
+      )}
     </div>
   );
 }
