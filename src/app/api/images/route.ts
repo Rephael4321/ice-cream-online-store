@@ -18,6 +18,7 @@ export async function GET(_req: NextRequest) {
     const result = await s3.send(
       new ListObjectsV2Command({
         Bucket,
+        Prefix: "images/",
         MaxKeys: 1000,
       })
     );

@@ -13,34 +13,40 @@ export default function ImageEditor({
   const [busy, setBusy] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this image?")) return;
+    if (!confirm("למחוק את התמונה הזו?")) return;
 
     setBusy(true);
-    const res = await fetch("/api/images/delete", {
-      method: "DELETE",
-      body: JSON.stringify({ imageUrl }),
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      const res = await fetch("/api/images/delete", {
+        method: "DELETE",
+        body: JSON.stringify({ imageUrl }),
+        headers: { "Content-Type": "application/json" },
+      });
 
-    setBusy(false);
-
-    if (res.ok) {
-      showToast("Image deleted");
-      onDelete();
-    } else {
-      showToast("Failed to delete image");
+      if (res.ok) {
+        showToast("התמונה נמחקה");
+        onDelete();
+      } else {
+        showToast("מחיקה נכשלה");
+      }
+    } catch {
+      showToast("מחיקה נכשלה");
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="flex justify-between items-center mt-2 text-sm">
-      <code className="truncate text-gray-500 max-w-[60%]">{imageUrl}</code>
+    <div dir="rtl" className="flex justify-between items-center mt-2 text-sm">
+      <code className="truncate text-gray-500 max-w-[60%]" title={imageUrl}>
+        {imageUrl}
+      </code>
       <button
-        className="text-red-600 text-xs underline disabled:opacity-50"
+        className="text-red-700 hover:text-red-800 text-xs underline disabled:opacity-50"
         onClick={handleDelete}
         disabled={busy}
       >
-        Delete
+        {busy ? "מוחק…" : "מחק"}
       </button>
     </div>
   );

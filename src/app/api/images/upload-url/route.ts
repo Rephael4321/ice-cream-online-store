@@ -4,6 +4,10 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { assumeRole } from "@/lib/aws/assume-role";
 
+function buildKey(filename: string) {
+  return `images/${filename}`;
+}
+
 async function generateUploadUrl(req: NextRequest) {
   try {
     const { filename, contentType } = await req.json();
@@ -17,19 +21,20 @@ async function generateUploadUrl(req: NextRequest) {
     const credentials = await assumeRole();
     const s3 = new S3Client({ region: Region, credentials });
 
+    const Key = buildKey(filename);
+
     const command = new PutObjectCommand({
       Bucket,
-      Key: filename,
-      // if the client sends a specific MIME type, prefer it; otherwise fall back
+      Key,
       ContentType: contentType ?? "image/*",
     });
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 });
 
-    return NextResponse.json({
-      uploadUrl,
-      fileUrl: `https://${Bucket}.s3.amazonaws.com/${filename}`,
-    });
+    // encode the path segment properly (Hebrew, spaces, etc.)
+    const fileUrl = `https://${Bucket}.s3.amazonaws.com/${encodeURI(Key)}`;
+
+    return NextResponse.json({ uploadUrl, fileUrl });
   } catch (err) {
     console.error("Failed to create upload URL:", err);
     return NextResponse.json(
