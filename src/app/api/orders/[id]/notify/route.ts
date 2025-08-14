@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
-// === POST /api/orders/:id/notify – Mark order as notified (client, no auth) ===
 async function notifyOrder(
   req: NextRequest,
   context: { params: { id: string } }
@@ -24,5 +23,4 @@ async function notifyOrder(
   }
 }
 
-// ✅ Apply middleware with skipAuth because it's used by clients
 export const PATCH = withMiddleware(notifyOrder, { skipAuth: true });
