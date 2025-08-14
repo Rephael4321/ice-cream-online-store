@@ -8,16 +8,21 @@ export default function ViewImages() {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [freezeMsg, setFreezeMsg] = useState<string | null>(null); // ← global freeze overlay
 
   useEffect(() => {
-    fetch("/api/images")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch images");
-        return res.json();
-      })
-      .then((data) => setImages(Array.isArray(data) ? data : []))
-      .catch(() => setError("אירעה שגיאה בטעינת התמונות"))
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const res = await fetch("/api/images");
+        if (!res.ok) throw new Error("bad status");
+        const data = await res.json();
+        setImages(Array.isArray(data) ? data : []);
+      } catch {
+        setError("אירעה שגיאה בטעינת התמונות");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   return (
@@ -36,7 +41,16 @@ export default function ViewImages() {
           אין תמונות עדיין. העלה/י תמונה כדי להתחיל.
         </div>
       ) : (
-        <ImageGrid images={images} />
+        <ImageGrid images={images} onFreeze={setFreezeMsg} />
+      )}
+
+      {/* Full-screen freeze overlay */}
+      {freezeMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="rounded-xl bg-white px-6 py-4 text-center shadow">
+            <p className="text-sm text-gray-700">{freezeMsg}</p>
+          </div>
+        </div>
       )}
     </div>
   );
