@@ -58,6 +58,7 @@ function toImagesKey(file: File): string {
 export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const controllersRef = useRef<AbortController[]>([]);
+  const cancelRequested = useRef(false);
 
   const [items, setItems] = useState<Item[]>([]);
   const [serverIndex, setServerIndex] = useState<Set<string>>(new Set());
@@ -83,7 +84,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         }
         const data = await res.json();
         if (data?.images && typeof data.images === "object") {
-          setServerIndex(new Set(Object.keys(data.images)));
+          setServerIndex(new Set(Object.values(data.images) as string[]));
         }
       } catch (err) {
         console.warn("No index found or failed to load — treating as empty.");
@@ -107,12 +108,13 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   };
 
   const cancelAll = () => {
+    cancelRequested.current = true;
     controllersRef.current.forEach((c) => c.abort());
     controllersRef.current = [];
     setBusy(false);
     setItems((prev) =>
       prev.map((it) =>
-        ["hashing", "uploading"].includes(it.status)
+        ["hashing", "uploading", "ready", "idle"].includes(it.status)
           ? { ...it, status: "error", error: "בוטל" }
           : it
       )
@@ -122,6 +124,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   // Combined: Check duplicates → Upload
   const handleUploadClick = async () => {
     if (!indexLoaded || !items.length) return;
+    cancelRequested.current = false;
     setBusy(true);
 
     const next = [...items];
@@ -129,11 +132,13 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
 
     // Phase 1: Check duplicates
     for (let i = 0; i < next.length; i++) {
+      if (cancelRequested.current) break;
       const it = next[i];
       try {
         it.status = "hashing";
         setItems([...next]);
         const hash = await hashFileSHA256(it.file);
+        if (cancelRequested.current) break;
         it.hash = hash;
         if (serverIndex.has(hash)) {
           it.status = "duplicate";
@@ -149,6 +154,11 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
       }
     }
 
+    if (cancelRequested.current) {
+      setBusy(false);
+      return;
+    }
+
     setSummary({ uploaded: 0, duplicates, failed: 0 });
 
     // Phase 2: Upload non-duplicates
@@ -157,6 +167,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
       failed = 0;
 
     for (const it of readyFiles) {
+      if (cancelRequested.current) break;
       try {
         it.status = "uploading";
         setItems([...next]);
@@ -179,6 +190,8 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         if (!res.ok || data.error)
           throw new Error(data.error || "signing failed");
 
+        if (cancelRequested.current) break;
+
         const uploadController = new AbortController();
         controllersRef.current.push(uploadController);
 
@@ -196,7 +209,20 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         it.status = "done";
         uploaded++;
         setItems([...next]);
+
+        // ✅ Update index right after each upload
+        await fetch("/api/images/update-index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: it.key, hash: it.hash }),
+        });
+
+        // ✅ Also update local serverIndex so later files in same run detect as duplicates
+        if (it.hash) {
+          setServerIndex((prev) => new Set([...prev, it.hash!]));
+        }
       } catch (err: any) {
+        if (cancelRequested.current) break;
         it.status = "error";
         it.error = err?.message || "upload error";
         failed++;
@@ -206,7 +232,11 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
 
     setSummary({ uploaded, duplicates, failed });
     setBusy(false);
-    if (failed === 0) onUpload();
+
+    // Call onUpload only once at the end
+    if (!cancelRequested.current) {
+      onUpload();
+    }
   };
 
   return (
