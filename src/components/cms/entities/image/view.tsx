@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import UploadImage from "./upload";
+import UploadFolder from "./upload-folder";
 import ImageGrid from "./ui/image-grid";
 
 export default function ViewImages() {
@@ -29,7 +30,10 @@ export default function ViewImages() {
     <div dir="rtl" lang="he" className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-semibold">ניהול תמונות</h1>
-        <UploadImage onUpload={() => window.location.reload()} />
+        <div className="flex gap-2">
+          <UploadImage onUpload={() => window.location.reload()} />
+          <UploadFolder onUpload={() => window.location.reload()} />
+        </div>
       </div>
 
       {loading ? (
