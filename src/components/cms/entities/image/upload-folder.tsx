@@ -4,93 +4,226 @@ import { useRef, useState } from "react";
 
 type Item = {
   file: File;
-  key: string; // images/…/…/name.ext
-  status: "idle" | "signing" | "uploading" | "done" | "error";
+  key: string; // images/.../.../name.ext
+  hash?: string;
+  status:
+    | "idle"
+    | "hashing"
+    | "signing"
+    | "uploading"
+    | "done"
+    | "duplicate"
+    | "skipped"
+    | "error";
   progress: number; // 0..100 (best effort)
   error?: string;
 };
+
+// ---- helpers ----
+
+// Accept common image types; if a browser leaves type empty, check extension
+function isImageFile(f: File) {
+  if (f.type && f.type.startsWith("image/")) return true;
+  const ext = f.name.split(".").pop()?.toLowerCase() || "";
+  return [
+    "png",
+    "jpg",
+    "jpeg",
+    "webp",
+    "gif",
+    "bmp",
+    "avif",
+    "tiff",
+    "svg",
+  ].includes(ext);
+}
+
+// Hash a file (SHA-256) using Web Crypto
+async function hashFileSHA256(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(hashBuf)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// Build an S3 key under images/, preserving the folder structure from the picker
+function toImagesKey(file: File): string {
+  const rel = (file as any).webkitRelativePath || file.name; // e.g. MyFolder/sub/a.png
+  const raw = String(rel).replace(/\\/g, "/").replace(/^\/+/, "");
+  const cleaned = raw
+    .split("/")
+    .map((seg) => (seg && seg !== "." && seg !== ".." ? seg.trim() : ""))
+    .filter(Boolean)
+    .join("/");
+  const collapsed = cleaned.replace(/\/{2,}/g, "/");
+  return collapsed.startsWith("images/") ? collapsed : `images/${collapsed}`;
+}
 
 export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(false);
+  const [summary, setSummary] = useState<{
+    uploaded: number;
+    duplicates: number;
+    failed: number;
+  } | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
   const pickFolder = () => inputRef.current?.click();
 
   const onPick: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const files = Array.from(e.target.files ?? []);
+    const files = Array.from(e.target.files ?? []).filter(isImageFile);
     if (!files.length) return;
 
-    // Build keys using webkitRelativePath if available
-    const mapped: Item[] = files.map((file) => {
-      const rel = (file as any).webkitRelativePath || file.name; // e.g. MyFolder/sub/a.png
-      // Normalize slashes & ensure images/ prefix (API enforces too – double safe)
-      const relClean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
-      const key = relClean.startsWith("images/")
-        ? relClean
-        : `images/${relClean}`;
-      return { file, key, status: "idle", progress: 0 };
-    });
+    // Initialize items with normalized keys
+    const mapped: Item[] = files.map((file) => ({
+      file,
+      key: toImagesKey(file),
+      status: "idle",
+      progress: 0,
+    }));
     setItems(mapped);
+    setSummary(null);
+    setGlobalError(null);
   };
 
   const uploadAll = async () => {
     if (!items.length) return;
     setBusy(true);
+    setSummary(null);
+    setGlobalError(null);
 
+    // 1) Hash all files and do local dedupe (same content in selected folder)
     const next = [...items];
-    setItems(next);
+    const hashToIndex = new Map<string, number>(); // first index per hash
+    const toProcess: number[] = []; // indices that will proceed to server check
 
     for (let i = 0; i < next.length; i++) {
       const it = next[i];
       try {
-        // 1) get signed URL for this key
-        it.status = "signing";
+        it.status = "hashing";
         setItems([...next]);
 
-        const signRes = await fetch("/api/images/upload-url", {
+        const h = await hashFileSHA256(it.file);
+        it.hash = h;
+
+        if (hashToIndex.has(h)) {
+          // already saw this content in selection → skip locally
+          it.status = "skipped";
+          it.progress = 100;
+        } else {
+          hashToIndex.set(h, i);
+          it.status = "signing"; // next phase
+          toProcess.push(i);
+        }
+        setItems([...next]);
+      } catch (err: any) {
+        it.status = "error";
+        it.error = err?.message || "hash failed";
+        setItems([...next]);
+      }
+    }
+
+    // 2) For each unique-by-hash file: ask server for duplicate verdict or signed URL
+    const newIndexEntries: Array<{
+      hash: string;
+      key: string;
+      name?: string;
+      size?: number;
+    }> = [];
+    let uploaded = 0;
+    let duplicates = 0;
+    let failed = 0;
+
+    for (const i of toProcess) {
+      const it = next[i];
+      if (!it.hash) continue; // hashing failed earlier
+
+      try {
+        const res = await fetch("/api/images/upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: it.key }),
+          body: JSON.stringify({
+            key: it.key,
+            contentType: it.file.type || "application/octet-stream",
+            hash: it.hash,
+          }),
         });
-        if (!signRes.ok) {
+        if (!res.ok) {
           const msg =
-            (await signRes.json().catch(() => ({})))?.error || "signing failed";
+            (await res.json().catch(() => ({})))?.error || "signing failed";
           throw new Error(msg);
         }
-        const { uploadUrl } = await signRes.json();
+        const data = await res.json();
 
-        // 2) PUT file to S3
+        if (data.duplicate) {
+          it.status = "duplicate";
+          it.progress = 100;
+          duplicates++;
+          setItems([...next]);
+          continue;
+        }
+
+        // 3) Upload to S3
         it.status = "uploading";
         setItems([...next]);
-
-        // NOTE: fetch won't give granular progress; show 0→100 best-effort
-        const putRes = await fetch(uploadUrl, {
+        const put = await fetch(data.uploadUrl, {
           method: "PUT",
           headers: {
             "Content-Type": it.file.type || "application/octet-stream",
           },
           body: it.file,
         });
-        if (!putRes.ok) throw new Error(`upload failed (${putRes.status})`);
+        if (!put.ok) throw new Error(`upload failed (${put.status})`);
 
         it.status = "done";
         it.progress = 100;
+        uploaded++;
+        newIndexEntries.push({
+          hash: it.hash,
+          key: data.key,
+          name: it.file.name,
+          size: it.file.size,
+        });
         setItems([...next]);
       } catch (err: any) {
         it.status = "error";
         it.error = err?.message || "upload error";
+        failed++;
         setItems([...next]);
       }
     }
 
+    // 4) Batch update index with only the newly uploaded files
+    if (newIndexEntries.length > 0) {
+      try {
+        await fetch("/api/images/update-index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entries: newIndexEntries }),
+        });
+      } catch {
+        // It's okay if this fails; you can reconcile later
+        setGlobalError(
+          "עדכון האינדקס נכשל עבור חלק מהקבצים שהועלו. ניתן להריץ תיקון מאוחר יותר."
+        );
+      }
+    }
+
     setBusy(false);
-    // If all done (no errors), refresh list
-    if (next.every((x) => x.status === "done")) onUpload();
+    setSummary({ uploaded, duplicates, failed });
+
+    // Auto-refresh grid if everything succeeded (no failures)
+    if (failed === 0) onUpload();
   };
 
   const total = items.length;
-  const done = items.filter((x) => x.status === "done").length;
+  const done = items.filter(
+    (x) =>
+      x.status === "done" || x.status === "duplicate" || x.status === "skipped"
+  ).length;
   const errs = items.filter((x) => x.status === "error").length;
 
   return (
@@ -99,12 +232,12 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         <input
           ref={inputRef}
           type="file"
-          // Folder picker: works in Chromium/Edge; Safari uses directory as well
-          // @ts-ignore
+          // @ts-ignore – directory selection
           webkitdirectory="true"
           // @ts-ignore
           directory="true"
           multiple
+          accept="image/*"
           className="hidden"
           onChange={onPick}
         />
@@ -124,14 +257,23 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         >
           העלאת תיקייה
         </button>
+
         {total > 0 && (
           <span className="text-xs text-gray-600">
             {errs > 0
-              ? `הושלמו ${done}/${total} | שגיאות: ${errs}`
-              : `הושלמו ${done}/${total}`}
+              ? `בוצעו ${done}/${total} | שגיאות: ${errs}`
+              : `בוצעו ${done}/${total}`}
           </span>
         )}
       </div>
+
+      {summary && (
+        <div className="text-xs text-gray-700">
+          הועלו: {summary.uploaded} • כפולים (שרת): {summary.duplicates} • כשלו:{" "}
+          {summary.failed}
+        </div>
+      )}
+      {globalError && <div className="text-xs text-red-600">{globalError}</div>}
 
       {items.length > 0 && (
         <div className="max-h-64 overflow-auto rounded border">
@@ -145,17 +287,17 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
             <tbody>
               {items.map((it, idx) => (
                 <tr key={idx} className="border-t">
-                  <td
-                    className="p-2 truncate w-[500px]"
-                    title={it.file.name}
-                  >
-                    {it.file.name}
+                  <td className="p-2 truncate w-[500px]" title={it.key}>
+                    {it.key.replace(/^images\//, "")}
                   </td>
                   <td className="p-2">
                     {it.status === "idle" && "מוכן"}
-                    {it.status === "signing" && "יוצר קישור…"}
+                    {it.status === "hashing" && "מחשב גיבוב…"}
+                    {it.status === "signing" && "בודק כפילויות…"}
                     {it.status === "uploading" && "מעלה…"}
-                    {it.status === "done" && "הושלם"}
+                    {it.status === "done" && "הועלה"}
+                    {it.status === "duplicate" && "↩️ כפול (כבר קיים בשרת)"}
+                    {it.status === "skipped" && "⏭️ דילוג (כפול בתיקייה)"}
                     {it.status === "error" && (
                       <span className="text-red-600">
                         שגיאה {it.error ? `– ${it.error}` : ""}
