@@ -114,7 +114,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
           disabled={busy}
           className="bg-gray-700 hover:bg-gray-800 text-white text-sm px-3 py-2 rounded"
         >
-          בחרי תיקייה
+          בחר תיקייה
         </button>
         <button
           type="button"
@@ -139,7 +139,6 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="text-right p-2 font-medium">קובץ</th>
-                <th className="text-right p-2 font-medium">נתיב (S3)</th>
                 <th className="text-right p-2 font-medium">סטטוס</th>
               </tr>
             </thead>
@@ -147,13 +146,10 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
               {items.map((it, idx) => (
                 <tr key={idx} className="border-t">
                   <td
-                    className="p-2 truncate max-w-[160px]"
+                    className="p-2 truncate w-[500px]"
                     title={it.file.name}
                   >
                     {it.file.name}
-                  </td>
-                  <td className="p-2 truncate max-w-[280px]" title={it.key}>
-                    {it.key}
                   </td>
                   <td className="p-2">
                     {it.status === "idle" && "מוכן"}
