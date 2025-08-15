@@ -70,13 +70,14 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
     failed: number;
   } | null>(null);
 
-  // Load index from S3 once
+  // Load index from API once (fresh, no-cache)
   useEffect(() => {
     async function loadIndex() {
       try {
-        const res = await fetch(
-          "https://ice-cream-online-store.s3.amazonaws.com/images-index.json"
-        );
+        const res = await fetch("/api/images/index", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-store" },
+        });
         if (!res.ok) {
           console.warn(`Index fetch failed: ${res.status}`);
           setServerIndex(new Set());
@@ -84,7 +85,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         }
         const data = await res.json();
         if (data?.images && typeof data.images === "object") {
-          setServerIndex(new Set(Object.values(data.images) as string[]));
+          setServerIndex(new Set(Object.keys(data.images)));
         }
       } catch (err) {
         console.warn("No index found or failed to load — treating as empty.");
@@ -113,17 +114,24 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
     controllersRef.current = [];
     setBusy(false);
     setItems((prev) =>
-      prev.map((it) =>
-        ["hashing", "uploading", "ready", "idle"].includes(it.status)
-          ? { ...it, status: "error", error: "בוטל" }
-          : it
-      )
+      prev.map((it) => ({
+        ...it,
+        status: "idle",
+        error: undefined,
+      }))
     );
   };
 
   // Combined: Check duplicates → Upload
   const handleUploadClick = async () => {
     if (!indexLoaded || !items.length) return;
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        status: "idle",
+        error: undefined,
+      }))
+    );
     cancelRequested.current = false;
     setBusy(true);
 
@@ -153,6 +161,9 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         setItems([...next]);
       }
     }
+
+    // ✅ Immediately clear serverIndex from memory after checking
+    setServerIndex(new Set());
 
     if (cancelRequested.current) {
       setBusy(false);
@@ -210,17 +221,20 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         uploaded++;
         setItems([...next]);
 
-        // ✅ Update index right after each upload
         await fetch("/api/images/update-index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: it.key, hash: it.hash }),
+          body: JSON.stringify({
+            entries: [
+              {
+                key: it.key,
+                hash: it.hash!,
+                name: it.file.name,
+                size: it.file.size,
+              },
+            ],
+          }),
         });
-
-        // ✅ Also update local serverIndex so later files in same run detect as duplicates
-        if (it.hash) {
-          setServerIndex((prev) => new Set([...prev, it.hash!]));
-        }
       } catch (err: any) {
         if (cancelRequested.current) break;
         it.status = "error";
@@ -233,7 +247,6 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
     setSummary({ uploaded, duplicates, failed });
     setBusy(false);
 
-    // Call onUpload only once at the end
     if (!cancelRequested.current) {
       onUpload();
     }
