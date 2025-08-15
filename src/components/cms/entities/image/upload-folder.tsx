@@ -1,27 +1,24 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
+
+type Status =
+  | "idle"
+  | "hashing"
+  | "ready"
+  | "duplicate"
+  | "uploading"
+  | "done"
+  | "error";
 
 type Item = {
   file: File;
-  key: string; // images/.../.../name.ext
+  key: string;
   hash?: string;
-  status:
-    | "idle"
-    | "hashing"
-    | "signing"
-    | "uploading"
-    | "done"
-    | "duplicate"
-    | "skipped"
-    | "error";
-  progress: number; // 0..100 (best effort)
+  status: Status;
   error?: string;
 };
 
-// ---- helpers ----
-
-// Accept common image types; if a browser leaves type empty, check extension
 function isImageFile(f: File) {
   if (f.type && f.type.startsWith("image/")) return true;
   const ext = f.name.split(".").pop()?.toLowerCase() || "";
@@ -38,7 +35,6 @@ function isImageFile(f: File) {
   ].includes(ext);
 }
 
-// Hash a file (SHA-256) using Web Crypto
 async function hashFileSHA256(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
   const hashBuf = await crypto.subtle.digest("SHA-256", buf);
@@ -47,9 +43,8 @@ async function hashFileSHA256(file: File): Promise<string> {
     .join("");
 }
 
-// Build an S3 key under images/, preserving the folder structure from the picker
 function toImagesKey(file: File): string {
-  const rel = (file as any).webkitRelativePath || file.name; // e.g. MyFolder/sub/a.png
+  const rel = (file as any).webkitRelativePath || file.name;
   const raw = String(rel).replace(/\\/g, "/").replace(/^\/+/, "");
   const cleaned = raw
     .split("/")
@@ -62,61 +57,89 @@ function toImagesKey(file: File): string {
 
 export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const controllersRef = useRef<AbortController[]>([]);
+
   const [items, setItems] = useState<Item[]>([]);
+  const [serverIndex, setServerIndex] = useState<Set<string>>(new Set());
+  const [indexLoaded, setIndexLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<{
     uploaded: number;
     duplicates: number;
     failed: number;
   } | null>(null);
-  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  // Load index from S3 once
+  useEffect(() => {
+    async function loadIndex() {
+      try {
+        const res = await fetch(
+          "https://ice-cream-online-store.s3.amazonaws.com/images-index.json"
+        );
+        if (!res.ok) {
+          console.warn(`Index fetch failed: ${res.status}`);
+          setServerIndex(new Set());
+          return;
+        }
+        const data = await res.json();
+        if (data?.images && typeof data.images === "object") {
+          setServerIndex(new Set(Object.keys(data.images)));
+        }
+      } catch (err) {
+        console.warn("No index found or failed to load — treating as empty.");
+        setServerIndex(new Set());
+      } finally {
+        setIndexLoaded(true);
+      }
+    }
+    loadIndex();
+  }, []);
 
   const pickFolder = () => inputRef.current?.click();
 
   const onPick: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     const files = Array.from(e.target.files ?? []).filter(isImageFile);
     if (!files.length) return;
-
-    // Initialize items with normalized keys
-    const mapped: Item[] = files.map((file) => ({
-      file,
-      key: toImagesKey(file),
-      status: "idle",
-      progress: 0,
-    }));
-    setItems(mapped);
+    setItems(
+      files.map((file) => ({ file, key: toImagesKey(file), status: "idle" }))
+    );
     setSummary(null);
-    setGlobalError(null);
   };
 
-  const uploadAll = async () => {
-    if (!items.length) return;
+  const cancelAll = () => {
+    controllersRef.current.forEach((c) => c.abort());
+    controllersRef.current = [];
+    setBusy(false);
+    setItems((prev) =>
+      prev.map((it) =>
+        ["hashing", "uploading"].includes(it.status)
+          ? { ...it, status: "error", error: "בוטל" }
+          : it
+      )
+    );
+  };
+
+  // Combined: Check duplicates → Upload
+  const handleUploadClick = async () => {
+    if (!indexLoaded || !items.length) return;
     setBusy(true);
-    setSummary(null);
-    setGlobalError(null);
 
-    // 1) Hash all files and do local dedupe (same content in selected folder)
     const next = [...items];
-    const hashToIndex = new Map<string, number>(); // first index per hash
-    const toProcess: number[] = []; // indices that will proceed to server check
+    let duplicates = 0;
 
+    // Phase 1: Check duplicates
     for (let i = 0; i < next.length; i++) {
       const it = next[i];
       try {
         it.status = "hashing";
         setItems([...next]);
-
-        const h = await hashFileSHA256(it.file);
-        it.hash = h;
-
-        if (hashToIndex.has(h)) {
-          // already saw this content in selection → skip locally
-          it.status = "skipped";
-          it.progress = 100;
+        const hash = await hashFileSHA256(it.file);
+        it.hash = hash;
+        if (serverIndex.has(hash)) {
+          it.status = "duplicate";
+          duplicates++;
         } else {
-          hashToIndex.set(h, i);
-          it.status = "signing"; // next phase
-          toProcess.push(i);
+          it.status = "ready";
         }
         setItems([...next]);
       } catch (err: any) {
@@ -126,22 +149,21 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
       }
     }
 
-    // 2) For each unique-by-hash file: ask server for duplicate verdict or signed URL
-    const newIndexEntries: Array<{
-      hash: string;
-      key: string;
-      name?: string;
-      size?: number;
-    }> = [];
-    let uploaded = 0;
-    let duplicates = 0;
-    let failed = 0;
+    setSummary({ uploaded: 0, duplicates, failed: 0 });
 
-    for (const i of toProcess) {
-      const it = next[i];
-      if (!it.hash) continue; // hashing failed earlier
+    // Phase 2: Upload non-duplicates
+    const readyFiles = next.filter((it) => it.status === "ready");
+    let uploaded = 0,
+      failed = 0;
 
+    for (const it of readyFiles) {
       try {
+        it.status = "uploading";
+        setItems([...next]);
+
+        const signController = new AbortController();
+        controllersRef.current.push(signController);
+
         const res = await fetch("/api/images/upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -150,43 +172,29 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
             contentType: it.file.type || "application/octet-stream",
             hash: it.hash,
           }),
+          signal: signController.signal,
         });
-        if (!res.ok) {
-          const msg =
-            (await res.json().catch(() => ({})))?.error || "signing failed";
-          throw new Error(msg);
-        }
+
         const data = await res.json();
+        if (!res.ok || data.error)
+          throw new Error(data.error || "signing failed");
 
-        if (data.duplicate) {
-          it.status = "duplicate";
-          it.progress = 100;
-          duplicates++;
-          setItems([...next]);
-          continue;
-        }
+        const uploadController = new AbortController();
+        controllersRef.current.push(uploadController);
 
-        // 3) Upload to S3
-        it.status = "uploading";
-        setItems([...next]);
         const put = await fetch(data.uploadUrl, {
           method: "PUT",
           headers: {
             "Content-Type": it.file.type || "application/octet-stream",
           },
           body: it.file,
+          signal: uploadController.signal,
         });
+
         if (!put.ok) throw new Error(`upload failed (${put.status})`);
 
         it.status = "done";
-        it.progress = 100;
         uploaded++;
-        newIndexEntries.push({
-          hash: it.hash,
-          key: data.key,
-          name: it.file.name,
-          size: it.file.size,
-        });
         setItems([...next]);
       } catch (err: any) {
         it.status = "error";
@@ -196,35 +204,10 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
       }
     }
 
-    // 4) Batch update index with only the newly uploaded files
-    if (newIndexEntries.length > 0) {
-      try {
-        await fetch("/api/images/update-index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ entries: newIndexEntries }),
-        });
-      } catch {
-        // It's okay if this fails; you can reconcile later
-        setGlobalError(
-          "עדכון האינדקס נכשל עבור חלק מהקבצים שהועלו. ניתן להריץ תיקון מאוחר יותר."
-        );
-      }
-    }
-
-    setBusy(false);
     setSummary({ uploaded, duplicates, failed });
-
-    // Auto-refresh grid if everything succeeded (no failures)
+    setBusy(false);
     if (failed === 0) onUpload();
   };
-
-  const total = items.length;
-  const done = items.filter(
-    (x) =>
-      x.status === "done" || x.status === "duplicate" || x.status === "skipped"
-  ).length;
-  const errs = items.filter((x) => x.status === "error").length;
 
   return (
     <div dir="rtl" className="flex flex-col gap-3">
@@ -232,9 +215,9 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         <input
           ref={inputRef}
           type="file"
-          // @ts-ignore – directory selection
+          //@ts-ignore
           webkitdirectory="true"
-          // @ts-ignore
+          //@ts-ignore
           directory="true"
           multiple
           accept="image/*"
@@ -242,7 +225,6 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
           onChange={onPick}
         />
         <button
-          type="button"
           onClick={pickFolder}
           disabled={busy}
           className="bg-gray-700 hover:bg-gray-800 text-white text-sm px-3 py-2 rounded"
@@ -250,30 +232,28 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
           בחר תיקייה
         </button>
         <button
-          type="button"
-          onClick={uploadAll}
-          disabled={!items.length || busy}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm px-3 py-2 rounded"
+          onClick={handleUploadClick}
+          disabled={busy || !items.length}
+          className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded"
         >
-          העלאת תיקייה
+          העלה (בדיקה+העלאה)
         </button>
-
-        {total > 0 && (
-          <span className="text-xs text-gray-600">
-            {errs > 0
-              ? `בוצעו ${done}/${total} | שגיאות: ${errs}`
-              : `בוצעו ${done}/${total}`}
-          </span>
+        {busy && (
+          <button
+            onClick={cancelAll}
+            className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-2 rounded"
+          >
+            בטל
+          </button>
         )}
       </div>
 
       {summary && (
         <div className="text-xs text-gray-700">
-          הועלו: {summary.uploaded} • כפולים (שרת): {summary.duplicates} • כשלו:{" "}
+          הועלו: {summary.uploaded} • כפולים: {summary.duplicates} • כשלו:{" "}
           {summary.failed}
         </div>
       )}
-      {globalError && <div className="text-xs text-red-600">{globalError}</div>}
 
       {items.length > 0 && (
         <div className="max-h-64 overflow-auto rounded border">
@@ -293,11 +273,10 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
                   <td className="p-2">
                     {it.status === "idle" && "מוכן"}
                     {it.status === "hashing" && "מחשב גיבוב…"}
-                    {it.status === "signing" && "בודק כפילויות…"}
+                    {it.status === "ready" && "✅ מוכן להעלאה"}
+                    {it.status === "duplicate" && "↩️ כפול (בשרת)"}
                     {it.status === "uploading" && "מעלה…"}
                     {it.status === "done" && "הועלה"}
-                    {it.status === "duplicate" && "↩️ כפול (כבר קיים בשרת)"}
-                    {it.status === "skipped" && "⏭️ דילוג (כפול בתיקייה)"}
                     {it.status === "error" && (
                       <span className="text-red-600">
                         שגיאה {it.error ? `– ${it.error}` : ""}
