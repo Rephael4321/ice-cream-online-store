@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { CartProvider } from "@/context/cart-context";
 import { Toaster } from "sonner";
 import SWRegister from "@/components/pwa/sw-register";
+import GlobalImageRetry from "@/components/global-image-retry";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <GlobalImageRetry />
         {/* Make sure SW controls ALL routes (helps Install App prompt) */}
         <SWRegister />
         <Toaster richColors position="top-center" />
