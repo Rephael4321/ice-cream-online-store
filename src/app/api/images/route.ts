@@ -1,11 +1,14 @@
+// src/app/api/images/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { withMiddleware } from "@/lib/api/with-middleware";
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { assumeRole } from "@/lib/aws/assume-role";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest) {
+async function listImages(_req: NextRequest) {
   try {
+    // 1. Assume role
     const credentials = await assumeRole();
     const Bucket = process.env.MEDIA_BUCKET!;
     const Region = process.env.AWS_REGION!;
@@ -15,6 +18,7 @@ export async function GET(_req: NextRequest) {
       credentials,
     });
 
+    // 2. List objects in S3
     const result = await s3.send(
       new ListObjectsV2Command({
         Bucket,
@@ -23,6 +27,7 @@ export async function GET(_req: NextRequest) {
       })
     );
 
+    // 3. Return full URLs
     const urls =
       (result.Contents ?? []).map(
         (item) => `https://${Bucket}.s3.amazonaws.com/${item.Key}`
@@ -37,3 +42,5 @@ export async function GET(_req: NextRequest) {
     );
   }
 }
+
+export const GET = withMiddleware(listImages);

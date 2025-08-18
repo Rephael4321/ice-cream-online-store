@@ -21,6 +21,11 @@ const entityGroups = [
         description: "צפה והחזר מוצרים שאזלו.",
         slug: "products/out-of-stock",
       },
+      {
+        name: "ניהול תמונות מוצרים",
+        description: "צפה בתמונות ובשימוש שלהן במוצרים.",
+        slug: "products/images",
+      },
     ],
   },
   {
