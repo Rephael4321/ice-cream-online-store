@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-// Hash a file (SHA-256) using Web Crypto
-async function hashFileSHA256(file: File): Promise<string> {
-  const buf = await file.arrayBuffer();
-  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(hashBuf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+import { validateImageFile, hashFileSHA256 } from "./utils/upload-utils";
 
 export default function UploadImage({ onUpload }: { onUpload: () => void }) {
   const [file, setFile] = useState<File | null>(null);
@@ -23,6 +15,14 @@ export default function UploadImage({ onUpload }: { onUpload: () => void }) {
     setError(null);
     setInfo(null);
 
+    // ✅ Validate file (type + size)
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setBusy(false);
+      setError(validationError);
+      return;
+    }
+
     try {
       // 1) Hash locally
       const hash = await hashFileSHA256(file);
@@ -32,7 +32,7 @@ export default function UploadImage({ onUpload }: { onUpload: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          filename: file.name, // server will normalize to images/...
+          filename: file.name,
           contentType: file.type || "application/octet-stream",
           hash,
         }),

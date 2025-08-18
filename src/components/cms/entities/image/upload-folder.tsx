@@ -1,59 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-
-type Status =
-  | "idle"
-  | "hashing"
-  | "ready"
-  | "duplicate"
-  | "uploading"
-  | "done"
-  | "error";
-
-type Item = {
-  file: File;
-  key: string;
-  hash?: string;
-  status: Status;
-  error?: string;
-};
-
-function isImageFile(f: File) {
-  if (f.type && f.type.startsWith("image/")) return true;
-  const ext = f.name.split(".").pop()?.toLowerCase() || "";
-  return [
-    "png",
-    "jpg",
-    "jpeg",
-    "webp",
-    "gif",
-    "bmp",
-    "avif",
-    "tiff",
-    "svg",
-  ].includes(ext);
-}
-
-async function hashFileSHA256(file: File): Promise<string> {
-  const buf = await file.arrayBuffer();
-  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(hashBuf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function toImagesKey(file: File): string {
-  const rel = (file as any).webkitRelativePath || file.name;
-  const raw = String(rel).replace(/\\/g, "/").replace(/^\/+/, "");
-  const cleaned = raw
-    .split("/")
-    .map((seg) => (seg && seg !== "." && seg !== ".." ? seg.trim() : ""))
-    .filter(Boolean)
-    .join("/");
-  const collapsed = cleaned.replace(/\/{2,}/g, "/");
-  return collapsed.startsWith("images/") ? collapsed : `images/${collapsed}`;
-}
+import {
+  validateImageFile,
+  hashFileSHA256,
+  toImagesKey,
+  Item,
+} from "./utils/upload-utils";
 
 export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -70,7 +23,6 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
     failed: number;
   } | null>(null);
 
-  // Load index from API once (fresh, no-cache)
   useEffect(() => {
     async function loadIndex() {
       try {
@@ -87,7 +39,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
         if (data?.images && typeof data.images === "object") {
           setServerIndex(new Set(Object.keys(data.images)));
         }
-      } catch (err) {
+      } catch {
         console.warn("No index found or failed to load — treating as empty.");
         setServerIndex(new Set());
       } finally {
@@ -100,11 +52,20 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   const pickFolder = () => inputRef.current?.click();
 
   const onPick: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const files = Array.from(e.target.files ?? []).filter(isImageFile);
+    const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    setItems(
-      files.map((file) => ({ file, key: toImagesKey(file), status: "idle" }))
-    );
+
+    const items: Item[] = files.map((file) => {
+      const error = validateImageFile(file);
+      return {
+        file,
+        key: toImagesKey(file),
+        status: error ? "error" : "idle",
+        error: error || undefined,
+      };
+    });
+
+    setItems(items);
     setSummary(null);
   };
 
@@ -122,15 +83,18 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
     );
   };
 
-  // Combined: Check duplicates → Upload
   const handleUploadClick = async () => {
     if (!indexLoaded || !items.length) return;
     setItems((prev) =>
-      prev.map((it) => ({
-        ...it,
-        status: "idle",
-        error: undefined,
-      }))
+      prev.map((it) =>
+        it.status === "error"
+          ? it
+          : {
+              ...it,
+              status: "idle",
+              error: undefined,
+            }
+      )
     );
     cancelRequested.current = false;
     setBusy(true);
@@ -138,10 +102,12 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
     const next = [...items];
     let duplicates = 0;
 
-    // Phase 1: Check duplicates
     for (let i = 0; i < next.length; i++) {
       if (cancelRequested.current) break;
       const it = next[i];
+
+      if (it.status === "error") continue; // skip invalid files
+
       try {
         it.status = "hashing";
         setItems([...next]);
@@ -162,7 +128,6 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
       }
     }
 
-    // ✅ Immediately clear serverIndex from memory after checking
     setServerIndex(new Set());
 
     if (cancelRequested.current) {
@@ -172,7 +137,6 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
 
     setSummary({ uploaded: 0, duplicates, failed: 0 });
 
-    // Phase 2: Upload non-duplicates
     const readyFiles = next.filter((it) => it.status === "ready");
     let uploaded = 0,
       failed = 0;

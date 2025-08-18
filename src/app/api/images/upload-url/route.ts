@@ -6,6 +6,30 @@ import { assumeRole } from "@/lib/aws/assume-role";
 import { getJson, putJson } from "@/lib/aws/s3";
 import { INDEX_KEY, ImagesIndex, emptyIndex } from "@/lib/aws/images-index";
 
+/** Safeguard settings */
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_EXTENSIONS = [
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "gif",
+  "bmp",
+  "avif",
+  "tiff",
+  "svg",
+];
+const ALLOWED_CONTENT_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/avif",
+  "image/tiff",
+  "image/svg+xml",
+];
+
 /** Encode each path segment but keep slashes */
 function encodeKeyForUrl(key: string) {
   return key.split("/").map(encodeURIComponent).join("/");
@@ -59,10 +83,42 @@ async function generateUploadUrl(req: NextRequest) {
       (typeof body.contentType === "string" && body.contentType) ||
       "application/octet-stream";
 
+    const size: number = Number(body?.size || 0);
     const hash: string = String(body?.hash || "").toLowerCase();
+
+    // ✅ Safeguard 1: Valid hash
     if (!/^[a-f0-9]{64}$/i.test(hash)) {
       return NextResponse.json(
         { error: "valid sha256 hash required" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Safeguard 2: Allowed content type
+    if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+      return NextResponse.json(
+        { error: `Unsupported file type: ${contentType}` },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Safeguard 3: Allowed extension
+    const ext = rawKey.split(".").pop()?.toLowerCase();
+    if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+      return NextResponse.json(
+        { error: `Unsupported file extension: .${ext}` },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Safeguard 4: Max size check
+    if (size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        {
+          error: `File too large (${(size / 1024 / 1024).toFixed(
+            1
+          )}MB). Max allowed is ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB`,
+        },
         { status: 400 }
       );
     }
