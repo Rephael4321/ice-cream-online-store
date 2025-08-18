@@ -9,26 +9,36 @@ type ProductRow = {
   image: string;
   created_at: string;
   updated_at: string;
+  in_stock: boolean;
   saleQuantity: number | null;
   salePrice: number | null;
   saleUpdatedAt: string | null;
+  categories: string[] | null;
 };
 
 async function listProducts() {
   try {
     const result = await pool.query<ProductRow>(
-      `SELECT 
-         p.id, 
-         p.name, 
-         p.price, 
-         p.image, 
-         p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-         p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
-         s.quantity AS "saleQuantity", 
-         s.sale_price AS "salePrice",
-         s.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "saleUpdatedAt"
-       FROM products p
-       LEFT JOIN sales s ON s.product_id = p.id`
+      `
+      SELECT 
+        p.id,
+        p.name,
+        p.price,
+        p.image,
+        p.in_stock,
+        p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+        p.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+        s.quantity AS "saleQuantity",
+        s.sale_price AS "salePrice",
+        s.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "saleUpdatedAt",
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT c.name), NULL) AS categories
+      FROM products p
+      LEFT JOIN sales s ON s.product_id = p.id
+      LEFT JOIN product_categories pc ON pc.product_id = p.id
+      LEFT JOIN categories c ON c.id = pc.category_id
+      GROUP BY p.id, s.quantity, s.sale_price, s.updated_at
+      ORDER BY p.id DESC
+      `
     );
 
     return NextResponse.json({ products: result.rows });
@@ -69,7 +79,6 @@ async function createProduct(req: NextRequest) {
 
     const productId = insertResult.rows[0].id;
 
-    // Optional: Insert sale
     const quantity = Number(saleQuantity);
     const sale = Number(salePrice);
     const isValidQuantity = !isNaN(quantity) && quantity > 0;
