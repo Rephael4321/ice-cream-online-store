@@ -4,6 +4,20 @@ import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { assumeRole } from "@/lib/aws/assume-role";
 import db from "@/lib/db";
 
+function normalizeImagePath(img: string): string {
+  if (!img) return "";
+  try {
+    if (img.startsWith("http")) {
+      // handle full S3 URL
+      const u = new URL(img);
+      return u.pathname.replace(/^\/+/, ""); // strip leading slash
+    }
+    return img.replace(/^\/+/, ""); // strip leading slash from /images/...
+  } catch {
+    return img;
+  }
+}
+
 async function listUnusedImages(req: NextRequest) {
   try {
     // 1. Assume role to list objects
@@ -28,14 +42,19 @@ async function listUnusedImages(req: NextRequest) {
         url: `https://${bucket}.s3.amazonaws.com/${o.Key}`, // ✅ full usable URL
       })) || [];
 
-    // 3. Get all product image keys from DB
+    // 3. Get all product image keys from DB and normalize
     const products = await db.query<{ image: string | null }>(`
       SELECT image FROM products WHERE image IS NOT NULL
     `);
-    const usedKeys = new Set(products.rows.map((r) => r.image!));
 
-    // 4. Keep only unused images
-    let unused = s3Objects.filter((obj) => !usedKeys.has(obj.key));
+    const usedKeys = new Set(
+      products.rows.map((r) => normalizeImagePath(r.image!))
+    );
+
+    // 4. Keep only unused images (normalize obj.key as well just in case)
+    let unused = s3Objects.filter(
+      (obj) => !usedKeys.has(normalizeImagePath(obj.key))
+    );
 
     // 5. Sorting (query params ?sort=name|size|updated, ?order=asc|desc)
     const { searchParams } = new URL(req.url);
