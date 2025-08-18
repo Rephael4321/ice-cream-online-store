@@ -20,12 +20,16 @@ interface Props {
   productId: number;
   initialStorageAreaId?: number | null;
   disabled?: boolean;
+  mode?: "edit" | "new";
+  onChange?: (storageId: number | null) => void;
 }
 
 export default function ProductStorageSelector({
   productId,
   initialStorageAreaId,
   disabled,
+  mode = "edit",
+  onChange,
 }: Props) {
   const [areas, setAreas] = useState<StorageArea[]>([]);
   const [selected, setSelected] = useState<string | undefined>(
@@ -38,15 +42,20 @@ export default function ProductStorageSelector({
       const data = await res.json();
       setAreas(data.areas || []);
     };
-
     fetchAreas();
   }, []);
 
   const handleSelect = async (areaId: string) => {
     setSelected(areaId);
-
     const storage_area_id = areaId === "none" ? null : Number(areaId);
 
+    if (mode === "new") {
+      // only bubble up
+      onChange?.(storage_area_id);
+      return;
+    }
+
+    // edit mode → API
     const res = await fetch("/api/storage/assign", {
       method: "POST",
       body: JSON.stringify({

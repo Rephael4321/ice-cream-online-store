@@ -9,6 +9,8 @@ import { showToast } from "../../ui/toast";
 import ImageSelector from "../../ui/image-selector";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
+import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
+import CategorySelector from "@/components/cms/entities/product/ui/category";
 
 type ProductForm = {
   name: string;
@@ -16,6 +18,8 @@ type ProductForm = {
   image: string;
   saleQuantity: string;
   salePrice: string;
+  storageAreaId?: number | null; // new
+  categories: number[]; // new
 };
 
 type ProductPayload = {
@@ -37,13 +41,14 @@ export default function NewProduct() {
     image: "",
     saleQuantity: "",
     salePrice: "",
+    storageAreaId: null,
+    categories: [],
   });
 
   const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
   const [usedImages, setUsedImages] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🟢 Prefill if query param exists
   useEffect(() => {
     if (prefillImage) {
       const file = prefillImage.split("/").pop() || "";
@@ -121,6 +126,7 @@ export default function NewProduct() {
     if (!isNaN(sale)) payload.salePrice = sale;
 
     try {
+      // 1. Create product
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,14 +139,45 @@ export default function NewProduct() {
       }
 
       const result = await response.json();
-      showToast(`✔ נשמר בהצלחה (מזהה: ${result.productId})`);
+      const productId = result.productId;
+      showToast(`✔ נשמר בהצלחה (מזהה: ${productId})`);
 
+      // 2. Assign storage area if chosen
+      if (product.storageAreaId) {
+        await fetch("/api/storage/assign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_id: productId,
+            storage_area_id: product.storageAreaId,
+          }),
+        });
+      }
+
+      // 3. Assign categories if chosen
+      if (product.categories.length > 0) {
+        for (const categoryId of product.categories) {
+          await fetch("/api/product-category", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              targetId: productId,
+              categoryId,
+              type: "product",
+            }),
+          });
+        }
+      }
+
+      // Reset form
       setProduct({
         name: "",
         price: "",
         image: "",
         saleQuantity: "",
         salePrice: "",
+        storageAreaId: null,
+        categories: [],
       });
     } catch (err: any) {
       console.error(err);
@@ -266,6 +303,29 @@ export default function NewProduct() {
               />
             </div>
           </div>
+
+          <ProductStorageSelector
+            productId={0}
+            initialStorageAreaId={product.storageAreaId}
+            disabled={isSubmitting}
+            mode="new"
+            onChange={(id) =>
+              setProduct((prev) => ({ ...prev, storageAreaId: id }))
+            }
+          />
+
+          <CategorySelector
+            productId="0"
+            initialCategories={[]}
+            disabled={isSubmitting}
+            mode="new"
+            onUpdate={(cats) =>
+              setProduct((prev) => ({
+                ...prev,
+                categories: cats.map((c) => c.id),
+              }))
+            }
+          />
 
           <Button
             type="submit"

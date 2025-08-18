@@ -21,6 +21,7 @@ interface Props {
   initialCategories: Category[];
   onUpdate: (newCategories: Category[]) => void;
   disabled?: boolean;
+  mode?: "edit" | "new";
 }
 
 export default function CategorySelector({
@@ -28,6 +29,7 @@ export default function CategorySelector({
   initialCategories,
   onUpdate,
   disabled = false,
+  mode = "edit",
 }: Props) {
   const [linked, setLinked] = useState<Category[]>(initialCategories);
   const [available, setAvailable] = useState<Category[]>([]);
@@ -42,18 +44,25 @@ export default function CategorySelector({
       );
       setAvailable(filtered);
     }
-
     fetchAvailable();
   }, [linked]);
 
   const unlink = async (categoryId: number) => {
     if (disabled) return;
 
+    if (mode === "new") {
+      // just local
+      const updated = linked.filter((c) => c.id !== categoryId);
+      setLinked(updated);
+      onUpdate(updated);
+      return;
+    }
+
+    // edit mode → API call
     await fetch(
       `/api/product-category?targetId=${productId}&categoryId=${categoryId}&type=product`,
       { method: "DELETE" }
     );
-
     const updated = linked.filter((c) => c.id !== categoryId);
     setLinked(updated);
     onUpdate(updated);
@@ -62,6 +71,18 @@ export default function CategorySelector({
   const link = async () => {
     if (!selectedId || disabled) return;
 
+    const newCat = available.find((c) => c.id === selectedId);
+    if (!newCat) return;
+
+    if (mode === "new") {
+      const updated = [...linked, newCat];
+      setLinked(updated);
+      setSelectedId(null);
+      onUpdate(updated);
+      return;
+    }
+
+    // edit mode → API call
     await fetch("/api/product-category", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -71,9 +92,6 @@ export default function CategorySelector({
         type: "product",
       }),
     });
-
-    const newCat = available.find((c) => c.id === selectedId);
-    if (!newCat) return;
 
     const updated = [...linked, newCat];
     setLinked(updated);
