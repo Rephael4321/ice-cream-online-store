@@ -79,6 +79,21 @@ const entityGroups = [
     ],
   },
   {
+    title: "תמונות",
+    items: [
+      {
+        name: "ניהול תמונות",
+        description: "העלה, מחק ושנה שמות של תמונות.",
+        slug: "images",
+      },
+      {
+        name: "מיגרציית תמונות",
+        description: "כלי לניהול ומעבר מאגרי תמונות.",
+        slug: "images-migration",
+      },
+    ],
+  },
+  {
     title: "אחסון",
     items: [
       {
