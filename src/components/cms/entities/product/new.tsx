@@ -8,6 +8,7 @@ import { images } from "@/data/images";
 import { showToast } from "../../ui/toast";
 import ImageSelector from "../../ui/image-selector";
 import Image from "next/image";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type ProductForm = {
   name: string;
@@ -26,6 +27,10 @@ type ProductPayload = {
 };
 
 export default function NewProduct() {
+  const searchParams = useSearchParams();
+  const prefillImage = searchParams.get("image"); // 👈 get ?image param
+  const router = useRouter(); // 👈 router for navigation
+
   const [product, setProduct] = useState<ProductForm>({
     name: "",
     price: "",
@@ -38,6 +43,26 @@ export default function NewProduct() {
   const [usedImages, setUsedImages] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🟢 Prefill if query param exists
+  useEffect(() => {
+    if (prefillImage) {
+      const file = prefillImage.split("/").pop() || "";
+      const displayName = file.split(".")[0];
+
+      setProduct((prev) => ({
+        ...prev,
+        image: displayName,
+        name: displayName, // also set as default name
+      }));
+
+      setImagePathMap((prev) => ({
+        ...prev,
+        [displayName]: prefillImage,
+      }));
+    }
+  }, [prefillImage]);
+
+  // fetch used images
   useEffect(() => {
     fetch("/api/products")
       .then((res) => res.json())
@@ -132,6 +157,18 @@ export default function NewProduct() {
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
+      {/* Go back button */}
+      <div className="mb-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+          className="cursor-pointer"
+        >
+          ← חזור
+        </Button>
+      </div>
+
       <h1 className="text-xl sm:text-2xl font-bold text-center mb-6">
         מוצר חדש
       </h1>

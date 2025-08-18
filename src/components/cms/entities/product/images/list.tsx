@@ -10,7 +10,6 @@ export type ProductImage = {
   url: string;
 };
 
-
 export default function ProductImagesList() {
   const [images, setImages] = useState<ProductImage[]>([]);
   const [loading, setLoading] = useState(true);
