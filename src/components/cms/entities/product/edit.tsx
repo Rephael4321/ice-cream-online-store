@@ -53,6 +53,13 @@ type ConflictState = null | {
   nextSalePrice: number | null;
 };
 
+// Helpers for filenames / display names
+const stripExt = (s: string) => s.replace(/\.[^/.]+$/, "");
+const fileFromPath = (p: string) => {
+  const last = p.split("/").pop() || p;
+  return decodeURIComponent(last);
+};
+
 export default function EditProduct({ params }: ParamsProps) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,12 +71,12 @@ export default function EditProduct({ params }: ParamsProps) {
   const [conflict, setConflict] = useState<ConflictState>(null);
   const [modalBusy, setModalBusy] = useState(false);
 
-  // S3 images for selector
+  // S3 images for selector (normalized list: {id, name, image})
   const [imageItems, setImageItems] = useState<
     { id: number; name: string; image: string }[]
   >([]);
 
-  // NEW: free-typing input text for the image selector
+  // free-typing input text for the image selector
   const [imageDraft, setImageDraft] = useState("");
 
   useEffect(() => {
@@ -78,7 +85,7 @@ export default function EditProduct({ params }: ParamsProps) {
         const { id } = await params;
 
         // 1) product
-        const res = await fetch(`/api/products/${id}`);
+        const res = await fetch(`/api/products/${id}`, { cache: "no-store" });
         if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצר");
         const data = await res.json();
         const loaded = data.product ?? data;
@@ -87,7 +94,7 @@ export default function EditProduct({ params }: ParamsProps) {
           id: loaded.id,
           name: loaded.name,
           price: loaded.price,
-          image: loaded.image || "", // store full S3 URL
+          image: loaded.image || "", // full S3 URL
           saleQuantity: loaded.sale?.quantity ?? "",
           salePrice: loaded.sale?.price ?? "",
           inStock: loaded.in_stock,
@@ -96,30 +103,56 @@ export default function EditProduct({ params }: ParamsProps) {
 
         // Initialize the draft so the input shows the filename (not URL)
         const currentUrl = loaded.image || "";
-        const currentFile = currentUrl.split("/").pop() || "";
-        const currentName = currentFile ? currentFile.split(".")[0] : "";
+        const currentName = currentUrl
+          ? stripExt(fileFromPath(currentUrl))
+          : "";
         setImageDraft(currentName);
 
         // 2) product categories
-        const catRes = await fetch(`/api/products/${loaded.id}/categories`);
+        const catRes = await fetch(`/api/products/${loaded.id}/categories`, {
+          cache: "no-store",
+        });
         const catData = await catRes.json();
         setCategories(catData.categories || []);
 
-        // 3) S3 image list
-        const imageRes = await fetch("/api/images");
-        const paths: string[] = imageRes.ok ? await imageRes.json() : [];
+        // 3) S3 image list (accept both legacy string[] and new {url,key,name}[])
+        const imageRes = await fetch("/api/images", { cache: "no-store" });
+        const rawData: unknown = imageRes.ok ? await imageRes.json() : [];
 
-        const items = paths.map((path, idx) => {
-          const file = path.split("/").pop() || "";
-          const name = file.split(".")[0];
-          return { id: idx, name, image: path };
-        });
+        type ApiItem = string | { url: string; key?: string; name?: string };
+
+        const items =
+          (Array.isArray(rawData) ? (rawData as ApiItem[]) : []).map(
+            (it, idx) => {
+              if (typeof it === "string") {
+                // legacy: plain URL
+                return {
+                  id: idx,
+                  name: stripExt(fileFromPath(it)),
+                  image: it,
+                };
+              } else {
+                // new: { url, key?, name? } — prefer index display name
+                const url = it.url;
+                const display = stripExt(
+                  it.name ?? fileFromPath(it.key ?? it.url)
+                );
+                return {
+                  id: idx,
+                  name: display,
+                  image: url,
+                };
+              }
+            }
+          ) ?? [];
 
         // ensure current product image is in the list so the selector can show its name
         if (loaded.image && !items.find((i) => i.image === loaded.image)) {
-          const file = loaded.image.split("/").pop() || "";
-          const name = file.split(".")[0];
-          items.push({ id: -1, name, image: loaded.image });
+          items.push({
+            id: -1,
+            name: stripExt(fileFromPath(loaded.image)),
+            image: loaded.image,
+          });
         }
 
         setImageItems(items);
@@ -364,7 +397,7 @@ export default function EditProduct({ params }: ParamsProps) {
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             items={imageItems}
-            value={imageDraft} // use free-typing draft
+            value={imageDraft} // free-typing draft
             onChange={(item) => {
               if (!item) {
                 setImageDraft("");
