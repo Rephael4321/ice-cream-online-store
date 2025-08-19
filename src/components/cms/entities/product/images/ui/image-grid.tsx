@@ -19,19 +19,14 @@ export default function ImageGrid({
   );
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+    <div
+      dir="rtl"
+      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
+    >
       {groups.map(({ label, items }) => (
         <Fragment key={label}>
-          {/* Divider */}
-          <div className="col-span-full">
-            <div className="flex items-center gap-3 my-2">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs text-gray-500">{label}</span>
-              <div className="h-px flex-1 bg-gray-200" />
-            </div>
-          </div>
+          <GroupDivider label={label} count={items.length} />
 
-          {/* Cards (sorted within group) */}
           {items.map((img) => (
             <ImageCard key={img.key} image={img} />
           ))}
@@ -41,11 +36,32 @@ export default function ImageGrid({
   );
 }
 
-/* ---------- helpers ---------- */
+/* ─── Divider Component (emphasized) ─────────────────────────────────────── */
+
+function GroupDivider({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="col-span-full sticky top-14 sm:top-16 z-20">
+      <div className="my-2">
+        <div className="flex items-center gap-3">
+          <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-blue-300 to-transparent" />
+          <div className="px-3 py-1.5 rounded-full bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-1 ring-blue-700/30 flex items-center gap-2">
+            <span className="text-xs sm:text-sm font-semibold">{label}</span>
+            <span className="text-[10px] leading-none px-2 py-0.5 rounded-full bg-white/25">
+              {count}
+            </span>
+          </div>
+          <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-blue-300 to-transparent" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Group + Sort Helpers (unchanged logic, sorts items inside each group) ─ */
 
 function displayNameOf(img: ProductImage) {
-  // Supports optional API-provided `name`, falls back to filename
-  // @ts-ignore — allow name if your type didn't include it yet
+  // If API added `name`, prefer it; fallback to filename
+  // @ts-ignore optional
   const name: string | undefined = (img as any).name;
   return name ?? img.key.split("/").pop() ?? img.key;
 }
@@ -55,7 +71,6 @@ function groupAndSortImages(
   by: GroupBy,
   order: "asc" | "desc"
 ) {
-  // Prepare normalized fields used for sorting
   const enriched = images.map((img) => ({
     ...img,
     __display: displayNameOf(img).toLowerCase(),
@@ -65,7 +80,6 @@ function groupAndSortImages(
     __bucket: by === "size" ? sizeBucket(img.size) : undefined,
   }));
 
-  // Group
   const map = new Map<string, ProductImage[]>();
   const groupKeyOrder: Array<{ key: string; sortKey: number | string }> = [];
 
@@ -77,7 +91,6 @@ function groupAndSortImages(
   };
 
   if (by === "updated") {
-    // group by local calendar day; sort groups by date
     for (const img of enriched) {
       const d = img.__updatedMs;
       const label =
@@ -86,12 +99,10 @@ function groupAndSortImages(
       upsertGroup(label, dayStart);
       map.get(label)!.push(img);
     }
-    // sort groups by dayStart
     groupKeyOrder.sort((a, b) =>
       a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0
     );
   } else if (by === "name") {
-    // group by first letter; sort groups A→Z
     for (const img of enriched) {
       const first = img.__display.charAt(0).toUpperCase() || "#";
       upsertGroup(first, first);
@@ -101,7 +112,6 @@ function groupAndSortImages(
       (a.sortKey as string).localeCompare(b.sortKey as string, "he")
     );
   } else {
-    // by === "size" — group into size buckets; use a fixed logical order
     for (const img of enriched) {
       const b = img.__bucket!;
       upsertGroup(b.label, b.rank);
@@ -110,10 +120,8 @@ function groupAndSortImages(
     groupKeyOrder.sort((a, b) => (a.sortKey as number) - (b.sortKey as number));
   }
 
-  // Apply order to groups (asc keeps natural order, desc reverses)
   if (order === "desc") groupKeyOrder.reverse();
 
-  // Sort items within each group by the same key (then tiebreak by name, then key)
   const compare = (a: any, b: any) => {
     let cmp = 0;
     if (by === "updated") {
@@ -121,7 +129,6 @@ function groupAndSortImages(
     } else if (by === "name") {
       cmp = a.__display.localeCompare(b.__display, "he");
     } else {
-      // size
       cmp = (a.size as number) - (b.size as number);
     }
     if (cmp === 0) {
