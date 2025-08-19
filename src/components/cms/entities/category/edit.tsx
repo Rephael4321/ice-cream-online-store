@@ -13,7 +13,7 @@ interface Category {
   id: number;
   name: string;
   type: CategoryType;
-  image: string; // S3 URL
+  image: string;
   description: string;
   parent_id: number | null;
   show_in_menu: 0 | 1;
@@ -50,8 +50,6 @@ export default function EditCategory({ id }: Props) {
   const [imageItems, setImageItems] = useState<
     { id: number; name: string; image: string }[]
   >([]);
-
-  // NEW: free-typing text shown in the ImageSelector input
   const [imageDraft, setImageDraft] = useState("");
 
   useEffect(() => {
@@ -62,11 +60,15 @@ export default function EditCategory({ id }: Props) {
           fetch(`/api/categories?full=true`),
           fetch(`/api/images`),
         ]);
-        if (!res.ok || !listRes.ok || !imageRes.ok) throw new Error("שגיאה");
+
+        if (!res.ok || !listRes.ok || !imageRes.ok) {
+          throw new Error("שגיאה");
+        }
 
         const data: { category: Category } = await res.json();
         const all: { categories: Category[] } = await listRes.json();
-        const imagePaths: string[] = await imageRes.json();
+        const imagePaths: { key: string; url: string }[] =
+          await imageRes.json();
 
         const parsedCategory: Category = {
           ...data.category,
@@ -75,7 +77,6 @@ export default function EditCategory({ id }: Props) {
           salePrice: data.category.salePrice?.toString() ?? "",
         };
 
-        // Parent categories
         const filtered = all.categories.filter((c) => c.id !== Number(id));
         setParentCategories(filtered);
         const parent = filtered.find((c) => c.id === data.category.parent_id);
@@ -87,14 +88,12 @@ export default function EditCategory({ id }: Props) {
           });
         }
 
-        // Build S3 list
-        const transformed = imagePaths.map((path, index) => {
-          const file = path.split("/").pop() || "";
+        const transformed = imagePaths.map(({ key, url }, index) => {
+          const file = key.split("/").pop() || "";
           const name = file.split(".")[0];
-          return { id: index, name, image: path };
+          return { id: index, name, image: url };
         });
 
-        // Ensure current image is present for display
         const existingItem = transformed.find(
           (img) => img.image === data.category.image
         );
@@ -105,7 +104,6 @@ export default function EditCategory({ id }: Props) {
         }
         setImageItems(transformed);
 
-        // Initialize draft with filename (not URL) so the input is typeable/readable
         const file = (parsedCategory.image || "").split("/").pop() || "";
         const nameOnly = file ? file.split(".")[0] : "";
         setImageDraft(nameOnly);
@@ -117,6 +115,7 @@ export default function EditCategory({ id }: Props) {
         setLoading(false);
       }
     }
+
     load();
   }, [id]);
 
@@ -127,14 +126,7 @@ export default function EditCategory({ id }: Props) {
 
   const handleTypeChange = (value: CategoryType) => {
     setCategory((prev) =>
-      prev
-        ? {
-            ...prev,
-            type: value,
-            saleQuantity: "",
-            salePrice: "",
-          }
-        : prev
+      prev ? { ...prev, type: value, saleQuantity: "", salePrice: "" } : prev
     );
   };
 
@@ -147,7 +139,7 @@ export default function EditCategory({ id }: Props) {
     const payload: UpdateCategoryPayload = {
       name: sanitizedName,
       type: category.type,
-      image: category.image, // already a full S3 URL
+      image: category.image,
       description: category.description,
       parent_id: selectedParent?.id || null,
       show_in_menu: category.show_in_menu,
@@ -187,8 +179,7 @@ export default function EditCategory({ id }: Props) {
 
       alert("הקטגוריה נמחקה בהצלחה");
       window.location.href = "/categories";
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("שגיאה בעת מחיקת הקטגוריה");
     }
   };
@@ -208,21 +199,18 @@ export default function EditCategory({ id }: Props) {
         className="flex flex-col md:flex-row gap-6 items-start"
       >
         <div className="w-full md:w-1/2 space-y-4">
-          {/* Image from S3 with free-typing field */}
           <ImageSelector
             items={imageItems}
-            value={imageDraft} // show and allow typing the filename
+            value={imageDraft}
             onChange={(item) => {
               if (!item) {
                 setImageDraft("");
                 return;
               }
-              // typing path: selector sends { id:"", name:"typed" } (no image url)
               if (!("image" in item) || !item.image) {
                 setImageDraft(item.name);
                 return;
               }
-              // selection path: commit S3 URL to model and show its name
               setCategory((prev) =>
                 prev ? { ...prev, image: item.image } : prev
               );
@@ -287,7 +275,6 @@ export default function EditCategory({ id }: Props) {
             </div>
           )}
 
-          {/* Parent category selector (unchanged logic) */}
           <ImageSelector
             items={parentCategories.map((cat) => ({
               id: cat.id,
