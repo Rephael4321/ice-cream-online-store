@@ -14,7 +14,7 @@ import CategorySelector from "@/components/cms/entities/product/ui/category";
 type ProductForm = {
   name: string;
   price: string;
-  image: string; // full S3 URL (or "")
+  image: string;
   saleQuantity: string;
   salePrice: string;
   storageAreaId?: number | null;
@@ -24,14 +24,14 @@ type ProductForm = {
 type ProductPayload = {
   name: string;
   price: number;
-  image: string; // full S3 URL
+  image: string;
   saleQuantity?: number;
   salePrice?: number;
 };
 
 export default function NewProduct() {
   const searchParams = useSearchParams();
-  const prefillImage = searchParams.get("image"); // optional prefill ?image=<S3 URL>
+  const prefillImage = searchParams.get("image");
   const router = useRouter();
 
   const [product, setProduct] = useState<ProductForm>({
@@ -94,21 +94,36 @@ export default function NewProduct() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/images");
+        const res = await fetch("/api/images", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load images");
-        const paths: string[] = await res.json();
+        const data: unknown = await res.json();
 
-        const items = paths.map((path, idx) => ({
-          id: idx,
-          name: fileBase(path),
-          image: path, // full URL
-        }));
+        type ApiItem = string | { url: string; key?: string; name?: string };
 
-        // ensure prefilled image (if any) is part of the list so the selector can resolve its name
+        const stripExt = (s: string) => s.replace(/\.[^/.]+$/, "");
+        const filename = (p: string) => {
+          const last = p.split("/").pop() || p;
+          return decodeURIComponent(last);
+        };
+
+        const items =
+          (Array.isArray(data) ? (data as ApiItem[]) : []).map((it, idx) => {
+            if (typeof it === "string") {
+              const display = stripExt(filename(it));
+              return { id: idx, name: display, image: it };
+            } else {
+              const url = it.url;
+              // Prefer index name; else fall back to key/url filename
+              const display = stripExt(it.name ?? filename(it.key ?? it.url));
+              return { id: idx, name: display, image: url };
+            }
+          }) ?? [];
+
+        // ensure prefilled image (if any) is part of the list so selector can resolve its name
         if (product.image && !items.find((i) => i.image === product.image)) {
           items.push({
             id: -1,
-            name: fileBase(product.image),
+            name: stripExt(filename(product.image)),
             image: product.image,
           });
         }
