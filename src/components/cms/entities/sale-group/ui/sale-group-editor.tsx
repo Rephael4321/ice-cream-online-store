@@ -21,10 +21,26 @@ interface SaleGroupEditorProps {
   initialCategories: { id: number; name: string }[];
 }
 
-const baseName = (url: string) => {
-  const file = url.split("/").pop() || "";
-  return file.split(".")[0];
-};
+type SelectorItem = { id: number; name: string; image: string };
+
+// Robust base name extractor that tolerates unknown inputs
+function baseNameFromUnknown(input: unknown): string {
+  const url =
+    typeof input === "string"
+      ? input
+      : input && typeof (input as any).image === "string"
+      ? (input as any).image
+      : input && typeof (input as any).url === "string"
+      ? (input as any).url
+      : "";
+
+  if (!url) return "";
+  // strip query/hash then get filename and remove extension
+  const clean = url.split(/[?#]/)[0];
+  const file = clean.split("/").pop() ?? "";
+  const dot = file.lastIndexOf(".");
+  return dot === -1 ? file : file.slice(0, dot);
+}
 
 export function SaleGroupEditor({
   id,
@@ -41,34 +57,57 @@ export function SaleGroupEditor({
   const [name, setName] = useState(initialName ?? "");
   const [image, setImage] = useState<string>(initialImage ?? ""); // full S3 URL
 
-  // Image selector state
+  // Image selector state (draft text shown in the input)
   const [imageDraft, setImageDraft] = useState<string>(
-    initialImage ? baseName(initialImage) : ""
+    baseNameFromUnknown(initialImage)
   );
-  const [imageItems, setImageItems] = useState<
-    { id: number; name: string; image: string }[]
-  >([]);
+  const [imageItems, setImageItems] = useState<SelectorItem[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState(initialCategories || []);
 
-  // Load S3 image list
+  // Load S3 image list (supports string[] or {url/key/name}[] or {image}[])
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/images");
         if (!res.ok) throw new Error("Failed to load images");
-        const paths: string[] = await res.json();
+        const data: unknown = await res.json();
 
-        const items = paths.map((path, idx) => ({
-          id: idx,
-          name: baseName(path),
-          image: path, // full S3 URL
-        }));
+        const items: SelectorItem[] = Array.isArray(data)
+          ? (data
+              .map((entry, idx) => {
+                if (typeof entry === "string") {
+                  const name = baseNameFromUnknown(entry);
+                  return { id: idx, name, image: entry };
+                }
+                if (entry && typeof entry === "object") {
+                  const obj = entry as any;
+                  const url: string =
+                    typeof obj.url === "string"
+                      ? obj.url
+                      : typeof obj.image === "string"
+                      ? obj.image
+                      : "";
+                  if (!url) return null;
+                  const name: string =
+                    typeof obj.name === "string" && obj.name
+                      ? obj.name
+                      : baseNameFromUnknown(url);
+                  return { id: idx, name, image: url };
+                }
+                return null;
+              })
+              .filter(Boolean) as SelectorItem[])
+          : [];
 
-        // Ensure current image (if any) appears in the list so the selector can show its name
+        // Ensure current image (if any) is present in list so selector shows its label
         if (image && !items.find((i) => i.image === image)) {
-          items.push({ id: -1, name: baseName(image), image });
+          items.push({
+            id: -1,
+            name: baseNameFromUnknown(image),
+            image,
+          });
         }
 
         setImageItems(items);
@@ -96,6 +135,7 @@ export function SaleGroupEditor({
 
       if (!res.ok) throw new Error();
       showToast("קבוצת מבצע עודכנה בהצלחה", "success");
+      // router.refresh(); // optional
     } catch {
       showToast("אירעה שגיאה בעדכון הקבוצה", "error");
     } finally {
@@ -137,26 +177,32 @@ export function SaleGroupEditor({
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             items={imageItems}
-            // Use the draft so the input is typeable
             value={imageDraft}
-            onChange={(item) => {
+            onChange={(item: any) => {
               if (!item) {
                 setImageDraft("");
                 setImage("");
                 return;
               }
-              // Free typing path (ImageSelector sends {id:"", name:"typed"})
-              // -> update only the draft
-              if (!("image" in item) || !item.image) {
-                setImageDraft(item.name);
+              // Free-typed value (ImageSelector may pass { id:"", name:"typed" })
+              if (
+                typeof item !== "object" ||
+                !("image" in item) ||
+                !item.image
+              ) {
+                const typed =
+                  typeof item === "string" ? item : item?.name ?? "";
+                setImageDraft(typed);
                 return;
               }
-              // Real selection from list -> commit URL and show its base name
-              setImage(item.image); // full S3 URL
-              setImageDraft(item.name); // visible label
-              setName((prev) => prev || item.name); // convenience: default name if empty
+              // Real selection from list
+              const pickedUrl: string = item.image;
+              const pickedName: string =
+                item.name || baseNameFromUnknown(pickedUrl);
+              setImage(pickedUrl); // commit S3 URL
+              setImageDraft(pickedName); // show label
+              setName((prev) => prev || pickedName); // convenience default
             }}
-            // Just echo the draft back into the input
             getDisplayValue={(val) => val}
             disabled={loading}
           />
