@@ -1,292 +1,185 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import {
-  validateImageFile,
-  hashFileSHA256,
-  toImagesKey,
-  Item,
-} from "./utils/upload-utils";
+import { useRef, useState } from "react";
+import { validateImageFile } from "./utils/upload-utils";
+
+type Result = {
+  name: string;
+  size: number;
+  type: string;
+  hash?: string;
+  key?: string;
+  status: "uploaded" | "duplicate" | "skipped" | "error";
+  message?: string;
+};
 
 export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const controllersRef = useRef<AbortController[]>([]);
-  const cancelRequested = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const [items, setItems] = useState<Item[]>([]);
-  const [serverIndex, setServerIndex] = useState<Set<string>>(new Set());
-  const [indexLoaded, setIndexLoaded] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [summary, setSummary] = useState<{
-    uploaded: number;
-    duplicates: number;
-    failed: number;
-  } | null>(null);
-
-  useEffect(() => {
-    async function loadIndex() {
-      try {
-        const res = await fetch("/api/images/index", {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-store" },
-        });
-        if (!res.ok) {
-          console.warn(`Index fetch failed: ${res.status}`);
-          setServerIndex(new Set());
-          return;
-        }
-        const data = await res.json();
-        if (data?.images && typeof data.images === "object") {
-          setServerIndex(new Set(Object.keys(data.images)));
-        }
-      } catch {
-        console.warn("No index found or failed to load — treating as empty.");
-        setServerIndex(new Set());
-      } finally {
-        setIndexLoaded(true);
-      }
-    }
-    loadIndex();
-  }, []);
+  const [results, setResults] = useState<Result[] | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
   const pickFolder = () => inputRef.current?.click();
 
   const onPick: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
+    const selected = Array.from(e.target.files ?? []);
+    if (!selected.length) return;
 
-    const items: Item[] = files.map((file) => {
-      const error = validateImageFile(file);
-      return {
-        file,
-        key: toImagesKey(file),
-        status: error ? "error" : "idle",
-        error: error || undefined,
-      };
-    });
+    const errs: string[] = [];
+    const ok: File[] = [];
 
-    setItems(items);
-    setSummary(null);
+    for (const f of selected) {
+      const err = validateImageFile(f);
+      if (err) errs.push(`${f.webkitRelativePath || f.name}: ${err}`);
+      else ok.push(f);
+    }
+
+    setFiles(ok);
+    setErrors(errs);
+    setResults(null);
   };
 
-  const cancelAll = () => {
-    cancelRequested.current = true;
-    controllersRef.current.forEach((c) => c.abort());
-    controllersRef.current = [];
-    setBusy(false);
-    setItems((prev) =>
-      prev.map((it) => ({
-        ...it,
-        status: "idle",
-        error: undefined,
-      }))
-    );
-  };
-
-  const handleUploadClick = async () => {
-    if (!indexLoaded || !items.length) return;
-    setItems((prev) =>
-      prev.map((it) =>
-        it.status === "error"
-          ? it
-          : {
-              ...it,
-              status: "idle",
-              error: undefined,
-            }
-      )
-    );
-    cancelRequested.current = false;
+  const upload = async () => {
+    if (!files.length || busy) return;
     setBusy(true);
+    setResults(null);
 
-    const next = [...items];
-    let duplicates = 0;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
 
-    for (let i = 0; i < next.length; i++) {
-      if (cancelRequested.current) break;
-      const it = next[i];
+    try {
+      const fd = new FormData();
+      for (const f of files) fd.append("files", f);
 
-      if (it.status === "error") continue; // skip invalid files
+      const res = await fetch("/api/images/upload", {
+        method: "POST",
+        body: fd,
+        signal: abortRef.current.signal,
+      });
 
-      try {
-        it.status = "hashing";
-        setItems([...next]);
-        const hash = await hashFileSHA256(it.file);
-        if (cancelRequested.current) break;
-        it.hash = hash;
-        if (serverIndex.has(hash)) {
-          it.status = "duplicate";
-          duplicates++;
-        } else {
-          it.status = "ready";
-        }
-        setItems([...next]);
-      } catch (err: any) {
-        it.status = "error";
-        it.error = err?.message || "hash failed";
-        setItems([...next]);
-      }
-    }
+      const data = await res.json();
+      const out: Result[] = Array.isArray(data?.results) ? data.results : [];
+      setResults(out);
 
-    setServerIndex(new Set());
-
-    if (cancelRequested.current) {
-      setBusy(false);
-      return;
-    }
-
-    setSummary({ uploaded: 0, duplicates, failed: 0 });
-
-    const readyFiles = next.filter((it) => it.status === "ready");
-    let uploaded = 0,
-      failed = 0;
-
-    for (const it of readyFiles) {
-      if (cancelRequested.current) break;
-      try {
-        it.status = "uploading";
-        setItems([...next]);
-
-        const signController = new AbortController();
-        controllersRef.current.push(signController);
-
-        const res = await fetch("/api/images/upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            key: it.key,
-            contentType: it.file.type || "application/octet-stream",
-            hash: it.hash,
-          }),
-          signal: signController.signal,
-        });
-
-        const data = await res.json();
-        if (!res.ok || data.error)
-          throw new Error(data.error || "signing failed");
-
-        if (cancelRequested.current) break;
-
-        const uploadController = new AbortController();
-        controllersRef.current.push(uploadController);
-
-        const put = await fetch(data.uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": it.file.type || "application/octet-stream",
+      if (out.some((r) => r.status === "uploaded")) onUpload();
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        setResults([
+          {
+            name: "—",
+            size: 0,
+            type: "",
+            status: "error",
+            message: "Upload failed",
           },
-          body: it.file,
-          signal: uploadController.signal,
-        });
-
-        if (!put.ok) throw new Error(`upload failed (${put.status})`);
-
-        it.status = "done";
-        uploaded++;
-        setItems([...next]);
-
-        await fetch("/api/images/update-index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            entries: [
-              {
-                key: it.key,
-                hash: it.hash!,
-                name: it.file.name,
-                size: it.file.size,
-              },
-            ],
-          }),
-        });
-      } catch (err: any) {
-        if (cancelRequested.current) break;
-        it.status = "error";
-        it.error = err?.message || "upload error";
-        failed++;
-        setItems([...next]);
+        ]);
       }
-    }
-
-    setSummary({ uploaded, duplicates, failed });
-    setBusy(false);
-
-    if (!cancelRequested.current) {
-      onUpload();
+    } finally {
+      setBusy(false);
+      abortRef.current = null;
     }
   };
+
+  const cancel = () => {
+    abortRef.current?.abort();
+    setBusy(false);
+  };
+
+  const summary = (() => {
+    const r = results ?? [];
+    const up = r.filter((x) => x.status === "uploaded").length;
+    const du = r.filter((x) => x.status === "duplicate").length;
+    const sk = r.filter((x) => x.status === "skipped").length;
+    const er = r.filter((x) => x.status === "error").length;
+    return { up, du, sk, er };
+  })();
 
   return (
-    <div dir="rtl" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={inputRef}
-          type="file"
-          //@ts-ignore
-          webkitdirectory="true"
-          //@ts-ignore
-          directory="true"
-          multiple
-          accept="image/*"
-          className="hidden"
-          onChange={onPick}
-        />
+    <div dir="rtl" className="flex flex-col gap-2 w-full sm:w-auto">
+      <input
+        ref={inputRef}
+        type="file"
+        // @ts-ignore
+        webkitdirectory="true"
+        // @ts-ignore
+        directory="true"
+        multiple
+        accept="image/*"
+        className="hidden"
+        onChange={onPick}
+      />
+      <div className="flex flex-col sm:flex-row gap-2">
         <button
           onClick={pickFolder}
           disabled={busy}
-          className="bg-gray-700 hover:bg-gray-800 text-white text-sm px-3 py-2 rounded"
+          className="w-full sm:w-auto bg-white border px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
         >
           בחר תיקייה
         </button>
         <button
-          onClick={handleUploadClick}
-          disabled={busy || !items.length}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded"
+          onClick={upload}
+          disabled={!files.length || busy}
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg text-sm"
         >
-          העלה (בדיקה+העלאה)
+          {busy ? "מעלה…" : files.length ? `העלה (${files.length})` : "העלה"}
         </button>
         {busy && (
           <button
-            onClick={cancelAll}
-            className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-2 rounded"
+            onClick={cancel}
+            className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
           >
             בטל
           </button>
         )}
       </div>
 
-      {summary && (
-        <div className="text-xs text-gray-700">
-          הועלו: {summary.uploaded} • כפולים: {summary.duplicates} • כשלו:{" "}
-          {summary.failed}
+      {errors.length > 0 && (
+        <div className="text-xs text-red-600 space-y-1">
+          {errors.map((e, i) => (
+            <div key={i}>{e}</div>
+          ))}
         </div>
       )}
 
-      {items.length > 0 && (
-        <div className="max-h-64 overflow-auto rounded border">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 sticky top-0">
+      {results && (
+        <div className="rounded-lg border border-gray-200 p-3 max-h-60 overflow-auto text-xs bg-white">
+          <div className="flex flex-wrap gap-3 mb-2">
+            <span className="px-2 py-0.5 rounded bg-green-50 text-green-700">
+              הועלו: {summary.up}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700">
+              כפולים: {summary.du}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-gray-50 text-gray-700">
+              נדחו: {summary.sk}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-red-50 text-red-700">
+              שגיאות: {summary.er}
+            </span>
+          </div>
+          <table className="w-full">
+            <thead className="sticky top-0 bg-gray-50">
               <tr>
-                <th className="text-right p-2 font-medium">קובץ</th>
+                <th className="text-right p-2 font-medium">שם קובץ</th>
                 <th className="text-right p-2 font-medium">סטטוס</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((it, idx) => (
-                <tr key={idx} className="border-t">
-                  <td className="p-2 truncate w-[500px]" title={it.key}>
-                    {it.key.replace(/^images\//, "")}
+              {results.map((r, i) => (
+                <tr key={i} className="border-t">
+                  <td className="p-2 truncate" title={r.name}>
+                    {r.name}
                   </td>
-                  <td className="p-2">
-                    {it.status === "idle" && "מוכן"}
-                    {it.status === "hashing" && "מחשב גיבוב…"}
-                    {it.status === "ready" && "✅ מוכן להעלאה"}
-                    {it.status === "duplicate" && "↩️ כפול (בשרת)"}
-                    {it.status === "uploading" && "מעלה…"}
-                    {it.status === "done" && "הועלה"}
-                    {it.status === "error" && (
+                  <td className="p-2 whitespace-nowrap">
+                    {r.status === "uploaded" && "הועלה ✅"}
+                    {r.status === "duplicate" && "כפול ♻️"}
+                    {r.status === "skipped" && "נדחה"}
+                    {r.status === "error" && (
                       <span className="text-red-600">
-                        שגיאה {it.error ? `– ${it.error}` : ""}
+                        שגיאה {r.message ? `– ${r.message}` : ""}
                       </span>
                     )}
                   </td>

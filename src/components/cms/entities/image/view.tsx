@@ -29,6 +29,8 @@ export default function ViewImages() {
     })();
   }, []);
 
+  const refresh = () => window.location.reload();
+
   const toggleImageSelection = (url: string) => {
     setSelectedImages((prev) => {
       const next = new Set(prev);
@@ -60,7 +62,7 @@ export default function ViewImages() {
 
   return (
     <div dir="rtl" lang="he" className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
-      {/* 🧭 Top toolbar */}
+      {/* Top toolbar */}
       {selectMode && (
         <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-12 p-3 rounded shadow w-full max-w-4xl">
           <span className="text-blue-800 font-semibold">
@@ -88,9 +90,9 @@ export default function ViewImages() {
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-semibold">ניהול תמונות</h1>
-        <div className="flex gap-2">
-          <UploadImage onUpload={() => window.location.reload()} />
-          <UploadFolder onUpload={() => window.location.reload()} />
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <UploadImage onUpload={refresh} />
+          <UploadFolder onUpload={refresh} />
         </div>
       </div>
 
@@ -99,7 +101,7 @@ export default function ViewImages() {
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : images.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center text-sm text-gray-600">
+        <div className="rounded-lg border p-6 text-center text-sm text-gray-600 bg-white">
           אין תמונות עדיין. העלה/י תמונה כדי להתחיל.
         </div>
       ) : (
