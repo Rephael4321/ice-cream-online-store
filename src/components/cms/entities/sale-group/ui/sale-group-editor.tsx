@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/cms/ui/button";
 import { Input } from "@/components/cms/ui/input";
 import { showToast } from "@/components/cms/ui/toast";
-import { images } from "@/data/images";
 import { Label } from "@/components/cms/ui/label";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,14 +17,14 @@ interface SaleGroupEditorProps {
   initialPrice: number | null; // regular unit price
   initialQuantity: number | null;
   initialSalePrice: number | null; // sale price per unit
-  initialImage: string | null;
+  initialImage: string | null; // full S3 URL or null
   initialCategories: { id: number; name: string }[];
 }
 
-function getDisplayName(path: string) {
-  const file = path.split("/").pop() || "";
+const baseName = (url: string) => {
+  const file = url.split("/").pop() || "";
   return file.split(".")[0];
-}
+};
 
 export function SaleGroupEditor({
   id,
@@ -35,16 +35,52 @@ export function SaleGroupEditor({
   initialImage,
   initialCategories,
 }: SaleGroupEditorProps) {
+  const router = useRouter();
+
+  // Committed fields
   const [name, setName] = useState(initialName ?? "");
-  const [image, setImage] = useState(getDisplayName(initialImage || ""));
-  const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
+  const [image, setImage] = useState<string>(initialImage ?? ""); // full S3 URL
+
+  // Image selector state
+  const [imageDraft, setImageDraft] = useState<string>(
+    initialImage ? baseName(initialImage) : ""
+  );
+  const [imageItems, setImageItems] = useState<
+    { id: number; name: string; image: string }[]
+  >([]);
+
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState(initialCategories || []);
 
-  const fullImagePath =
-    imagePathMap[image] ||
-    images.find((img) => getDisplayName(img) === image) ||
-    "";
+  // Load S3 image list
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/images");
+        if (!res.ok) throw new Error("Failed to load images");
+        const paths: string[] = await res.json();
+
+        const items = paths.map((path, idx) => ({
+          id: idx,
+          name: baseName(path),
+          image: path, // full S3 URL
+        }));
+
+        // Ensure current image (if any) appears in the list so the selector can show its name
+        if (image && !items.find((i) => i.image === image)) {
+          items.push({ id: -1, name: baseName(image), image });
+        }
+
+        setImageItems(items);
+      } catch (e) {
+        console.error("Failed to load images", e);
+        setImageItems([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fullImagePath = image || "";
 
   const handleSave = async () => {
     setLoading(true);
@@ -54,7 +90,7 @@ export function SaleGroupEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim() || null,
-          image: fullImagePath || null,
+          image: fullImagePath || null, // full S3 URL (or null)
         }),
       });
 
@@ -100,21 +136,28 @@ export function SaleGroupEditor({
         {/* Left Column */}
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
-            items={images.map((path, index) => ({
-              id: index,
-              name: getDisplayName(path),
-              image: path,
-            }))}
-            value={image}
+            items={imageItems}
+            // Use the draft so the input is typeable
+            value={imageDraft}
             onChange={(item) => {
-              setImage(item?.name || "");
-              if (item?.name && item.image) {
-                setImagePathMap((prev) => ({
-                  ...prev,
-                  [item.name]: item.image,
-                }));
+              if (!item) {
+                setImageDraft("");
+                setImage("");
+                return;
               }
+              // Free typing path (ImageSelector sends {id:"", name:"typed"})
+              // -> update only the draft
+              if (!("image" in item) || !item.image) {
+                setImageDraft(item.name);
+                return;
+              }
+              // Real selection from list -> commit URL and show its base name
+              setImage(item.image); // full S3 URL
+              setImageDraft(item.name); // visible label
+              setName((prev) => prev || item.name); // convenience: default name if empty
             }}
+            // Just echo the draft back into the input
+            getDisplayValue={(val) => val}
             disabled={loading}
           />
 

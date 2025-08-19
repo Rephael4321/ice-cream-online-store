@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useEffect, useState } from "react";
+import { Input } from "@/components/cms/ui/input";
+import { Button } from "@/components/cms/ui/button";
+import { Label } from "@/components/cms/ui/label";
 import {
   Select,
   SelectTrigger,
@@ -9,16 +11,13 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/cms/ui/select";
-import { Input } from "@/components/cms/ui/input";
-import { Button } from "@/components/cms/ui/button";
-import { Label } from "@/components/cms/ui/label";
+import Image from "next/image";
 import ImageSelector from "@/components/cms/ui/image-selector";
-import { images } from "@/data/images";
 
 type CategoryForm = {
   name: string;
   type: "collection" | "sale";
-  image: string;
+  image: string; // full S3 URL (or "")
   saleQuantity: string;
   salePrice: string;
   showInMenu: boolean;
@@ -27,7 +26,7 @@ type CategoryForm = {
 type CategoryPayload = {
   name: string;
   type: "collection" | "sale";
-  image: string;
+  image: string; // send full URL to backend
   saleQuantity?: number;
   salePrice?: number;
   show_in_menu?: boolean;
@@ -37,24 +36,49 @@ export default function NewCategory() {
   const [category, setCategory] = useState<CategoryForm>({
     name: "",
     type: "collection",
-    image: "",
+    image: "", // full URL (or empty)
     saleQuantity: "",
     salePrice: "",
     showInMenu: false,
   });
 
-  const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
+  const [imageItems, setImageItems] = useState<
+    { id: number; name: string; image: string }[]
+  >([]);
 
-  const getDisplayName = (path: string): string => {
-    const file = path.split("/").pop() || "";
-    return file.split(".")[0];
-  };
+  // NEW: text shown/typed in the selector input (filename without extension)
+  const [imageDraft, setImageDraft] = useState("");
 
-  const imageItems = images.map((img, idx) => ({
-    id: idx,
-    name: getDisplayName(img),
-    image: img,
-  }));
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/images");
+        if (!res.ok) throw new Error("failed");
+        const paths: string[] = await res.json();
+
+        const items = paths.map((path, idx) => {
+          const file = path.split("/").pop() || "";
+          const name = file.split(".")[0];
+          return { id: idx, name, image: path };
+        });
+
+        // if a prefilled URL exists, ensure it's in the list so its name can show
+        if (category.image && !items.find((i) => i.image === category.image)) {
+          const file = category.image.split("/").pop() || "";
+          const name = file.split(".")[0];
+          items.push({ id: -1, name, image: category.image });
+          // also reflect that in the draft field
+          setImageDraft(name);
+        }
+
+        setImageItems(items);
+      } catch (e) {
+        console.error("Failed to load images", e);
+        setImageItems([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -75,14 +99,7 @@ export default function NewCategory() {
     setCategory((prev) => ({ ...prev, showInMenu: !prev.showInMenu }));
   };
 
-  const clearName = () => {
-    setCategory((prev) => ({ ...prev, name: "" }));
-  };
-
-  const previewSrc =
-    imagePathMap[category.image] ||
-    images.find((img) => getDisplayName(img) === category.image) ||
-    "";
+  const previewSrc = category.image || "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,15 +117,10 @@ export default function NewCategory() {
       return;
     }
 
-    const fullImagePath =
-      imagePathMap[category.image] ||
-      images.find((img) => getDisplayName(img) === category.image) ||
-      "";
-
     const payload: CategoryPayload = {
       name: category.name,
       type: category.type,
-      image: fullImagePath,
+      image: category.image, // already a full S3 URL
     };
 
     if (category.type === "sale") {
@@ -131,7 +143,7 @@ export default function NewCategory() {
       }
 
       const data = await res.json();
-      alert("נשמר בהצלחה עם מזהה: " + data.categoryId);
+      alert("שמר בהצלחה עם מזהה: " + data.categoryId);
 
       setCategory({
         name: "",
@@ -141,6 +153,7 @@ export default function NewCategory() {
         salePrice: "",
         showInMenu: false,
       });
+      setImageDraft("");
     } catch (err) {
       console.error(err);
       alert("נכשלה שמירת הקטגוריה");
@@ -161,24 +174,28 @@ export default function NewCategory() {
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
             items={imageItems}
-            value={category.image}
+            value={imageDraft /* typeable text */}
             onChange={(item) => {
               if (!item) {
+                setImageDraft("");
                 setCategory((prev) => ({ ...prev, image: "" }));
                 return;
               }
-
+              // free typing path => selector sends { id:"", name:"typed" } without image url
+              if (!("image" in item) || !item.image) {
+                setImageDraft(item.name);
+                return;
+              }
+              // selection from list => commit the URL, show its name
               setCategory((prev) => ({
                 ...prev,
-                image: item.name,
+                image: item.image, // full S3 URL
                 name: prev.name || item.name,
               }));
-
-              setImagePathMap((prev) => ({
-                ...prev,
-                [item.name]: item.image || "",
-              }));
+              setImageDraft(item.name);
             }}
+            // display the file "name" even though the stored value is a URL
+            getDisplayValue={(val) => val}
             placeholder="ארטיקים"
             label="שם תמונה"
           />
@@ -199,7 +216,7 @@ export default function NewCategory() {
                   type="button"
                   variant="outline"
                   className="whitespace-nowrap px-2 cursor-pointer"
-                  onClick={clearName}
+                  onClick={() => setCategory((prev) => ({ ...prev, name: "" }))}
                 >
                   נקה
                 </Button>

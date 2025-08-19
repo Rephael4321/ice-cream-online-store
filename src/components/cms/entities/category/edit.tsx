@@ -5,7 +5,6 @@ import { Input } from "@/components/cms/ui/input";
 import { Label } from "@/components/cms/ui/label";
 import { Button } from "@/components/cms/ui/button";
 import ImageSelector from "@/components/cms/ui/image-selector";
-import { images } from "@/data/images";
 import Image from "next/image";
 
 type CategoryType = "collection" | "sale";
@@ -14,7 +13,7 @@ interface Category {
   id: number;
   name: string;
   type: CategoryType;
-  image: string;
+  image: string; // S3 URL
   description: string;
   parent_id: number | null;
   show_in_menu: 0 | 1;
@@ -48,26 +47,35 @@ export default function EditCategory({ id }: Props) {
   const [selectedParent, setSelectedParent] = useState<MinimalCategory | null>(
     null
   );
+  const [imageItems, setImageItems] = useState<
+    { id: number; name: string; image: string }[]
+  >([]);
+
+  // NEW: free-typing text shown in the ImageSelector input
+  const [imageDraft, setImageDraft] = useState("");
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/categories/${id}`);
-        const listRes = await fetch(`/api/categories?full=true`);
-        if (!res.ok || !listRes.ok) throw new Error("שגיאה");
+        const [res, listRes, imageRes] = await Promise.all([
+          fetch(`/api/categories/${id}`),
+          fetch(`/api/categories?full=true`),
+          fetch(`/api/images`),
+        ]);
+        if (!res.ok || !listRes.ok || !imageRes.ok) throw new Error("שגיאה");
 
         const data: { category: Category } = await res.json();
         const all: { categories: Category[] } = await listRes.json();
+        const imagePaths: string[] = await imageRes.json();
 
-        const parsedCategory = {
+        const parsedCategory: Category = {
           ...data.category,
           description: data.category.description || "",
           saleQuantity: data.category.saleQuantity?.toString() ?? "",
           salePrice: data.category.salePrice?.toString() ?? "",
         };
 
-        setCategory(parsedCategory);
-
+        // Parent categories
         const filtered = all.categories.filter((c) => c.id !== Number(id));
         setParentCategories(filtered);
         const parent = filtered.find((c) => c.id === data.category.parent_id);
@@ -78,6 +86,31 @@ export default function EditCategory({ id }: Props) {
             image: parent.image,
           });
         }
+
+        // Build S3 list
+        const transformed = imagePaths.map((path, index) => {
+          const file = path.split("/").pop() || "";
+          const name = file.split(".")[0];
+          return { id: index, name, image: path };
+        });
+
+        // Ensure current image is present for display
+        const existingItem = transformed.find(
+          (img) => img.image === data.category.image
+        );
+        if (!existingItem && data.category.image) {
+          const file = data.category.image.split("/").pop() || "";
+          const name = file.split(".")[0];
+          transformed.push({ id: -1, name, image: data.category.image });
+        }
+        setImageItems(transformed);
+
+        // Initialize draft with filename (not URL) so the input is typeable/readable
+        const file = (parsedCategory.image || "").split("/").pop() || "";
+        const nameOnly = file ? file.split(".")[0] : "";
+        setImageDraft(nameOnly);
+
+        setCategory(parsedCategory);
       } catch {
         alert("שגיאה בטעינת הקטגוריה");
       } finally {
@@ -114,7 +147,7 @@ export default function EditCategory({ id }: Props) {
     const payload: UpdateCategoryPayload = {
       name: sanitizedName,
       type: category.type,
-      image: category.image,
+      image: category.image, // already a full S3 URL
       description: category.description,
       parent_id: selectedParent?.id || null,
       show_in_menu: category.show_in_menu,
@@ -149,10 +182,7 @@ export default function EditCategory({ id }: Props) {
     if (!confirm("האם אתה בטוח שברצונך למחוק את הקטגוריה?")) return;
 
     try {
-      const res = await fetch(`/api/categories/${id}`, {
-        method: "DELETE",
-      });
-
+      const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("שגיאה במחיקת קטגוריה");
 
       alert("הקטגוריה נמחקה בהצלחה");
@@ -167,19 +197,6 @@ export default function EditCategory({ id }: Props) {
   if (!category)
     return <div className="p-4 text-red-600">לא נמצאה קטגוריה</div>;
 
-  const getDisplayName = (path: string): string => {
-    const file = path.split("/").pop() || "";
-    return file.split(".")[0];
-  };
-
-  const imageItems = images.map((path, index) => ({
-    id: index,
-    name: getDisplayName(path),
-    image: path,
-  }));
-
-  const previewSrc = category.image;
-
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
       <h1 className="text-xl sm:text-2xl font-bold text-center mb-6">
@@ -190,19 +207,26 @@ export default function EditCategory({ id }: Props) {
         onSubmit={handleSubmit}
         className="flex flex-col md:flex-row gap-6 items-start"
       >
-        {/* טופס */}
         <div className="w-full md:w-1/2 space-y-4">
+          {/* Image from S3 with free-typing field */}
           <ImageSelector
             items={imageItems}
-            value={category.image}
+            value={imageDraft} // show and allow typing the filename
             onChange={(item) => {
+              if (!item) {
+                setImageDraft("");
+                return;
+              }
+              // typing path: selector sends { id:"", name:"typed" } (no image url)
+              if (!("image" in item) || !item.image) {
+                setImageDraft(item.name);
+                return;
+              }
+              // selection path: commit S3 URL to model and show its name
               setCategory((prev) =>
-                prev ? { ...prev, image: item?.image || "" } : prev
+                prev ? { ...prev, image: item.image } : prev
               );
-            }}
-            getDisplayValue={(val) => {
-              const found = imageItems.find((i) => i.image === val);
-              return found?.name || "";
+              setImageDraft(item.name);
             }}
             placeholder="בחר תמונה"
             label="תמונה"
@@ -263,6 +287,7 @@ export default function EditCategory({ id }: Props) {
             </div>
           )}
 
+          {/* Parent category selector (unchanged logic) */}
           <ImageSelector
             items={parentCategories.map((cat) => ({
               id: cat.id,
@@ -300,9 +325,9 @@ export default function EditCategory({ id }: Props) {
         </div>
 
         <div className="w-full md:w-1/2">
-          {previewSrc && (
+          {category.image && (
             <Image
-              src={previewSrc}
+              src={category.image}
               alt="תצוגה מקדימה"
               width={500}
               height={500}

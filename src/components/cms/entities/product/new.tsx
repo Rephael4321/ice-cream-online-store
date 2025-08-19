@@ -4,81 +4,122 @@ import { useEffect, useState } from "react";
 import { Input } from "../../ui/input";
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
-import { images } from "@/data/images";
 import { showToast } from "../../ui/toast";
+import { useSearchParams, useRouter } from "next/navigation";
 import ImageSelector from "../../ui/image-selector";
 import Image from "next/image";
-import { useSearchParams, useRouter } from "next/navigation";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 import CategorySelector from "@/components/cms/entities/product/ui/category";
 
 type ProductForm = {
   name: string;
   price: string;
-  image: string;
+  image: string; // full S3 URL (or "")
   saleQuantity: string;
   salePrice: string;
-  storageAreaId?: number | null; // new
-  categories: number[]; // new
+  storageAreaId?: number | null;
+  categories: number[];
 };
 
 type ProductPayload = {
   name: string;
   price: number;
-  image: string;
+  image: string; // full S3 URL
   saleQuantity?: number;
   salePrice?: number;
 };
 
 export default function NewProduct() {
   const searchParams = useSearchParams();
-  const prefillImage = searchParams.get("image"); // 👈 get ?image param
-  const router = useRouter(); // 👈 router for navigation
+  const prefillImage = searchParams.get("image"); // optional prefill ?image=<S3 URL>
+  const router = useRouter();
 
   const [product, setProduct] = useState<ProductForm>({
     name: "",
     price: "",
-    image: "",
+    image: "", // store the S3 URL here
     saleQuantity: "",
     salePrice: "",
     storageAreaId: null,
     categories: [],
   });
 
-  const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
+  // the text shown/typed in the selector input (basename without extension)
+  const [imageDraft, setImageDraft] = useState("");
+
+  // S3 images for the selector
+  const [imageItems, setImageItems] = useState<
+    { id: number; name: string; image: string }[]
+  >([]);
+
+  // URLs of images already used by other products (to disable them)
   const [usedImages, setUsedImages] = useState<Set<string>>(new Set());
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // helper to derive display name from URL
+  const fileBase = (url: string) => {
+    const file = url.split("/").pop() || "";
+    return file.split(".")[0];
+  };
+
+  // Prefill from query param (URL)
   useEffect(() => {
     if (prefillImage) {
-      const file = prefillImage.split("/").pop() || "";
-      const displayName = file.split(".")[0];
-
+      const displayName = fileBase(prefillImage);
       setProduct((prev) => ({
         ...prev,
-        image: displayName,
-        name: displayName, // also set as default name
+        image: prefillImage, // commit URL
+        name: prev.name || displayName,
       }));
-
-      setImagePathMap((prev) => ({
-        ...prev,
-        [displayName]: prefillImage,
-      }));
+      setImageDraft(displayName); // show human-readable
     }
   }, [prefillImage]);
 
-  // fetch used images
+  // Load already-used image URLs (to disable them)
   useEffect(() => {
     fetch("/api/products")
       .then((res) => res.json())
       .then((data) => {
         const paths = new Set<string>();
-        data.products.forEach((p: { image: string }) => {
+        (data.products || []).forEach((p: { image?: string }) => {
           if (p.image) paths.add(p.image);
         });
         setUsedImages(paths);
       })
       .catch((err) => console.error("Failed to fetch products", err));
+  }, []);
+
+  // Load S3 images
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/images");
+        if (!res.ok) throw new Error("Failed to load images");
+        const paths: string[] = await res.json();
+
+        const items = paths.map((path, idx) => ({
+          id: idx,
+          name: fileBase(path),
+          image: path, // full URL
+        }));
+
+        // ensure prefilled image (if any) is part of the list so the selector can resolve its name
+        if (product.image && !items.find((i) => i.image === product.image)) {
+          items.push({
+            id: -1,
+            name: fileBase(product.image),
+            image: product.image,
+          });
+        }
+
+        setImageItems(items);
+      } catch (e) {
+        console.error(e);
+        setImageItems([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,43 +131,40 @@ export default function NewProduct() {
     setProduct((prev) => ({ ...prev, name: "" }));
   };
 
-  const getDisplayName = (path: string): string => {
-    const file = path.split("/").pop() || "";
-    return file.split(".")[0];
-  };
-
-  const imageItems = images
-    .map((path, index) => ({
-      id: index,
-      name: getDisplayName(path),
-      image: path,
-      disabled: usedImages.has(path),
-    }))
-    .sort((a, b) => Number(a.disabled) - Number(b.disabled));
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const fullImagePath =
-      imagePathMap[product.image] ||
-      images.find((img) => getDisplayName(img) === product.image) ||
-      "";
+    if (!product.name.trim()) {
+      showToast("נא להזין שם מוצר", "error");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!product.image) {
+      showToast("נא לבחור תמונה (מספרייה)", "error");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!product.price || isNaN(Number(product.price))) {
+      showToast("נא להזין מחיר חוקי", "error");
+      setIsSubmitting(false);
+      return;
+    }
 
     const payload: ProductPayload = {
       name: product.name,
       price: Number(product.price),
-      image: fullImagePath,
+      image: product.image, // already a full S3 URL
     };
 
     const quantity = Number(product.saleQuantity);
     const sale = Number(product.salePrice);
-
-    if (!isNaN(quantity)) payload.saleQuantity = quantity;
-    if (!isNaN(sale)) payload.salePrice = sale;
+    if (!isNaN(quantity) && product.saleQuantity !== "")
+      payload.saleQuantity = quantity;
+    if (!isNaN(sale) && product.salePrice !== "") payload.salePrice = sale;
 
     try {
-      // 1. Create product
+      // 1) Create
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +172,7 @@ export default function NewProduct() {
       });
 
       if (!response.ok) {
-        const errorRes = await response.json();
+        const errorRes = await response.json().catch(() => ({}));
         throw new Error(errorRes.error || "Unknown error");
       }
 
@@ -142,7 +180,7 @@ export default function NewProduct() {
       const productId = result.productId;
       showToast(`✔ נשמר בהצלחה (מזהה: ${productId})`);
 
-      // 2. Assign storage area if chosen
+      // 2) Assign storage area
       if (product.storageAreaId) {
         await fetch("/api/storage/assign", {
           method: "POST",
@@ -154,7 +192,7 @@ export default function NewProduct() {
         });
       }
 
-      // 3. Assign categories if chosen
+      // 3) Assign categories
       if (product.categories.length > 0) {
         for (const categoryId of product.categories) {
           await fetch("/api/product-category", {
@@ -169,7 +207,7 @@ export default function NewProduct() {
         }
       }
 
-      // Reset form
+      // Reset
       setProduct({
         name: "",
         price: "",
@@ -179,6 +217,7 @@ export default function NewProduct() {
         storageAreaId: null,
         categories: [],
       });
+      setImageDraft("");
     } catch (err: any) {
       console.error(err);
       showToast(`❌ שגיאה: ${err.message}`, "error");
@@ -187,14 +226,11 @@ export default function NewProduct() {
     }
   };
 
-  const previewSrc =
-    imagePathMap[product.image] ||
-    images.find((img) => getDisplayName(img) === product.image) ||
-    "";
+  const previewSrc = product.image || "";
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
-      {/* Go back button */}
+      {/* Back */}
       <div className="mb-4">
         <Button
           type="button"
@@ -216,22 +252,38 @@ export default function NewProduct() {
       >
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
-            items={imageItems}
-            value={product.image}
+            // Disable images that are already used (by URL)
+            items={imageItems
+              .map((i) => ({ ...i, disabled: usedImages.has(i.image) }))
+              .sort((a, b) => Number(!!a.disabled) - Number(!!b.disabled))}
+            // Use the DRAFT as the controlled text so you can type freely
+            value={imageDraft}
             onChange={(item) => {
-              if (!item || item.disabled) return;
-
+              if (!item) {
+                setImageDraft("");
+                setProduct((prev) => ({ ...prev, image: "" }));
+                return;
+              }
+              // Free typing path: ImageSelector sends { id:"", name:"typed" } with no image
+              if (!("image" in item) || !item.image) {
+                setImageDraft(item.name);
+                // do NOT change product.image until user selects a real item
+                return;
+              }
+              // Item selected from list → commit URL and show its basename
+              if (item.disabled) return; // respect disabled
               setProduct((prev) => ({
                 ...prev,
-                image: item.name,
-                name: item.name,
+                image: item.image, // full S3 URL
+                name: prev.name || item.name, // optional UX: default name from image
               }));
-
-              setImagePathMap((prev) => ({
-                ...prev,
-                [item.name]: item.image || "",
-              }));
+              setImageDraft(item.name);
             }}
+            // we already control the text via imageDraft, so just return it
+            getDisplayValue={(val) => val}
+            placeholder="שם תמונה (ניתן להקליד או לבחור מהרשימה)"
+            label="תמונה"
+            disabled={isSubmitting}
           />
 
           <div>

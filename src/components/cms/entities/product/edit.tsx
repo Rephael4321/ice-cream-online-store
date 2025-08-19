@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { Label } from "@/components/cms/ui/label";
-import { images } from "@/data/images";
 import Image from "next/image";
 import ImageSelector from "@/components/cms/ui/image-selector";
 import Category from "@/components/cms/entities/product/ui/category";
@@ -15,7 +14,7 @@ interface ProductDetail {
   id: string;
   name: string;
   price: string | number;
-  image?: string;
+  image?: string; // full S3 URL or ""
   saleQuantity?: string | number;
   salePrice?: string | number;
   inStock: boolean;
@@ -59,41 +58,71 @@ export default function EditProduct({ params }: ParamsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [imagePathMap, setImagePathMap] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     []
   );
-  // NEW: modal + busy state
   const [conflict, setConflict] = useState<ConflictState>(null);
   const [modalBusy, setModalBusy] = useState(false);
 
+  // S3 images for selector
+  const [imageItems, setImageItems] = useState<
+    { id: number; name: string; image: string }[]
+  >([]);
+
+  // NEW: free-typing input text for the image selector
+  const [imageDraft, setImageDraft] = useState("");
+
   useEffect(() => {
-    async function fetchProduct() {
+    async function fetchAll() {
       try {
         const { id } = await params;
+
+        // 1) product
         const res = await fetch(`/api/products/${id}`);
         if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצר");
         const data = await res.json();
         const loaded = data.product ?? data;
 
-        const displayName = getDisplayName(loaded.image || "");
-
         setProduct({
           id: loaded.id,
           name: loaded.name,
           price: loaded.price,
-          image: displayName,
+          image: loaded.image || "", // store full S3 URL
           saleQuantity: loaded.sale?.quantity ?? "",
           salePrice: loaded.sale?.price ?? "",
           inStock: loaded.in_stock,
           storage_area_id: loaded.storage_area_id ?? null,
         });
 
-        setImagePathMap({ [displayName]: loaded.image });
+        // Initialize the draft so the input shows the filename (not URL)
+        const currentUrl = loaded.image || "";
+        const currentFile = currentUrl.split("/").pop() || "";
+        const currentName = currentFile ? currentFile.split(".")[0] : "";
+        setImageDraft(currentName);
 
+        // 2) product categories
         const catRes = await fetch(`/api/products/${loaded.id}/categories`);
         const catData = await catRes.json();
         setCategories(catData.categories || []);
+
+        // 3) S3 image list
+        const imageRes = await fetch("/api/images");
+        const paths: string[] = imageRes.ok ? await imageRes.json() : [];
+
+        const items = paths.map((path, idx) => {
+          const file = path.split("/").pop() || "";
+          const name = file.split(".")[0];
+          return { id: idx, name, image: path };
+        });
+
+        // ensure current product image is in the list so the selector can show its name
+        if (loaded.image && !items.find((i) => i.image === loaded.image)) {
+          const file = loaded.image.split("/").pop() || "";
+          const name = file.split(".")[0];
+          items.push({ id: -1, name, image: loaded.image });
+        }
+
+        setImageItems(items);
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -101,13 +130,8 @@ export default function EditProduct({ params }: ParamsProps) {
       }
     }
 
-    fetchProduct();
+    fetchAll();
   }, [params]);
-
-  const getDisplayName = (path: string) => {
-    const file = path.split("/").pop() || "";
-    return file.split(".")[0];
-  };
 
   const handleToggleStock = async () => {
     if (!product) return;
@@ -134,30 +158,21 @@ export default function EditProduct({ params }: ParamsProps) {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!product) return;
-    const { name, value } = e.target;
-    setProduct({ ...product, [name]: value });
-  };
-
-  // --- helpers to compute payload (+ normalized numbers) ---
+  // --- compute payload (+ normalize numbers) ---
   function computeUpdatePayload(p: ProductDetail): {
     payload: ProductUpdatePayload;
     nextPrice: number;
     nextSaleQty: number | null;
     nextSalePrice: number | null;
   } {
-    const fullImagePath =
-      imagePathMap[p.image || ""] ||
-      images.find((img) => getDisplayName(img) === (p.image || "")) ||
-      "";
-
+    const fullImagePath = p.image || "";
     const priceNum = Number(p.price);
 
     const quantity = Number(p.saleQuantity);
     const sale = Number(p.salePrice);
-    const isQuantityEmpty = p.saleQuantity === "";
-    const isSalePriceEmpty = p.salePrice === "";
+    const isQuantityEmpty =
+      p.saleQuantity === "" || p.saleQuantity === undefined;
+    const isSalePriceEmpty = p.salePrice === "" || p.salePrice === undefined;
 
     const isValidQuantity =
       !isQuantityEmpty &&
@@ -170,7 +185,7 @@ export default function EditProduct({ params }: ParamsProps) {
     const payload: ProductUpdatePayload = {
       name: p.name,
       price: priceNum,
-      image: fullImagePath || null,
+      image: fullImagePath || null, // already URL
     };
 
     let nextSaleQty: number | null | undefined = undefined;
@@ -190,12 +205,11 @@ export default function EditProduct({ params }: ParamsProps) {
       (isValidQuantity && isSalePriceEmpty) ||
       (isValidSalePrice && isQuantityEmpty)
     ) {
-      // ignore inconsistent half-filled sale (keep existing in DB)
-      // don't attach sale fields to payload
+      // half-filled -> don't touch existing DB sale
       nextSaleQty = undefined;
       nextSalePrice = undefined;
     } else {
-      // invalid -> reset UI + clear sale
+      // invalid -> clear
       setProduct((prev) =>
         prev ? { ...prev, saleQuantity: "", salePrice: "" } : prev
       );
@@ -208,7 +222,7 @@ export default function EditProduct({ params }: ParamsProps) {
     return {
       payload,
       nextPrice: priceNum,
-      nextSaleQty: nextSaleQty ?? null, // normalize undefined→null for validate/propagate
+      nextSaleQty: nextSaleQty ?? null,
       nextSalePrice: nextSalePrice ?? null,
     };
   }
@@ -225,7 +239,6 @@ export default function EditProduct({ params }: ParamsProps) {
     if (!res.ok) throw new Error("ארעה תקלה בשמירת מוצר");
   }
 
-  // --- NEW: main save flow with validate + modal ---
   const handleSave = async () => {
     if (!product) return;
 
@@ -240,7 +253,6 @@ export default function EditProduct({ params }: ParamsProps) {
 
     setSaving(true);
     try {
-      // 1) ask backend if change conflicts with a sale group lock
       const vRes = await fetch(`/api/products/${id}/price-change/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -255,13 +267,11 @@ export default function EditProduct({ params }: ParamsProps) {
       const v = await vRes.json();
 
       if (!v.inGroup || !v.conflicts?.any) {
-        // No conflict → proceed normally
         await saveNormally(id, payload);
         alert("מוצר נשמר!");
         return;
       }
 
-      // Conflict → open modal
       setConflict({
         group: v.group,
         items: v.items,
@@ -277,7 +287,7 @@ export default function EditProduct({ params }: ParamsProps) {
     }
   };
 
-  // --- modal actions ---
+  // modal actions
   async function doDetach() {
     if (!product || !conflict) return;
     setModalBusy(true);
@@ -326,10 +336,7 @@ export default function EditProduct({ params }: ParamsProps) {
     }
   }
 
-  const previewSrc =
-    imagePathMap[product?.image || ""] ||
-    images.find((img) => getDisplayName(img) === (product?.image || "")) ||
-    "";
+  const previewSrc = product?.image || "";
 
   if (loading) return <p>טוען מוצר...</p>;
   if (error) return <p>שגיאה: {error}</p>;
@@ -356,22 +363,23 @@ export default function EditProduct({ params }: ParamsProps) {
 
         <div className="w-full md:w-1/2 space-y-4">
           <ImageSelector
-            items={images.map((path, index) => ({
-              id: index,
-              name: getDisplayName(path),
-              image: path,
-            }))}
-            value={product.image || ""}
+            items={imageItems}
+            value={imageDraft} // use free-typing draft
             onChange={(item) => {
-              setProduct((prev) =>
-                prev ? { ...prev, image: item?.name || "" } : prev
-              );
-              if (item?.name && item.image) {
-                setImagePathMap((prev) => ({
-                  ...prev,
-                  [item.name]: item.image,
-                }));
+              if (!item) {
+                setImageDraft("");
+                return;
               }
+              // When typing: ImageSelector passes { id:"", name:"typed" }
+              if (!("image" in item) || !item.image) {
+                setImageDraft(item.name);
+                return;
+              }
+              // When selecting a real item: commit the URL and show its name
+              setProduct((prev) =>
+                prev ? { ...prev, image: item.image } : prev
+              );
+              setImageDraft(item.name);
             }}
             disabled={saving}
           />
@@ -395,7 +403,11 @@ export default function EditProduct({ params }: ParamsProps) {
               id="name"
               name="name"
               value={product.name}
-              onChange={handleChange}
+              onChange={(e) =>
+                setProduct((prev) =>
+                  prev ? { ...prev, name: e.target.value } : prev
+                )
+              }
               placeholder="שם מוצר"
               required
               disabled={saving}
@@ -411,7 +423,11 @@ export default function EditProduct({ params }: ParamsProps) {
               step="0.01"
               min="0"
               value={product.price}
-              onChange={handleChange}
+              onChange={(e) =>
+                setProduct((prev) =>
+                  prev ? { ...prev, price: e.target.value } : prev
+                )
+              }
               placeholder="0.00"
               required
               disabled={saving}
@@ -428,7 +444,11 @@ export default function EditProduct({ params }: ParamsProps) {
                 step="1"
                 placeholder="כמות"
                 value={product.saleQuantity || ""}
-                onChange={handleChange}
+                onChange={(e) =>
+                  setProduct((prev) =>
+                    prev ? { ...prev, saleQuantity: e.target.value } : prev
+                  )
+                }
                 className="w-1/2"
                 disabled={saving}
               />
@@ -440,7 +460,11 @@ export default function EditProduct({ params }: ParamsProps) {
                 step="0.01"
                 placeholder="מחיר"
                 value={product.salePrice || ""}
-                onChange={handleChange}
+                onChange={(e) =>
+                  setProduct((prev) =>
+                    prev ? { ...prev, salePrice: e.target.value } : prev
+                  )
+                }
                 className="w-1/2"
                 disabled={saving}
               />

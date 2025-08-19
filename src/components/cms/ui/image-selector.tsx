@@ -19,7 +19,7 @@ interface ImageSelectorProps<T extends BaseItem> {
   label?: string;
   placeholder?: string;
   disabled?: boolean;
-  getDisplayValue?: (value: string) => string; // NEW: to display name instead of raw value
+  getDisplayValue?: (value: string) => string;
 }
 
 export default function ImageSelector<T extends BaseItem>({
