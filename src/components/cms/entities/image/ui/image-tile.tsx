@@ -2,18 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-
-function getKeyParts(imageUrl: string) {
-  const key = decodeURIComponent(new URL(imageUrl).pathname.slice(1));
-  const name = key.split("/").pop() || "";
-  const dot = name.lastIndexOf(".");
-  const base = dot >= 0 ? name.slice(0, dot) : name;
-  const ext = dot >= 0 ? name.slice(dot + 1) : "";
-  return { key, name, base, ext };
-}
+import type { ImageItem } from "./image-grid";
 
 export default function ImageTile({
-  url,
+  item,
   open,
   onToggle,
   onRequestClose,
@@ -23,7 +15,7 @@ export default function ImageTile({
   onToggleSelect,
   onEnterSelectMode,
 }: {
-  url: string;
+  item: ImageItem;
   open: boolean;
   onToggle: () => void;
   onRequestClose: () => void;
@@ -33,6 +25,8 @@ export default function ImageTile({
   onToggleSelect?: () => void;
   onEnterSelectMode?: () => void;
 }) {
+  const { url, key, name } = item;
+
   const rootRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -50,16 +44,16 @@ export default function ImageTile({
     if (!selectMode && onEnterSelectMode)
       touchRef.current = setTimeout(onEnterSelectMode, 600);
   };
-
   const cancelTouch = () => {
     if (touchRef.current) clearTimeout(touchRef.current);
   };
 
-  const { key, name, base } = getKeyParts(url);
+  // Use display name from index; strip extension for rename prompt default
+  const displayBase = name.replace(/\.[^/.]+$/, "");
 
   const handleRename = async () => {
-    const nextName = window.prompt("הכנס/י שם חדש (ללא סיומת):", base);
-    if (!nextName || nextName.trim() === base) return;
+    const nextName = window.prompt("הכנס/י שם חדש (ללא סיומת):", displayBase);
+    if (!nextName || nextName.trim() === displayBase) return;
     try {
       onFreeze("מבצע שינוי שם…");
       const res = await fetch("/api/images/rename", {
@@ -159,7 +153,7 @@ export default function ImageTile({
         <div className="aspect-[1/1] w-full">
           <Image
             src={url}
-            alt="תמונה שהועלתה"
+            alt={name || "תמונה שהועלתה"}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
             className="object-contain pointer-events-none"
@@ -221,7 +215,7 @@ export default function ImageTile({
         </div>
       </div>
 
-      {/* Filename */}
+      {/* Display name from index */}
       <button
         type="button"
         onClick={handleCopy}

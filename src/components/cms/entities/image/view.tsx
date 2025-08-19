@@ -5,13 +5,16 @@ import UploadImage from "./upload";
 import UploadFolder from "./upload-folder";
 import ImageGrid from "./ui/image-grid";
 
+type ImageItem = { url: string; key: string; name: string };
+
 export default function ViewImages() {
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [freezeMsg, setFreezeMsg] = useState<string | null>(null);
 
   const [selectMode, setSelectMode] = useState(false);
+  // selection stays by URL (stable & used by delete endpoint)
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export default function ViewImages() {
       if (res.ok) deleted.push(url);
     }
 
-    setImages((prev) => prev.filter((img) => !deleted.includes(img)));
+    setImages((prev) => prev.filter((img) => !deleted.includes(img.url)));
     setSelectedImages(new Set());
     setSelectMode(false);
     setFreezeMsg(null);
@@ -62,7 +65,6 @@ export default function ViewImages() {
 
   return (
     <div dir="rtl" lang="he" className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
-      {/* Top toolbar */}
       {selectMode && (
         <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-12 p-3 rounded shadow w-full max-w-4xl">
           <span className="text-blue-800 font-semibold">
