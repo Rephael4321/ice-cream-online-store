@@ -1,13 +1,28 @@
+// src/app/api/sale-groups/[id]/items/[productId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
 
+// Works whether params is sync or a Promise (Next 15 dynamic)
+async function resolveParams<T>(p: T | Promise<T>): Promise<T> {
+  return await Promise.resolve(p);
+}
+
+function eqMoney(a: number, b: number) {
+  return Number(Number(a).toFixed(2)) === Number(Number(b).toFixed(2));
+}
+
 async function addProductToSaleGroup(
-  req: NextRequest,
-  context: { params: { id: string; productId: string } }
+  _req: NextRequest,
+  context:
+    | { params: { id: string; productId: string } }
+    | { params: Promise<{ id: string; productId: string }> }
 ) {
-  const groupId = Number(context.params.id);
-  const productId = Number(context.params.productId);
+  const { id: idStr, productId: productIdStr } = await resolveParams(
+    (context as any).params
+  );
+  const groupId = Number(idStr);
+  const productId = Number(productIdStr);
 
   if (isNaN(groupId) || isNaN(productId)) {
     return NextResponse.json(
@@ -16,76 +31,72 @@ async function addProductToSaleGroup(
     );
   }
 
-  const { label, color } = await req.json();
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
 
+    // Fetch group base (may be nulls if empty)
     const groupRes = await client.query(
       `SELECT quantity, sale_price, price FROM sale_groups WHERE id = $1`,
       [groupId]
     );
-    const group = groupRes.rows[0];
+    const group = groupRes.rows[0] ?? {};
 
-    const productPriceRes = await client.query<{ price: number }>(
+    // Product unit price
+    const prodPriceRes = await client.query<{ price: number }>(
       `SELECT price FROM products WHERE id = $1`,
       [productId]
     );
-    const productBasePrice = productPriceRes.rows[0]?.price;
+    if (prodPriceRes.rowCount === 0) {
+      throw new Error(`Product not found: ${productId}`);
+    }
+    const productBasePrice = Number(prodPriceRes.rows[0].price);
 
-    const productRes = await client.query(
-      `SELECT quantity AS sale_quantity, sale_price
-       FROM sales
-       WHERE product_id = $1`,
+    // Product sale data
+    const saleRes = await client.query(
+      `SELECT quantity, sale_price FROM sales WHERE product_id = $1`,
       [productId]
     );
-    const product = productRes.rows[0];
-
-    if (!product || productBasePrice == null) {
-      throw new Error("Sale or price info not found for product");
+    if (saleRes.rowCount === 0) {
+      throw new Error(`Sale not defined for product: ${productId}`);
     }
+    const productSaleQty = Number(saleRes.rows[0].quantity);
+    const productSalePrice = Number(saleRes.rows[0].sale_price);
 
-    const { sale_quantity, sale_price } = product;
+    const hasBase =
+      group?.price != null &&
+      group?.sale_price != null &&
+      group?.quantity != null;
 
-    if (
-      group?.sale_price == null ||
-      group?.quantity == null ||
-      group?.price == null
-    ) {
+    if (!hasBase) {
+      // First product sets the base
       await client.query(
         `UPDATE sale_groups
-         SET quantity = $1, sale_price = $2, price = $3
+         SET quantity = $1, sale_price = $2, price = $3, updated_at = now()
          WHERE id = $4`,
-        [sale_quantity, sale_price, productBasePrice, groupId]
+        [productSaleQty, productSalePrice, productBasePrice, groupId]
       );
     } else {
-      const groupQuantity = Number(group.quantity);
+      // Enforce exact match with existing base (price, sale_price, quantity)
+      const groupQty = Number(group.quantity);
       const groupSalePrice = Number(group.sale_price);
       const groupBasePrice = Number(group.price);
 
-      const saleMatches =
-        groupQuantity === Number(sale_quantity) &&
-        Number(groupSalePrice.toFixed(2)) ===
-          Number(Number(sale_price).toFixed(2));
+      const qtyOk = groupQty === productSaleQty;
+      const saleOk = eqMoney(groupSalePrice, productSalePrice);
+      const priceOk = eqMoney(groupBasePrice, productBasePrice);
 
-      const unitPriceMatches =
-        Number(groupBasePrice.toFixed(2)) ===
-        Number(Number(productBasePrice).toFixed(2));
-
-      if (!saleMatches && !unitPriceMatches) {
-        throw new Error(
-          "❌ המחיר או פרטי המבצע של המוצר אינם תואמים את הקבוצה"
-        );
+      if (!(qtyOk && saleOk && priceOk)) {
+        throw new Error("Product does not match group pricing");
       }
     }
 
+    // Link product (ignore label/color; keep columns in DB untouched)
     await client.query(
-      `INSERT INTO product_sale_groups (product_id, sale_group_id, label, color)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (product_id, sale_group_id)
-       DO UPDATE SET label = EXCLUDED.label, color = EXCLUDED.color`,
-      [productId, groupId, label || null, color || null]
+      `INSERT INTO product_sale_groups (product_id, sale_group_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [productId, groupId]
     );
 
     await client.query("COMMIT");
@@ -93,7 +104,7 @@ async function addProductToSaleGroup(
   } catch (error: any) {
     await client.query("ROLLBACK");
     return NextResponse.json(
-      { error: error.message || "Failed to add product to sale group" },
+      { error: error?.message ?? "Failed to add product to sale group" },
       { status: 500 }
     );
   } finally {
@@ -103,10 +114,15 @@ async function addProductToSaleGroup(
 
 async function removeProductFromSaleGroup(
   _req: NextRequest,
-  context: { params: { id: string; productId: string } }
+  context:
+    | { params: { id: string; productId: string } }
+    | { params: Promise<{ id: string; productId: string }> }
 ) {
-  const groupId = Number(context.params.id);
-  const productId = Number(context.params.productId);
+  const { id: idStr, productId: productIdStr } = await resolveParams(
+    (context as any).params
+  );
+  const groupId = Number(idStr);
+  const productId = Number(productIdStr);
 
   if (isNaN(groupId) || isNaN(productId)) {
     return NextResponse.json(
@@ -116,7 +132,6 @@ async function removeProductFromSaleGroup(
   }
 
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
 
@@ -126,19 +141,17 @@ async function removeProductFromSaleGroup(
       [groupId, productId]
     );
 
+    // If last product removed → reset base (keeps your previous behavior)
     const remaining = await client.query<{ count: string }>(
       `SELECT COUNT(*)::int AS count
        FROM product_sale_groups
        WHERE sale_group_id = $1`,
       [groupId]
     );
-
-    const remainingCount = Number(remaining.rows[0]?.count ?? 0);
-
-    if (remainingCount === 0) {
+    if (Number(remaining.rows[0]?.count ?? 0) === 0) {
       await client.query(
         `UPDATE sale_groups
-         SET quantity = NULL, sale_price = NULL, price = NULL
+         SET quantity = NULL, sale_price = NULL, price = NULL, updated_at = now()
          WHERE id = $1`,
         [groupId]
       );

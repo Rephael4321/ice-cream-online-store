@@ -11,15 +11,19 @@ type SaleGroup = {
   price: number | null;
   created_at: string;
   updated_at: string;
-  categories: { id: number; name: string }[];
+  categories?: { id: number; name: string }[];
 };
+
+async function resolveParams<T>(p: T | Promise<T>): Promise<T> {
+  return await Promise.resolve(p);
+}
 
 async function getSaleGroup(
   _req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: { id: string } } | { params: Promise<{ id: string }> }
 ) {
-  const id = Number(context.params.id);
-
+  const { id: idStr } = await resolveParams((context as any).params);
+  const id = Number(idStr);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
@@ -27,21 +31,18 @@ async function getSaleGroup(
   try {
     const groupResult = await pool.query<SaleGroup>(
       `
-      SELECT 
-        id, name, image, quantity, sale_price, price, created_at, updated_at
+      SELECT id, name, image, quantity, sale_price, price, created_at, updated_at
       FROM sale_groups
       WHERE id = $1
       `,
       [id]
     );
-
     if (groupResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Sale group not found" },
         { status: 404 }
       );
     }
-
     const group = groupResult.rows[0];
 
     const categoryResult = await pool.query(
@@ -54,9 +55,7 @@ async function getSaleGroup(
       [id]
     );
 
-    const categories = categoryResult.rows;
-
-    return NextResponse.json({ ...group, categories });
+    return NextResponse.json({ ...group, categories: categoryResult.rows });
   } catch (error) {
     console.error("❌ Failed to get sale group:", error);
     return NextResponse.json(
@@ -68,22 +67,30 @@ async function getSaleGroup(
 
 async function updateSaleGroup(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: { id: string } } | { params: Promise<{ id: string }> }
 ) {
-  const id = Number(context.params.id);
-
+  const { id: idStr } = await resolveParams((context as any).params);
+  const id = Number(idStr);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
   try {
-    const body = await req.json();
-    const { name, image } = body;
+    const body = await (async () => {
+      try {
+        return await req.json();
+      } catch {
+        return {};
+      }
+    })();
+    const { name, image } = body as {
+      name?: string | null;
+      image?: string | null;
+    };
 
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-
       const result = await client.query<SaleGroup>(
         `
         UPDATE sale_groups
@@ -93,7 +100,6 @@ async function updateSaleGroup(
         `,
         [name ?? null, image ?? null, id]
       );
-
       if (result.rows.length === 0) {
         await client.query("ROLLBACK");
         return NextResponse.json(
@@ -101,7 +107,6 @@ async function updateSaleGroup(
           { status: 404 }
         );
       }
-
       await client.query("COMMIT");
       return NextResponse.json(result.rows[0]);
     } catch (error) {
@@ -121,10 +126,10 @@ async function updateSaleGroup(
 
 async function deleteSaleGroup(
   _req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: { id: string } } | { params: Promise<{ id: string }> }
 ) {
-  const id = Number(context.params.id);
-
+  const { id: idStr } = await resolveParams((context as any).params);
+  const id = Number(idStr);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }

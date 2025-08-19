@@ -11,9 +11,7 @@ type Product = {
   price: number;
   image: string;
   sale: { quantity: number; sale_price: number } | null;
-  label?: string;
-  color?: string;
-  alreadyLinked: boolean;
+  alreadyLinked: boolean; // 👈 removed label/color
 };
 
 type SaleGroupInfo = {
@@ -34,7 +32,7 @@ export default function ManageSaleGroupItems() {
   });
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false); // 👈 new: first-load gate
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   async function fetchProducts() {
     setLoading(true);
@@ -61,7 +59,7 @@ export default function ManageSaleGroupItems() {
       setProducts([]);
       setGroupSaleInfo({ quantity: null, sale_price: null, price: null });
     } finally {
-      setHasLoaded(true); // 👈 mark first load done
+      setHasLoaded(true);
       setLoading(false);
     }
   }
@@ -125,7 +123,6 @@ export default function ManageSaleGroupItems() {
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      {/* Show loader until first fetch finishes */}
       {!hasLoaded ? (
         <p className="text-muted animate-pulse">טוען מוצרים…</p>
       ) : filtered.length === 0 ? (

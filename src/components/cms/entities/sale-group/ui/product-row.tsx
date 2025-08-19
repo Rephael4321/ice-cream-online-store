@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/cms/ui/button";
-import { Input } from "@/components/cms/ui/input";
 import { showToast } from "@/components/cms/ui/toast";
 import Image from "next/image";
 
@@ -12,9 +11,7 @@ type Product = {
   price: number;
   image: string;
   sale: { quantity: number; sale_price: number } | null;
-  label?: string;
-  color?: string;
-  alreadyLinked: boolean;
+  alreadyLinked: boolean; // 👈 removed label/color
 };
 
 type SaleGroupInfo = {
@@ -36,8 +33,6 @@ export default function ProductRow({
   onChange,
   groupSaleInfo,
 }: Props) {
-  const [label, setLabel] = useState(product.label || "");
-  const [color, setColor] = useState(product.color || "#000000");
   const [loading, setLoading] = useState(false);
 
   // Normalize group values to numbers
@@ -65,40 +60,20 @@ export default function ProductRow({
   const productMismatch =
     !product.alreadyLinked && (unitPriceMismatch || saleMismatch);
 
-  // Debug log
-  console.log(`🧪 Product #${product.id} validation`, {
-    "→ Group has base?": groupHasBase,
-    "→ Product already linked?": product.alreadyLinked,
-    "→ Product price": product.price,
-    "→ Group price": priceNumber,
-    "→ Price mismatch": unitPriceMismatch,
-    "→ Product sale": product.sale,
-    "→ Group sale": {
-      quantity: quantityNumber,
-      sale_price: salePriceNumber,
-    },
-    "→ Sale mismatch": saleMismatch,
-    "→ Overall mismatch": productMismatch,
-  });
-
   async function addProduct() {
     if (productMismatch) {
       showToast("❌ מחיר המוצר או פרטי המבצע לא תואמים לקבוצה", "error");
       return;
     }
-
     setLoading(true);
     try {
+      // 👇 no label/color in body
       const res = await fetch(
         `/api/sale-groups/${saleGroupId}/items/${product.id}`,
-        {
-          method: "POST",
-          body: JSON.stringify({ label, color }),
-        }
+        { method: "POST" }
       );
 
       const data = await res.json();
-
       if (!res.ok) {
         showToast(data.error || "❌ שגיאה בהוספת המוצר", "error");
       } else {
@@ -116,13 +91,10 @@ export default function ProductRow({
     try {
       const res = await fetch(
         `/api/sale-groups/${saleGroupId}/items/${product.id}`,
-        {
-          method: "DELETE",
-        }
+        { method: "DELETE" }
       );
 
       const data = await res.json();
-
       if (!res.ok) {
         showToast(data.error || "❌ שגיאה בהסרת המוצר", "error");
       } else {
@@ -165,21 +137,6 @@ export default function ProductRow({
               </span>
             )}
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Input
-            placeholder="תווית"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            className="w-full sm:w-[120px]"
-          />
-          <input
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            className="w-10 h-10 rounded border"
-          />
         </div>
 
         <div className="w-full sm:w-auto">

@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
 
+// Helper: works whether params is sync or a Promise
+async function resolveParams<T>(p: T | Promise<T>): Promise<T> {
+  return await Promise.resolve(p);
+}
+
 async function getEligibleProducts(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } } | { params: Promise<{ id: string }> }
 ) {
-  const saleGroupId = Number(params.id);
+  const { id } = await resolveParams((context as any).params);
+  const saleGroupId = Number(id);
 
   if (isNaN(saleGroupId)) {
     return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
@@ -22,9 +28,7 @@ async function getEligibleProducts(
         p.image,
         s.quantity AS sale_quantity,
         s.sale_price AS sale_price,
-        psg.sale_group_id IS NOT NULL AS already_linked,
-        psg.label,
-        psg.color
+        (psg.sale_group_id IS NOT NULL) AS already_linked
       FROM products p
       LEFT JOIN sales s ON s.product_id = p.id
       LEFT JOIN product_sale_groups psg
@@ -36,7 +40,7 @@ async function getEligibleProducts(
     const data = result.rows.map((row) => ({
       id: row.id,
       name: row.name,
-      price: row.price ? Number(row.price) : null,
+      price: row.price != null ? Number(row.price) : null,
       image: row.image,
       sale:
         row.sale_quantity != null && row.sale_price != null
@@ -45,8 +49,6 @@ async function getEligibleProducts(
               sale_price: Number(row.sale_price),
             }
           : null,
-      label: row.label,
-      color: row.color,
       alreadyLinked: !!row.already_linked,
     }));
 
