@@ -54,20 +54,18 @@ export default function NewCategory() {
       try {
         const res = await fetch("/api/images");
         if (!res.ok) throw new Error("failed");
-        const paths: string[] = await res.json();
+        const raw: { key: string; url: string }[] = await res.json();
 
-        const items = paths.map((path, idx) => {
-          const file = path.split("/").pop() || "";
+        const items = raw.map(({ key, url }, idx) => {
+          const file = key.split("/").pop() || "";
           const name = file.split(".")[0];
-          return { id: idx, name, image: path };
+          return { id: idx, name, image: url };
         });
 
-        // if a prefilled URL exists, ensure it's in the list so its name can show
         if (category.image && !items.find((i) => i.image === category.image)) {
           const file = category.image.split("/").pop() || "";
           const name = file.split(".")[0];
           items.push({ id: -1, name, image: category.image });
-          // also reflect that in the draft field
           setImageDraft(name);
         }
 
