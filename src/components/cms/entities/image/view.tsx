@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import UploadImage from "./upload";
 import UploadFolder from "./upload-folder";
 import ImageGrid from "./ui/image-grid";
@@ -14,16 +15,26 @@ export default function ViewImages() {
   const [freezeMsg, setFreezeMsg] = useState<string | null>(null);
 
   const [selectMode, setSelectMode] = useState(false);
-  // selection stays by URL (stable & used by delete endpoint)
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
+
+  const router = useRouter();
+
+  // Send user to the products images page after upload
+  const goToProductsImages = () => router.replace("/products/images");
+
+  useEffect(() => {
+    // Prefetch target route for instant navigation after upload
+    router.prefetch("/products/images");
+  }, [router]);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/images");
+        const res = await fetch("/api/images", { cache: "no-store" });
         if (!res.ok) throw new Error("bad status");
         const data = await res.json();
-        setImages(Array.isArray(data) ? data : []);
+        // API returns [{ url, key, name }]
+        setImages(Array.isArray(data) ? (data as ImageItem[]) : []);
       } catch {
         setError("אירעה שגיאה בטעינת התמונות");
       } finally {
@@ -31,8 +42,6 @@ export default function ViewImages() {
       }
     })();
   }, []);
-
-  const refresh = () => window.location.reload();
 
   const toggleImageSelection = (url: string) => {
     setSelectedImages((prev) => {
@@ -64,7 +73,8 @@ export default function ViewImages() {
   };
 
   return (
-    <div dir="rtl" lang="he" className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
+    <div dir="rtl" lang="he" className="mx-auto max-w-6ל p-4 sm:p-6 space-y-4">
+      {/* top bar in select mode */}
       {selectMode && (
         <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-12 p-3 rounded shadow w-full max-w-4xl">
           <span className="text-blue-800 font-semibold">
@@ -93,8 +103,9 @@ export default function ViewImages() {
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-semibold">ניהול תמונות</h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <UploadImage onUpload={refresh} />
-          <UploadFolder onUpload={refresh} />
+          {/* Navigate to /products/images after successful upload */}
+          <UploadImage onUpload={goToProductsImages} />
+          <UploadFolder onUpload={goToProductsImages} />
         </div>
       </div>
 
