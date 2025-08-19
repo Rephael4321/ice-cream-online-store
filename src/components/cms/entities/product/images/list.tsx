@@ -5,9 +5,10 @@ import ImageGrid from "./ui/image-grid";
 
 export type ProductImage = {
   key: string;
+  url: string;
   size: number;
   updated_at: string | null;
-  url: string;
+  name?: string; // ✅ display name from index
 };
 
 export default function ProductImagesList() {
@@ -53,7 +54,8 @@ export default function ProductImagesList() {
         </select>
       </div>
 
-      <ImageGrid images={images} />
+      {/* ✅ Pass grouping hint */}
+      <ImageGrid images={images} groupBy={sort} order={order} />
     </div>
   );
 }
