@@ -102,6 +102,9 @@ export default function ManageSaleGroupItems() {
   const [busyFor, setBusyFor] = useState<string | null>(null); // section label being processed
   const [clearBusy, setClearBusy] = useState(false); // global clear
 
+  // Collapsed sections (default: all collapsed)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
   // Scroll state refs
   const hadLinkedRef = useRef<boolean | null>(null);
   const savedScrollYRef = useRef<number>(0);
@@ -383,7 +386,6 @@ export default function ManageSaleGroupItems() {
       const v = group.variants[0];
       addables = notLinked.filter((p) => variantMatchesProduct(v, p));
     } else if (requiresChoice) {
-      // no automatic addables without choosing a variant
       addables = [];
     }
 
@@ -411,12 +413,10 @@ export default function ManageSaleGroupItems() {
     const st = computeToggleState(group);
 
     if (st.mode === "add") {
-      // If multiple variants and no base set → open menu
       if (st.requiresChoice) {
         setMenuOpenFor((cur) => (cur === group.label ? null : group.label));
         return;
       }
-      // Otherwise add all addables (base match or single variant)
       const variant =
         (st.baseMatch as Variant | null) ?? group.variants[0] ?? null;
       if (!variant) {
@@ -429,6 +429,19 @@ export default function ManageSaleGroupItems() {
     if (st.mode === "remove") {
       return bulkRemoveSection(group);
     }
+  }
+
+  // Collapsible helpers
+  function isOpen(label: string) {
+    return expanded.has(label);
+  }
+  function toggleOpen(label: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
   }
 
   return (
@@ -481,8 +494,8 @@ export default function ManageSaleGroupItems() {
 
           const st = computeToggleState(group);
           const isBusy = busyFor === group.label;
+          const open = isOpen(group.label);
 
-          // Primary toggle button props
           const primaryLabel =
             st.mode === "add"
               ? isBusy
@@ -502,25 +515,27 @@ export default function ManageSaleGroupItems() {
           const primaryDisabled =
             isBusy ||
             st.mode === "disabled" ||
-            (st.mode === "add" &&
-              !st.requiresChoice && // when requires choice, we allow opening the menu
-              st.addablesCount === 0);
+            (st.mode === "add" && !st.requiresChoice && st.addablesCount === 0);
 
           return (
             <div
               key={group.label}
-              className={`space-y-2 rounded-md p-2 bg-white shadow-sm ${ringClass}`}
-              title={
-                group.hasLinked
-                  ? "מכיל מוצרים שכבר בקבוצה"
-                  : group.hasVariance
-                  ? "מחירי יחידה שונים בתוך קבוצה זו"
-                  : undefined
-              }
+              className={`relative space-y-2 rounded-md p-2 bg-white shadow-sm ${ringClass}`}
             >
+              {/* Header row (always visible) */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="text-lg font-semibold text-blue-600">
-                  {group.label} {group.hasLinked ? "• כבר בקבוצה" : ""}
+                <div className="flex items-center gap-2">
+                  <button
+                    className="text-sm px-2 py-1 rounded border bg-gray-50 hover:bg-gray-100"
+                    onClick={() => toggleOpen(group.label)}
+                    title={open ? "סגור" : "פתח"}
+                  >
+                    {open ? "▾" : "▸"}
+                  </button>
+
+                  <div className="text-lg font-semibold text-blue-600">
+                    {group.label} {group.hasLinked ? "• כבר בקבוצה" : ""}
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -542,7 +557,7 @@ export default function ManageSaleGroupItems() {
                     </span>
                   </div>
 
-                  {/* TOGGLE button + optional dropdown */}
+                  {/* Primary TOGGLE + optional dropdown (visible even when collapsed) */}
                   <div className="relative">
                     <div className="flex gap-1">
                       <Button
@@ -562,7 +577,6 @@ export default function ManageSaleGroupItems() {
                         {primaryLabel}
                       </Button>
 
-                      {/* Caret opens menu only when there is a choice to make */}
                       <Button
                         variant="secondary"
                         onClick={() =>
@@ -573,14 +587,10 @@ export default function ManageSaleGroupItems() {
                         disabled={
                           isBusy ||
                           !(
-                            // Show dropdown when we *need* or *want* to pick a variant
-                            (
-                              (!groupSaleInfo.price &&
-                                group.variants.length > 1) ||
-                              (groupSaleInfo.price != null &&
-                                // Even with base set, allow seeing variants (only base-enabled will be clickable)
-                                group.variants.length > 0)
-                            )
+                            (!groupSaleInfo.price &&
+                              group.variants.length > 1) ||
+                            (groupSaleInfo.price != null &&
+                              group.variants.length > 0)
                           )
                         }
                         aria-haspopup="menu"
@@ -647,37 +657,43 @@ export default function ManageSaleGroupItems() {
                 </div>
               </div>
 
-              {group.hasVariance && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {group.uniqueUnitPrices.map((p) => (
-                    <span
-                      key={p}
-                      className="text-xs px-2 py-1 rounded-full border bg-gray-50"
-                    >
-                      ₪{p.toFixed(2)}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Body (items, extra pills) — rendered only when expanded */}
+              {open && (
+                <>
+                  {group.hasVariance && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {group.uniqueUnitPrices.map((p) => (
+                        <span
+                          key={p}
+                          className="text-xs px-2 py-1 rounded-full border bg-gray-50"
+                        >
+                          ₪{p.toFixed(2)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
-              {group.items.map((p) => (
-                <ProductRow
-                  key={p.id}
-                  saleGroupId={Number(saleGroupId)}
-                  product={p}
-                  onChange={fetchProducts}
-                  groupSaleInfo={groupSaleInfo}
-                  groupStats={
-                    group.minUnitPrice !== null && group.maxUnitPrice !== null
-                      ? {
-                          min: group.minUnitPrice,
-                          max: group.maxUnitPrice,
-                          uniqueCount: group.uniqueUnitPrices.length,
-                        }
-                      : undefined
-                  }
-                />
-              ))}
+                  {group.items.map((p) => (
+                    <ProductRow
+                      key={p.id}
+                      saleGroupId={Number(saleGroupId)}
+                      product={p}
+                      onChange={fetchProducts}
+                      groupSaleInfo={groupSaleInfo}
+                      groupStats={
+                        group.minUnitPrice !== null &&
+                        group.maxUnitPrice !== null
+                          ? {
+                              min: group.minUnitPrice,
+                              max: group.maxUnitPrice,
+                              uniqueCount: group.uniqueUnitPrices.length,
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </>
+              )}
             </div>
           );
         })
