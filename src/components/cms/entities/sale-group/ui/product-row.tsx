@@ -32,7 +32,7 @@ type Props = {
   product: Product;
   onChange: () => void;
   groupSaleInfo: SaleGroupInfo;
-  groupStats?: GroupStats; // 👈 to highlight differences inside a section
+  groupStats?: GroupStats;
 };
 
 export default function ProductRow({
@@ -147,7 +147,6 @@ export default function ProductRow({
             {showPriceChip && priceIsMax && (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full border"
-                data-diff="max"
                 title="יקר בקבוצה"
               >
                 ⬆️ יקר בקבוצה
@@ -156,7 +155,6 @@ export default function ProductRow({
             {showPriceChip && !priceIsMax && priceIsMin && (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full border"
-                data-diff="min"
                 title="זול בקבוצה"
               >
                 ⬇️ זול בקבוצה

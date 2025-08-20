@@ -4,6 +4,8 @@
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
+import { Button } from "@/components/cms/ui/button";
+import { showToast } from "@/components/cms/ui/toast";
 import ProductRow from "./ui/product-row";
 
 type Product = {
@@ -12,7 +14,7 @@ type Product = {
   price: number;
   image: string;
   sale: { quantity: number; sale_price: number } | null;
-  alreadyLinked: boolean; // label/color removed from UI
+  alreadyLinked: boolean;
 };
 
 type SaleGroupInfo = {
@@ -21,18 +23,65 @@ type SaleGroupInfo = {
   price: number | null;
 };
 
+type Variant = {
+  key: string;
+  price: number;
+  sale_price: number | null;
+  quantity: number | null;
+  count: number;
+};
+
 type Grouped = {
   label: string;
   items: Product[];
   hasLinked: boolean;
   sortKey: number;
-  // stats for visibility of differences
+
   unitPrices: number[];
   uniqueUnitPrices: number[];
   minUnitPrice: number | null;
   maxUnitPrice: number | null;
   hasVariance: boolean;
+
+  variants: Variant[];
 };
+
+function round2(n: number | null | undefined): number | null {
+  if (n == null) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function makeVariantKey(p: Product) {
+  const price = round2(p.price);
+  const sp = p.sale ? round2(p.sale.sale_price) : null;
+  const q = p.sale ? p.sale.quantity : null;
+  return `${price}|${sp ?? "null"}|${q ?? "null"}`;
+}
+
+function variantMatchesProduct(v: Variant, p: Product) {
+  const pPrice = round2(p.price);
+  const pSalePrice = p.sale ? round2(p.sale.sale_price) : null;
+  const pQty = p.sale ? p.sale.quantity : null;
+  return (
+    pPrice === v.price && pSalePrice === v.sale_price && pQty === v.quantity
+  );
+}
+
+function baseMatchesVariant(base: SaleGroupInfo, v: Variant) {
+  return (
+    round2(base.price as number) === v.price &&
+    round2(base.sale_price as number | null) === v.sale_price &&
+    (base.quantity as number | null) === v.quantity
+  );
+}
+
+function formatVariant(v: Variant) {
+  const unit = `₪${v.price.toFixed(2)}`;
+  if (v.sale_price != null && v.quantity != null) {
+    return `${unit} · מבצע: ₪${v.sale_price.toFixed(2)} × ${v.quantity}`;
+  }
+  return `${unit} · ללא מבצע`;
+}
 
 export default function ManageSaleGroupItems() {
   const { id } = useParams();
@@ -47,6 +96,11 @@ export default function ManageSaleGroupItems() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  // Bulk UI state (toggle + dropdown)
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [busyFor, setBusyFor] = useState<string | null>(null); // section label being processed
+  const [clearBusy, setClearBusy] = useState(false); // global clear
 
   // Scroll state refs
   const hadLinkedRef = useRef<boolean | null>(null);
@@ -116,12 +170,13 @@ export default function ManageSaleGroupItems() {
           label,
           items: [],
           hasLinked: false,
-          sortKey: priceFromLabel(label), // used to sort sections
+          sortKey: priceFromLabel(label),
           unitPrices: [],
           uniqueUnitPrices: [],
           minUnitPrice: null,
           maxUnitPrice: null,
           hasVariance: false,
+          variants: [],
         };
       }
       groups[label].items.push(product);
@@ -129,37 +184,51 @@ export default function ManageSaleGroupItems() {
       if (product.alreadyLinked) groups[label].hasLinked = true;
     }
 
-    // compute stats for visibility
+    // compute stats + variants
     for (const g of Object.values(groups)) {
-      const rounded = g.unitPrices.map((v) => Number(v.toFixed(2)));
+      const rounded = g.unitPrices.map((v) => Number(round2(v)));
       const uniq = Array.from(new Set(rounded));
-      g.uniqueUnitPrices = uniq.sort((a, b) => b - a); // show high->low pills
-      if (uniq.length > 0) {
-        g.minUnitPrice = Math.min(...uniq);
-        g.maxUnitPrice = Math.max(...uniq);
-      } else {
-        g.minUnitPrice = null;
-        g.maxUnitPrice = null;
-      }
+      g.uniqueUnitPrices = uniq.sort((a, b) => b - a);
+      g.minUnitPrice = uniq.length ? Math.min(...uniq) : null;
+      g.maxUnitPrice = uniq.length ? Math.max(...uniq) : null;
       g.hasVariance = (g.minUnitPrice ?? 0) !== (g.maxUnitPrice ?? 0);
-      // sort items inside the section: alreadyLinked first, then unit price desc, then id asc
+
+      const map = new Map<string, Variant>();
+      for (const p of g.items) {
+        const key = makeVariantKey(p);
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            price: round2(p.price)!,
+            sale_price: p.sale ? round2(p.sale.sale_price) : null,
+            quantity: p.sale ? p.sale.quantity : null,
+            count: 0,
+          });
+        }
+        map.get(key)!.count += 1;
+      }
+      g.variants = Array.from(map.values()).sort((a, b) => {
+        if (a.price !== b.price) return b.price - a.price;
+        return b.count - a.count;
+      });
+
+      // sort items in section: linked first, then unit price DESC, then id asc
       g.items.sort((a, b) => {
         if (a.alreadyLinked !== b.alreadyLinked)
           return a.alreadyLinked ? -1 : 1;
-        if (a.price !== b.price) return b.price - a.price; // DESC by price
+        if (a.price !== b.price) return b.price - a.price;
         return a.id - b.id;
       });
     }
 
-    // Sections: 1) hasLinked first, 2) by sortKey DESC
+    // sections: hasLinked first, then price DESC
     return Object.values(groups).sort((a, b) => {
       if (a.hasLinked !== b.hasLinked) return a.hasLinked ? -1 : 1;
-      return b.sortKey - a.sortKey; // DESC
+      return b.sortKey - a.sortKey;
     });
   }, [filtered]);
 
-  // Smooth scroll to top when a linked section first appears,
-  // and back to the previous position when it disappears.
+  // Smooth scroll when linked section appears/disappears
   useEffect(() => {
     const hasLinkedNow = orderedGroups.some((g) => g.hasLinked);
     const hadLinkedBefore = hadLinkedRef.current;
@@ -186,9 +255,196 @@ export default function ManageSaleGroupItems() {
     hadLinkedRef.current = hasLinkedNow;
   }, [orderedGroups]);
 
+  // ---------- Bulk helpers ----------
+  async function bulkAddVariant(group: Grouped, variant: Variant) {
+    setBusyFor(group.label);
+    try {
+      const toAdd = group.items.filter(
+        (p) => !p.alreadyLinked && variantMatchesProduct(variant, p)
+      );
+
+      if (toAdd.length === 0) {
+        showToast("אין פריטים תואמים להוספה בקבוצה זו", "info");
+        return;
+      }
+
+      let ok = 0;
+      let fail = 0;
+      for (const p of toAdd) {
+        try {
+          const res = await fetch(
+            `/api/sale-groups/${saleGroupId}/items/${p.id}`,
+            { method: "POST" }
+          );
+          if (res.ok) ok++;
+          else fail++;
+        } catch {
+          fail++;
+        }
+      }
+
+      if (ok > 0) showToast(`✔️ נוספו ${ok} פריטים`, "success");
+      if (fail > 0) showToast(`⚠️ ${fail} פריטים נדחו`, "warning");
+      await fetchProducts();
+    } finally {
+      setBusyFor(null);
+      setMenuOpenFor(null);
+    }
+  }
+
+  async function bulkRemoveSection(group: Grouped) {
+    const linked = group.items.filter((p) => p.alreadyLinked);
+    if (linked.length === 0) {
+      showToast("אין פריטים מקושרים בקבוצה זו להסרה", "info");
+      return;
+    }
+    if (!confirm(`להסיר ${linked.length} פריטים מקושרים מהמקטע?`)) return;
+
+    setBusyFor(group.label);
+    try {
+      let ok = 0;
+      let fail = 0;
+      for (const p of linked) {
+        try {
+          const res = await fetch(
+            `/api/sale-groups/${saleGroupId}/items/${p.id}`,
+            { method: "DELETE" }
+          );
+          if (res.ok) ok++;
+          else fail++;
+        } catch {
+          fail++;
+        }
+      }
+      if (ok > 0) showToast(`🗑️ הוסרו ${ok} פריטים`, "success");
+      if (fail > 0) showToast(`⚠️ ${fail} פריטים לא הוסרו`, "warning");
+      await fetchProducts();
+    } finally {
+      setBusyFor(null);
+    }
+  }
+
+  async function clearAllLinkedInGroup() {
+    const allLinked = products.filter((p) => p.alreadyLinked);
+    if (allLinked.length === 0) {
+      showToast("אין פריטים מקושרים להסרה", "info");
+      return;
+    }
+    if (!confirm(`להסיר את כל ${allLinked.length} הפריטים המקושרים מהקבוצה?`))
+      return;
+
+    setClearBusy(true);
+    try {
+      let ok = 0;
+      let fail = 0;
+      for (const p of allLinked) {
+        try {
+          const res = await fetch(
+            `/api/sale-groups/${saleGroupId}/items/${p.id}`,
+            { method: "DELETE" }
+          );
+          if (res.ok) ok++;
+          else fail++;
+        } catch {
+          fail++;
+        }
+      }
+      if (ok > 0) showToast(`🗑️ הוסרו ${ok} פריטים`, "success");
+      if (fail > 0) showToast(`⚠️ ${fail} פריטים לא הוסרו`, "warning");
+      await fetchProducts();
+    } finally {
+      setClearBusy(false);
+    }
+  }
+
+  // ---------- Toggle logic per section ----------
+  function computeToggleState(group: Grouped) {
+    const groupHasBase =
+      groupSaleInfo.price != null &&
+      groupSaleInfo.sale_price != null &&
+      groupSaleInfo.quantity != null;
+
+    const notLinked = group.items.filter((p) => !p.alreadyLinked);
+    const linked = group.items.filter((p) => p.alreadyLinked);
+
+    const baseMatch =
+      groupHasBase &&
+      group.variants.find((v) => baseMatchesVariant(groupSaleInfo, v));
+
+    const requiresChoice =
+      !groupHasBase && group.variants.length > 1 && notLinked.length > 0;
+
+    let addables: Product[] = [];
+    if (groupHasBase && baseMatch) {
+      addables = notLinked.filter((p) =>
+        variantMatchesProduct(baseMatch as Variant, p)
+      );
+    } else if (!groupHasBase && group.variants.length === 1) {
+      const v = group.variants[0];
+      addables = notLinked.filter((p) => variantMatchesProduct(v, p));
+    } else if (requiresChoice) {
+      // no automatic addables without choosing a variant
+      addables = [];
+    }
+
+    type Mode = "add" | "remove" | "disabled";
+    let mode: Mode = "disabled";
+
+    if (addables.length > 0 || requiresChoice) {
+      mode = "add";
+    } else if (linked.length > 0) {
+      mode = "remove";
+    } else {
+      mode = "disabled";
+    }
+
+    return {
+      mode,
+      addablesCount: addables.length,
+      linkedCount: linked.length,
+      requiresChoice,
+      baseMatch: baseMatch || null,
+    };
+  }
+
+  function handlePrimaryToggle(group: Grouped) {
+    const st = computeToggleState(group);
+
+    if (st.mode === "add") {
+      // If multiple variants and no base set → open menu
+      if (st.requiresChoice) {
+        setMenuOpenFor((cur) => (cur === group.label ? null : group.label));
+        return;
+      }
+      // Otherwise add all addables (base match or single variant)
+      const variant =
+        (st.baseMatch as Variant | null) ?? group.variants[0] ?? null;
+      if (!variant) {
+        showToast("לא נמצאה וריאציה מתאימה להוספה", "error");
+        return;
+      }
+      return bulkAddVariant(group, variant);
+    }
+
+    if (st.mode === "remove") {
+      return bulkRemoveSection(group);
+    }
+  }
+
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-xl font-bold">ניהול קבוצת מבצע #{saleGroupId}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-xl font-bold">ניהול קבוצת מבצע #{saleGroupId}</h1>
+
+        <Button
+          variant="destructive"
+          onClick={clearAllLinkedInGroup}
+          disabled={clearBusy || loading}
+          title="הסר את כל הפריטים המקושרים בקבוצה"
+        >
+          {clearBusy ? "מסיר…" : "נקה קבוצה"}
+        </Button>
+      </div>
 
       {groupSaleInfo.price !== null && (
         <div className="text-sm text-gray-700 border p-2 rounded-md bg-white shadow-sm">
@@ -222,6 +478,34 @@ export default function ManageSaleGroupItems() {
             : group.hasVariance
             ? "ring-1 ring-red-300"
             : "ring-1 ring-slate-200";
+
+          const st = computeToggleState(group);
+          const isBusy = busyFor === group.label;
+
+          // Primary toggle button props
+          const primaryLabel =
+            st.mode === "add"
+              ? isBusy
+                ? "מוסיף…"
+                : "הוסף את כולם"
+              : st.mode === "remove"
+              ? isBusy
+                ? "מסיר…"
+                : "הסר מקושרים"
+              : "לא זמין";
+
+          const primaryVariant =
+            st.mode === "remove"
+              ? ("destructive" as const)
+              : ("default" as const);
+
+          const primaryDisabled =
+            isBusy ||
+            st.mode === "disabled" ||
+            (st.mode === "add" &&
+              !st.requiresChoice && // when requires choice, we allow opening the menu
+              st.addablesCount === 0);
+
           return (
             <div
               key={group.label}
@@ -234,26 +518,132 @@ export default function ManageSaleGroupItems() {
                   : undefined
               }
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="text-lg font-semibold text-blue-600">
                   {group.label} {group.hasLinked ? "• כבר בקבוצה" : ""}
                 </div>
 
-                <div className="text-sm text-gray-700 flex items-center flex-wrap gap-2">
-                  {group.hasVariance ? (
-                    <span className="font-semibold text-red-700">
-                      ⚠️ הבדל מחירים בקבוצה: ₪{group.minUnitPrice?.toFixed(2)}–₪
-                      {group.maxUnitPrice?.toFixed(2)}
-                    </span>
-                  ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="text-sm text-gray-700 flex items-center flex-wrap gap-2">
+                    {group.hasVariance ? (
+                      <span className="font-semibold text-red-700">
+                        ⚠️ הבדל מחירים בקבוצה: ₪{group.minUnitPrice?.toFixed(2)}
+                        –₪
+                        {group.maxUnitPrice?.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-600">
+                        מחיר אחיד בקבוצה: ₪{group.maxUnitPrice?.toFixed(2)}
+                      </span>
+                    )}
+                    <span className="text-gray-500">•</span>
                     <span className="text-gray-600">
-                      מחיר אחיד בקבוצה: ₪{group.maxUnitPrice?.toFixed(2)}
+                      {group.items.length} פריטים
                     </span>
-                  )}
-                  <span className="text-gray-500">•</span>
-                  <span className="text-gray-600">
-                    {group.items.length} פריטים
-                  </span>
+                  </div>
+
+                  {/* TOGGLE button + optional dropdown */}
+                  <div className="relative">
+                    <div className="flex gap-1">
+                      <Button
+                        variant={primaryVariant}
+                        onClick={() => handlePrimaryToggle(group)}
+                        disabled={primaryDisabled}
+                        title={
+                          st.mode === "add"
+                            ? st.requiresChoice
+                              ? "קיימות וריאציות שונות — לחץ לבחירה"
+                              : "הוסף את כל הפריטים התואמים"
+                            : st.mode === "remove"
+                            ? "הסר את כל הפריטים המקושרים במקטע זה"
+                            : "אין פעולות זמינות"
+                        }
+                      >
+                        {primaryLabel}
+                      </Button>
+
+                      {/* Caret opens menu only when there is a choice to make */}
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          setMenuOpenFor((cur) =>
+                            cur === group.label ? null : group.label
+                          )
+                        }
+                        disabled={
+                          isBusy ||
+                          !(
+                            // Show dropdown when we *need* or *want* to pick a variant
+                            (
+                              (!groupSaleInfo.price &&
+                                group.variants.length > 1) ||
+                              (groupSaleInfo.price != null &&
+                                // Even with base set, allow seeing variants (only base-enabled will be clickable)
+                                group.variants.length > 0)
+                            )
+                          )
+                        }
+                        aria-haspopup="menu"
+                        aria-expanded={menuOpenFor === group.label}
+                        title="בחר לפי מחיר/מבצע"
+                      >
+                        ▾
+                      </Button>
+                    </div>
+
+                    {menuOpenFor === group.label && (
+                      <div className="absolute right-0 z-10 mt-2 w-80 rounded-md border bg-white shadow-lg">
+                        <div className="px-3 py-2 text-xs text-gray-600 border-b">
+                          בחר וריאציה להוספה (לפי מחיר/מבצע)
+                        </div>
+                        <ul className="max-h-72 overflow-auto py-1">
+                          {group.variants.map((v) => {
+                            const matchesBase =
+                              groupSaleInfo.price != null
+                                ? baseMatchesVariant(groupSaleInfo, v)
+                                : true;
+                            const disabled =
+                              isBusy ||
+                              (groupSaleInfo.price != null && !matchesBase);
+                            const tooltip =
+                              groupSaleInfo.price != null && !matchesBase
+                                ? "לא תואם למחיר/מבצע שהוגדרו לקבוצה"
+                                : undefined;
+                            return (
+                              <li key={v.key}>
+                                <button
+                                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                                    disabled
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                  onClick={() =>
+                                    !disabled && bulkAddVariant(group, v)
+                                  }
+                                  title={tooltip}
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="font-medium">
+                                      {formatVariant(v)}
+                                    </span>
+                                    <span className="text-gray-500">
+                                      {v.count} פריטים
+                                    </span>
+                                  </div>
+                                  {groupSaleInfo.price != null &&
+                                    matchesBase && (
+                                      <div className="text-xs text-green-700">
+                                        תואם את בסיס הקבוצה
+                                      </div>
+                                    )}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
