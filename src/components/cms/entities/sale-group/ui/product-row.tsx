@@ -11,7 +11,7 @@ type Product = {
   price: number;
   image: string;
   sale: { quantity: number; sale_price: number } | null;
-  alreadyLinked: boolean; // 👈 removed label/color
+  alreadyLinked: boolean;
 };
 
 type SaleGroupInfo = {
@@ -35,7 +35,6 @@ export default function ProductRow({
 }: Props) {
   const [loading, setLoading] = useState(false);
 
-  // Normalize group values to numbers
   const priceNumber =
     groupSaleInfo.price !== null ? Number(groupSaleInfo.price) : null;
   const salePriceNumber =
@@ -65,9 +64,9 @@ export default function ProductRow({
       showToast("❌ מחיר המוצר או פרטי המבצע לא תואמים לקבוצה", "error");
       return;
     }
+
     setLoading(true);
     try {
-      // 👇 no label/color in body
       const res = await fetch(
         `/api/sale-groups/${saleGroupId}/items/${product.id}`,
         { method: "POST" }
@@ -131,10 +130,14 @@ export default function ProductRow({
                 מבצע: ₪{product.sale.sale_price} × {product.sale.quantity}
               </span>
             )}
-            {productMismatch && (
-              <span className="text-red-600 ms-2 font-semibold">
-                ⚠️ מחיר או מבצע לא תואמים לקבוצה
-              </span>
+            {product.alreadyLinked === false && ( // keep mismatch only for not-yet-linked
+              <>
+                {groupHasBase && (unitPriceMismatch || saleMismatch) && (
+                  <span className="text-red-600 ms-2 font-semibold">
+                    ⚠️ מחיר או מבצע לא תואמים לקבוצה
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>

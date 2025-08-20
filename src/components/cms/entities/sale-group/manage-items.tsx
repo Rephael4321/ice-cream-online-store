@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
 import ProductRow from "./ui/product-row";
 
@@ -11,13 +11,20 @@ type Product = {
   price: number;
   image: string;
   sale: { quantity: number; sale_price: number } | null;
-  alreadyLinked: boolean; // 👈 removed label/color
+  alreadyLinked: boolean; // label/color removed from UI
 };
 
 type SaleGroupInfo = {
   quantity: number | null;
   sale_price: number | null;
   price: number | null;
+};
+
+type Grouped = {
+  label: string;
+  items: Product[];
+  hasLinked: boolean;
+  sortKey: number;
 };
 
 export default function ManageSaleGroupItems() {
@@ -34,6 +41,10 @@ export default function ManageSaleGroupItems() {
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
 
+  // Scroll state refs
+  const hadLinkedRef = useRef<boolean | null>(null);
+  const savedScrollYRef = useRef<number>(0);
+
   async function fetchProducts() {
     setLoading(true);
     try {
@@ -48,6 +59,7 @@ export default function ManageSaleGroupItems() {
       } else {
         const productsData = await productsRes.json();
         const groupData = await groupRes.json();
+
         setProducts(productsData);
         setGroupSaleInfo({
           quantity: groupData.quantity,
@@ -80,23 +92,65 @@ export default function ManageSaleGroupItems() {
     [products, query]
   );
 
-  function groupProducts(items: Product[]) {
-    const groups: Record<string, Product[]> = {};
-    for (const product of items) {
-      const key = product.sale
+  const orderedGroups = useMemo(() => {
+    const groups: Record<string, Grouped> = {};
+    const priceFromLabel = (label: string) =>
+      parseFloat(label.replace(/[^\d.]/g, "")) || 0;
+
+    for (const product of filtered) {
+      const label = product.sale
         ? `מבצע: ₪${product.sale.sale_price} × ${product.sale.quantity}`
         : `₪${product.price}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(product);
+      if (!groups[label]) {
+        groups[label] = {
+          label,
+          items: [],
+          hasLinked: false,
+          sortKey: priceFromLabel(label),
+        };
+      }
+      groups[label].items.push(product);
+      if (product.alreadyLinked) groups[label].hasLinked = true;
     }
-    return Object.entries(groups)
-      .sort(([a], [b]) => {
-        const price = (label: string) =>
-          parseFloat(label.replace(/[^\d.]/g, "")) || 0;
-        return price(a) - price(b);
-      })
-      .map(([label, items]) => ({ label, items }));
-  }
+
+    // 1) sections with a linked product first, 2) then by price ascending
+    return Object.values(groups).sort((a, b) => {
+      if (a.hasLinked !== b.hasLinked) return a.hasLinked ? -1 : 1;
+      return a.sortKey - b.sortKey;
+    });
+  }, [filtered]);
+
+  // Smooth scroll to top when a linked section first appears,
+  // and back to the previous position when it disappears.
+  useEffect(() => {
+    const hasLinkedNow = orderedGroups.some((g) => g.hasLinked);
+    const hadLinkedBefore = hadLinkedRef.current;
+
+    // First render -> set and bail
+    if (hadLinkedBefore === null) {
+      hadLinkedRef.current = hasLinkedNow;
+      return;
+    }
+
+    // Transition: none -> some  (save Y and go to top)
+    if (!hadLinkedBefore && hasLinkedNow) {
+      savedScrollYRef.current = window.scrollY;
+      // ensure layout painted
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    // Transition: some -> none  (return to saved Y)
+    if (hadLinkedBefore && !hasLinkedNow) {
+      const y = Math.max(0, savedScrollYRef.current || 0);
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: y, behavior: "smooth" });
+      });
+    }
+
+    hadLinkedRef.current = hasLinkedNow;
+  }, [orderedGroups]);
 
   return (
     <div className="p-4 space-y-4">
@@ -125,13 +179,19 @@ export default function ManageSaleGroupItems() {
 
       {!hasLoaded ? (
         <p className="text-muted animate-pulse">טוען מוצרים…</p>
-      ) : filtered.length === 0 ? (
+      ) : orderedGroups.length === 0 ? (
         <p className="text-muted">לא נמצאו מוצרים</p>
       ) : (
-        groupProducts(filtered).map((group) => (
-          <div key={group.label} className="space-y-2">
+        orderedGroups.map((group) => (
+          <div
+            key={group.label}
+            className={`space-y-2 ${
+              group.hasLinked ? "ring-1 ring-amber-300 rounded-md p-1" : ""
+            }`}
+            title={group.hasLinked ? "מכיל מוצרים שכבר בקבוצה" : undefined}
+          >
             <div className="text-lg font-semibold text-blue-600">
-              {group.label}
+              {group.label} {group.hasLinked ? "• כבר בקבוצה" : ""}
             </div>
             {group.items.map((p) => (
               <ProductRow
