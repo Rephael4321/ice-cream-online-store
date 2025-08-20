@@ -1,3 +1,4 @@
+// components/cms/entities/sale-group/ui/product-row.tsx
 "use client";
 
 import { useState } from "react";
@@ -20,11 +21,18 @@ type SaleGroupInfo = {
   price: number | string | null;
 };
 
+type GroupStats = {
+  min: number;
+  max: number;
+  uniqueCount: number;
+};
+
 type Props = {
   saleGroupId: number;
   product: Product;
   onChange: () => void;
   groupSaleInfo: SaleGroupInfo;
+  groupStats?: GroupStats; // 👈 to highlight differences inside a section
 };
 
 export default function ProductRow({
@@ -32,6 +40,7 @@ export default function ProductRow({
   saleGroupId,
   onChange,
   groupSaleInfo,
+  groupStats,
 }: Props) {
   const [loading, setLoading] = useState(false);
 
@@ -58,6 +67,14 @@ export default function ProductRow({
 
   const productMismatch =
     !product.alreadyLinked && (unitPriceMismatch || saleMismatch);
+
+  const priceIsMax =
+    groupStats &&
+    Number(product.price.toFixed(2)) === Number(groupStats.max.toFixed(2));
+  const priceIsMin =
+    groupStats &&
+    Number(product.price.toFixed(2)) === Number(groupStats.min.toFixed(2));
+  const showPriceChip = !!groupStats && groupStats.uniqueCount > 1;
 
   async function addProduct() {
     if (productMismatch) {
@@ -123,22 +140,43 @@ export default function ProductRow({
           <div className="font-semibold truncate">
             #{product.id} - {product.name}
           </div>
-          <div className="text-sm text-muted truncate">
-            ₪{product.price}
-            {product.sale && (
-              <span className="text-green-600 ms-2">
-                מבצע: ₪{product.sale.sale_price} × {product.sale.quantity}
+
+          <div className="text-sm text-muted truncate flex flex-wrap items-center gap-2">
+            <span>₪{Number(product.price).toFixed(2)}</span>
+
+            {showPriceChip && priceIsMax && (
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-full border"
+                data-diff="max"
+                title="יקר בקבוצה"
+              >
+                ⬆️ יקר בקבוצה
               </span>
             )}
-            {product.alreadyLinked === false && ( // keep mismatch only for not-yet-linked
-              <>
-                {groupHasBase && (unitPriceMismatch || saleMismatch) && (
-                  <span className="text-red-600 ms-2 font-semibold">
-                    ⚠️ מחיר או מבצע לא תואמים לקבוצה
-                  </span>
-                )}
-              </>
+            {showPriceChip && !priceIsMax && priceIsMin && (
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-full border"
+                data-diff="min"
+                title="זול בקבוצה"
+              >
+                ⬇️ זול בקבוצה
+              </span>
             )}
+
+            {product.sale && (
+              <span className="text-green-600 ms-2">
+                מבצע: ₪{Number(product.sale.sale_price).toFixed(2)} ×{" "}
+                {product.sale.quantity}
+              </span>
+            )}
+
+            {product.alreadyLinked === false &&
+              groupHasBase &&
+              (unitPriceMismatch || saleMismatch) && (
+                <span className="text-red-600 ms-2 font-semibold">
+                  ⚠️ מחיר או מבצע לא תואמים לקבוצה
+                </span>
+              )}
           </div>
         </div>
 
