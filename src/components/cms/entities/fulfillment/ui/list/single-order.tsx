@@ -22,6 +22,8 @@ type Props = {
   selected?: boolean;
   onSelectToggle?: () => void;
   onEnterSelectMode?: () => void;
+  onTogglePaid: () => void;
+  onToggleReady: () => void;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -33,13 +35,24 @@ export default function SingleOrder({
   selected = false,
   onSelectToggle,
   onEnterSelectMode,
+  onTogglePaid,
+  onToggleReady,
 }: Props) {
   const date = new Date(order.createdAt);
   const formatted = !isNaN(date.getTime())
     ? date.toLocaleString("he-IL")
     : order.createdAt;
 
-  const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
+  // 🔥 Stand-out styles
+  const testStyle = order.isTest
+    ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
+    : "";
+
+  const completedStyle =
+    !order.isTest && order.isPaid && order.isReady
+      ? "bg-green-200 border-2 border-green-700 text-green-950"
+      : "";
+
   const touchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleLongPress = () => {
@@ -55,9 +68,7 @@ export default function SingleOrder({
   };
 
   const handleClickWrapper = () => {
-    if (selectMode) {
-      onSelectToggle?.();
-    }
+    if (selectMode) onSelectToggle?.();
   };
 
   const showUnnotified = order.isNotified === false && order.isTest !== true;
@@ -65,9 +76,9 @@ export default function SingleOrder({
   return (
     <li
       data-order-id={order.orderId}
-      className={`relative border rounded p-4 shadow transition-all duration-200 ${testStyle} ${
-        selectMode ? "ring-2 ring-blue-400" : ""
-      }`}
+      className={`relative rounded p-4 shadow transition-all duration-200 border
+        ${testStyle || completedStyle}
+        ${selectMode ? "ring-2 ring-blue-400" : ""}`}
       onClick={handleClickWrapper}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -106,10 +117,10 @@ export default function SingleOrder({
           <p className="font-bold flex items-center gap-2">
             הזמנה #{order.orderId}
             {order.isTest && (
-              <span className="text-yellow-700 text-sm">🧪 בדיקה</span>
+              <span className="text-yellow-900 text-sm">🧪 בדיקה</span>
             )}
             {showUnnotified && (
-              <span className="text-red-600 text-sm font-semibold">
+              <span className="text-red-700 text-sm font-semibold">
                 ⚠️ לא נשלחה הודעה
               </span>
             )}
@@ -119,8 +130,39 @@ export default function SingleOrder({
           <p>טלפון: {order.clientPhone || "—"}</p>
           <p>תאריך: {formatted}</p>
           <p>כמות מוצרים: {order.itemCount}</p>
-          <p>שולם: {order.isPaid ? "✔️" : "❌"}</p>
-          <p>מוכן: {order.isReady ? "✔️" : "❌"}</p>
+
+          {/* Clickable status buttons */}
+          <div className="mt-2 flex gap-2 flex-wrap">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePaid();
+              }}
+              className={`px-3 py-1 rounded text-white transition ${
+                order.isPaid
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-red-500 hover:bg-red-600"
+              }`}
+              title="שנה סטטוס תשלום"
+            >
+              {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleReady();
+              }}
+              className={`px-3 py-1 rounded text-white transition ${
+                order.isReady
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-red-500 hover:bg-red-600"
+              }`}
+              title="שנה סטטוס הזמנה"
+            >
+              {order.isReady ? "מוכן ✅" : "הזמנה חדשה 🆕"}
+            </button>
+          </div>
         </div>
 
         {/* 🔘 Action Buttons */}

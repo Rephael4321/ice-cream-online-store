@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
+import Link from "next/link";
 
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
 import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
@@ -50,19 +50,24 @@ export default function ViewOrder() {
 
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
-    const r = await fetch(`/api/orders/${order.orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isTest: flag }),
-    });
-    const data = await r.json();
-    setOrder((o) => (o ? { ...o, ...data } : o));
-    toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
+    try {
+      const r = await fetch(`/api/orders/${order.orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isTest: flag }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrder((o) => (o ? { ...o, ...data } : o));
+      toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
+    } catch {
+      toast.error("❌ שגיאה בעדכון סטטוס בדיקה");
+    }
   };
 
   const handleTitleClick = () => {
     setClicks((c) => c + 1);
-    clickTimer.current && clearTimeout(clickTimer.current);
+    if (clickTimer.current) clearTimeout(clickTimer.current);
     clickTimer.current = setTimeout(() => setClicks(0), 1000);
     if (clicks + 1 >= 5) {
       setClicks(0);
@@ -72,7 +77,6 @@ export default function ViewOrder() {
 
   useEffect(() => {
     if (!id) return;
-
     (async () => {
       try {
         const ordRes = await fetch(`/api/orders/${id}`);
@@ -92,6 +96,8 @@ export default function ViewOrder() {
 
         setOrder(o);
         setItems(enriched);
+      } catch {
+        toast.error("❌ שגיאה בטעינת הזמנה");
       } finally {
         setLoad(false);
       }
@@ -135,30 +141,39 @@ export default function ViewOrder() {
     } catch {
       toast.error("❌ שגיאה בעדכון סטטוס וואטסאפ");
     }
-
-    return;
   };
 
-  const flipOrderBool = async (field: "isPaid" | "isReady") => {
+  // NEW: split endpoints
+  const togglePaid = async () => {
     if (!order) return;
-    const r = await fetch(`/api/orders/${order.orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: !order[field] }),
-    });
-    const data = await r.json();
-    setOrder((o) =>
-      o
-        ? {
-            ...o,
-            isPaid: data.isPaid ?? o.isPaid,
-            isReady: data.isReady ?? o.isReady,
-            clientName: data.name ?? o.clientName,
-            clientAddress: data.address ?? o.clientAddress,
-            clientPhone: data.phone ?? o.clientPhone,
-          }
-        : o
-    );
+    try {
+      const r = await fetch(`/api/orders/${order.orderId}/payment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPaid: !order.isPaid }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrder((o) => (o ? { ...o, isPaid: data.isPaid ?? !o.isPaid } : o));
+    } catch {
+      toast.error("❌ שגיאה בעדכון תשלום");
+    }
+  };
+
+  const toggleReady = async () => {
+    if (!order) return;
+    try {
+      const r = await fetch(`/api/orders/${order.orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isReady: !order.isReady }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrder((o) => (o ? { ...o, isReady: data.isReady ?? !o.isReady } : o));
+    } catch {
+      toast.error("❌ שגיאה בעדכון סטטוס הזמנה");
+    }
   };
 
   const toggleStock = async (productId: number) => {
@@ -171,6 +186,8 @@ export default function ViewOrder() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, inStock: justToggled.inStock }),
+      }).catch(() => {
+        toast.error("❌ שגיאה בעדכון מלאי לפריט");
       });
       return nextState;
     });
@@ -190,45 +207,51 @@ export default function ViewOrder() {
     return actual;
   };
 
-  const handleReadyClick = async () => {
-    if (!order) return;
-    await flipOrderBool("isReady");
-  };
-
   const handleDelete = async () => {
     if (!order) return;
     if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
-    const r = await fetch(`/api/orders/${order.orderId}`, { method: "DELETE" });
-    r.ok
-      ? (toast.success("🗑️ הזמנה נמחקה"), (window.location.href = "/orders"))
-      : toast.error("❌ שגיאה במחיקה");
+    try {
+      const r = await fetch(`/api/orders/${order.orderId}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) throw new Error();
+      toast.success("🗑️ הזמנה נמחקה");
+      window.location.href = "/orders";
+    } catch {
+      toast.error("❌ שגיאה במחיקה");
+    }
   };
 
   const handleUpdateClient = async () => {
     if (!order) return;
-    const r = await fetch(`/api/orders/${order.orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newName.trim(),
-        address: newAddr.trim(),
-      }),
-    });
-    const data = await r.json();
-    setOrder((o) =>
-      o
-        ? {
-            ...o,
-            clientName: data.name ?? o.clientName,
-            clientAddress: data.address ?? o.clientAddress,
-            clientPhone: data.phone ?? o.clientPhone,
-            isPaid: data.isPaid ?? o.isPaid,
-            isReady: data.isReady ?? o.isReady,
-          }
-        : o
-    );
-    toast.success("📝 עודכן בהצלחה");
-    setEditOpen(false);
+    try {
+      const r = await fetch(`/api/orders/${order.orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim(),
+          address: newAddr.trim(),
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrder((o) =>
+        o
+          ? {
+              ...o,
+              clientName: data.name ?? o.clientName,
+              clientAddress: data.address ?? o.clientAddress,
+              clientPhone: data.phone ?? o.clientPhone,
+              isPaid: data.isPaid ?? o.isPaid,
+              isReady: data.isReady ?? o.isReady,
+            }
+          : o
+      );
+      toast.success("📝 עודכן בהצלחה");
+      setEditOpen(false);
+    } catch {
+      toast.error("❌ שגיאה בעדכון פרטי לקוח");
+    }
   };
 
   if (loading) return <p className="p-6">טוען…</p>;
@@ -252,8 +275,8 @@ export default function ViewOrder() {
           setNewAddr(order.clientAddress ?? "");
           setEditOpen(true);
         }}
-        onTogglePaid={() => flipOrderBool("isPaid")}
-        onReadyClick={handleReadyClick}
+        onTogglePaid={togglePaid}
+        onReadyClick={toggleReady}
         handleTitleClick={handleTitleClick}
         onNotifyWhatsApp={handleNotifyAndWhatsApp}
       />

@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/cms/ui/button";
 import { toast } from "sonner";
+
 import "react-datepicker/dist/react-datepicker.css";
+
 import Link from "next/link";
 import DatePicker from "react-datepicker";
 import SingleOrder from "./ui/list/single-order";
@@ -169,6 +171,47 @@ export default function ListOrder() {
     });
   };
 
+  // NEW: toggles using split endpoints
+  const togglePaid = async (orderId: number, current: boolean) => {
+    try {
+      const r = await fetch(`/api/orders/${orderId}/payment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPaid: !current }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId ? { ...o, isPaid: data.isPaid ?? !current } : o
+        )
+      );
+    } catch {
+      toast.error("❌ שגיאה בעדכון תשלום");
+    }
+  };
+
+  const toggleReady = async (orderId: number, current: boolean) => {
+    try {
+      const r = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isReady: !current }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId
+            ? { ...o, isReady: data.isReady ?? !current }
+            : o
+        )
+      );
+    } catch {
+      toast.error("❌ שגיאה בעדכון סטטוס הזמנה");
+    }
+  };
+
   return (
     <div className="relative">
       {/* 🧭 Floating Toolbar */}
@@ -252,6 +295,9 @@ export default function ListOrder() {
                   setSelectMode(true);
                   toggleOrderSelection(order.orderId);
                 }}
+                // NEW: clickable status buttons
+                onTogglePaid={() => togglePaid(order.orderId, order.isPaid)}
+                onToggleReady={() => toggleReady(order.orderId, order.isReady)}
               />
             ))}
           </ul>

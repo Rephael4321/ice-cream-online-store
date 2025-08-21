@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
+import { z } from "zod";
 
 type OrderRow = {
   orderId: number;
@@ -45,7 +46,7 @@ async function getOrder(
   { params }: { params: { id: string } }
 ) {
   const orderId = Number(params.id);
-  if (isNaN(orderId)) {
+  if (!Number.isInteger(orderId)) {
     console.warn("❌ Invalid order ID:", params.id);
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
@@ -126,77 +127,126 @@ async function getOrder(
   }
 }
 
+/** PATCH supports ONLY:
+ *  - { isTest: boolean }
+ *  - { name?: string, address?: string } (at least one present)
+ *  For payment/status use:
+ *   - PATCH /api/orders/:id/payment
+ *   - PATCH /api/orders/:id/status
+ */
+const TestSchema = z.object({ isTest: z.boolean() });
+const ClientSchema = z
+  .object({
+    name: z.string().trim().min(1).optional(),
+    address: z.string().trim().min(1).optional(),
+  })
+  .refine((v) => typeof v.name === "string" || typeof v.address === "string", {
+    message: "At least one of 'name' or 'address' is required",
+  });
+
 async function updateOrder(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const orderId = Number(params.id);
-  if (isNaN(orderId)) {
+  if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
-  const body = await req.json();
-  const { isPaid, isReady, isTest, name, address } = body;
-
+  let body: unknown;
   try {
-    if (typeof isTest === "boolean") {
-      const testResult = await pool.query(
-        `UPDATE orders SET is_test = $1 WHERE id = $2 RETURNING is_test AS "isTest"`,
-        [isTest, orderId]
-      );
-      return NextResponse.json({
-        isTest: testResult.rows[0]?.isTest ?? false,
-      });
-    }
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-    const orderResult = await pool.query(
-      `UPDATE orders
-         SET is_paid = COALESCE($1, is_paid),
-             is_ready = COALESCE($2, is_ready)
-       WHERE id = $3
-       RETURNING id, client_id, is_paid AS "isPaid", is_ready AS "isReady"`,
-      [isPaid, isReady, orderId]
-    );
-
-    if (orderResult.rowCount === 0) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
-
-    const {
-      client_id,
-      isPaid: updatedIsPaid,
-      isReady: updatedIsReady,
-    } = orderResult.rows[0];
-
-    if ("name" in body || "address" in body) {
-      await pool.query(
-        `UPDATE clients
-           SET name = $1,
-               address = $2
-         WHERE id = $3`,
-        [name, address, client_id]
-      );
-    }
-
-    const clientResult = await pool.query(
-      `SELECT name, address, phone FROM clients WHERE id = $1`,
-      [client_id]
-    );
-
-    return NextResponse.json({
-      isPaid: updatedIsPaid,
-      isReady: updatedIsReady,
-      name: clientResult.rows[0].name,
-      address: clientResult.rows[0].address,
-      phone: clientResult.rows[0].phone,
-    });
-  } catch (err) {
-    console.error("Error updating order:", err);
+  // Hard fail if someone tries to update these here
+  if (
+    typeof (body as any)?.isPaid !== "undefined" ||
+    typeof (body as any)?.isReady !== "undefined"
+  ) {
     return NextResponse.json(
-      { error: "Failed to update order" },
-      { status: 500 }
+      {
+        error:
+          "Use dedicated endpoints for payment/status. " +
+          "Payment: PATCH /api/orders/:id/payment, Status: PATCH /api/orders/:id/status",
+      },
+      { status: 400 }
     );
   }
+
+  // 1) Mark/unmark test
+  const testParsed = TestSchema.safeParse(body);
+  if (testParsed.success) {
+    try {
+      const result = await pool.query(
+        `UPDATE orders SET is_test = $1, updated_at = now() WHERE id = $2 RETURNING is_test AS "isTest"`,
+        [testParsed.data.isTest, orderId]
+      );
+      if (result.rowCount === 0) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
+      return NextResponse.json({ isTest: result.rows[0].isTest });
+    } catch (err) {
+      console.error("❌ Error updating is_test:", err);
+      return NextResponse.json(
+        { error: "Failed to update order" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // 2) Update client details (name/address)
+  const clientParsed = ClientSchema.safeParse(body);
+  if (clientParsed.success) {
+    try {
+      const orderRes = await pool.query<{ client_id: number }>(
+        `SELECT client_id FROM orders WHERE id = $1`,
+        [orderId]
+      );
+      if (orderRes.rowCount === 0) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
+      const clientId = orderRes.rows[0].client_id;
+
+      const { name, address } = clientParsed.data;
+
+      await pool.query(
+        `UPDATE clients
+           SET name = COALESCE($1, name),
+               address = COALESCE($2, address)
+         WHERE id = $3`,
+        [name ?? null, address ?? null, clientId]
+      );
+
+      const clientResult = await pool.query(
+        `SELECT name, address, phone FROM clients WHERE id = $1`,
+        [clientId]
+      );
+
+      return NextResponse.json({
+        name: clientResult.rows[0].name,
+        address: clientResult.rows[0].address,
+        phone: clientResult.rows[0].phone,
+      });
+    } catch (err) {
+      console.error("❌ Error updating client details:", err);
+      return NextResponse.json(
+        { error: "Failed to update client" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // 3) Unsupported body
+  return NextResponse.json(
+    {
+      error:
+        "Unsupported body. This endpoint only supports { isTest } or { name, address }. " +
+        "For payment use /payment, for readiness use /status.",
+    },
+    { status: 400 }
+  );
 }
 
 async function deleteOrder(
@@ -204,14 +254,15 @@ async function deleteOrder(
   { params }: { params: { id: string } }
 ) {
   const orderId = Number(params.id);
-  if (isNaN(orderId)) {
+  if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
   try {
-    await pool.query(`UPDATE orders SET is_visible = false WHERE id = $1`, [
-      orderId,
-    ]);
+    await pool.query(
+      `UPDATE orders SET is_visible = false, updated_at = now() WHERE id = $1`,
+      [orderId]
+    );
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Error soft-deleting order:", err);
