@@ -1,47 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJWT } from "@/lib/jwt";
 
-export async function protectAPI(
-  req: NextRequest
-): Promise<NextResponse | null> {
-  // console.log("🔐 protectAPI called");
-  // console.log("🔍 Request method:", req.method);
+export type Role = "admin" | "driver" | "client";
 
-  if (req.method === "GET") {
-    // console.log("✅ GET request – skipping auth");
-    return null;
+function extractRole(payload: any): Role | undefined {
+  // Prefer explicit role
+  if (
+    payload?.role === "admin" ||
+    payload?.role === "driver" ||
+    payload?.role === "client"
+  ) {
+    return payload.role;
   }
+  // Back-compat with your existing admin tokens
+  if (payload?.admin === true || payload?.id === "admin") return "admin";
+  return undefined;
+}
+
+/**
+ * Enforces:
+ * - GET is public (unchanged)
+ * - Non-GET: by default admin-only, unless `allowed` is provided.
+ * - If `allowed` is provided, admin is *implicitly* allowed too.
+ */
+export async function protectAPI(
+  req: NextRequest,
+  allowed?: Role[]
+): Promise<NextResponse | null> {
+  // Public GET (unchanged)
+  if (req.method === "GET") return null;
 
   const token = req.cookies.get("token")?.value;
-  // console.log("🍪 Token from cookies:", token || "[none]");
-
   if (!token) {
-    // console.warn("🚫 No token found in cookies");
     return NextResponse.json({ error: "Missing token" }, { status: 401 });
   }
 
   try {
     const payload = await verifyJWT(token);
-    // console.log("🔓 Decoded JWT payload:", payload);
 
-    if (
-      !payload ||
-      typeof payload !== "object" ||
-      (!("admin" in payload) && !("id" in payload))
-    ) {
-      console.warn("🚫 Token payload invalid structure");
+    // If your verifyJWT doesn’t already enforce exp, keep this:
+    if (payload?.exp && Date.now() >= payload.exp * 1000) {
+      return NextResponse.json({ error: "Token expired" }, { status: 401 });
+    }
+
+    const role = extractRole(payload);
+    if (!role) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const isAdmin =
-      (payload as any).admin === true || (payload as any).id === "admin";
+    // Default behavior = admin-only (matches your current setup)
+    const allowedSet = new Set<Role>(
+      allowed && allowed.length ? [...allowed, "admin"] : ["admin"]
+    );
 
-    if (!isAdmin) {
-      console.warn("🚫 Token not admin");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!allowedSet.has(role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // console.log("✅ Token verified and admin");
     return null;
   } catch (err) {
     console.error("❌ Error verifying JWT:", err);

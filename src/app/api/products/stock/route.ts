@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import { z } from "zod";
+import db from "@/lib/db";
 
 /* ─── POST: Get stock status for multiple products ─── */
 async function getProductStock(req: NextRequest) {
@@ -60,6 +60,5 @@ async function updateProductStock(req: NextRequest) {
   }
 }
 
-// ✅ Export both methods
 export const POST = withMiddleware(getProductStock, { skipAuth: true });
 export const PATCH = withMiddleware(updateProductStock);
