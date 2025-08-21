@@ -281,9 +281,12 @@ export default function ViewOrder() {
         onNotifyWhatsApp={handleNotifyAndWhatsApp}
       />
 
+      {/* pass isPaid/isReady so the list can use the SAME highlight rules */}
       <OrderItemList
         items={items}
         isTest={!!order.isTest}
+        isPaid={order.isPaid}
+        isReady={order.isReady}
         onToggleInStock={toggleStock}
       />
 

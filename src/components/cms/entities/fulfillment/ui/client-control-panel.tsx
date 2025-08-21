@@ -40,7 +40,15 @@ export default function ClientControlPanel({
   const name = order.clientName;
   const address = order.clientAddress;
 
-  const testStyle = order.isTest ? "bg-yellow-100 border-yellow-400" : "";
+  // SAME standout palette as list
+  const testStyle = order.isTest
+    ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
+    : "";
+
+  const completedStyle =
+    !order.isTest && order.isPaid && order.isReady
+      ? "bg-green-200 border-2 border-green-700 text-green-950"
+      : "";
 
   const waMessage = ``;
   const waPhone = phone?.replace(/[^0-9]/g, "").replace(/^0/, "972");
@@ -49,7 +57,7 @@ export default function ClientControlPanel({
     : "#";
 
   return (
-    <div className={`border p-4 rounded shadow ${testStyle}`}>
+    <div className={`border p-4 rounded shadow ${testStyle || completedStyle}`}>
       {/* ───────── header ───────── */}
       <div className="flex items-start justify-between">
         <h1
@@ -59,10 +67,10 @@ export default function ClientControlPanel({
             handleTitleClick();
           }}
           className={`text-xl font-bold mb-2 select-none ${
-            order.isTest ? "text-orange-600" : ""
+            order.isTest ? "text-orange-700" : ""
           }`}
         >
-          הזמנה #{order.orderId}
+          הזמנה #{order.orderId}
         </h1>
 
         <div className="flex gap-2 flex-wrap">
@@ -74,7 +82,7 @@ export default function ClientControlPanel({
               }}
               className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded"
             >
-              הסר בדיקה
+              הסר בדיקה
             </button>
           )}
           <button
@@ -84,7 +92,7 @@ export default function ClientControlPanel({
             }}
             className="text-sm bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded"
           >
-            🗑️ מחק הזמנה
+            🗑️ מחק הזמנה
           </button>
           {!order.isTest && order.isNotified === false && onNotifyWhatsApp && (
             <button
@@ -135,7 +143,7 @@ export default function ClientControlPanel({
           className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
           onClick={() => console.log("📞 dial link clicked")}
         >
-          📞 התקשר
+          📞 התקשר
         </a>
 
         <a

@@ -19,17 +19,30 @@ export type Item = {
 type Props = {
   items: Item[];
   isTest: boolean;
+  isPaid: boolean;
+  isReady: boolean;
   onToggleInStock: (productId: number) => void;
 };
 
 export default function OrderItemList({
   items,
   isTest,
+  isPaid,
+  isReady,
   onToggleInStock,
 }: Props) {
   let before = 0,
     after = 0,
     actual = 0;
+
+  // highlight wrapper with SAME palette as list item
+  const testStyle = isTest
+    ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
+    : "";
+  const completedStyle =
+    !isTest && isPaid && isReady
+      ? "bg-green-200 border-2 border-green-700 text-green-950"
+      : "";
 
   // Group items by storageName
   const grouped = new Map<string, Item[]>();
@@ -97,12 +110,12 @@ export default function OrderItemList({
                     it.saleQuantity &&
                     it.quantity >= it.saleQuantity && (
                       <p>
-                        מחיר מבצע: ₪{it.salePrice.toFixed(2)} ל‑
+                        מחיר מבצע: ₪{it.salePrice.toFixed(2)} ל-
                         {it.saleQuantity}
                       </p>
                     )}
                   <p className="font-bold">
-                    סה״כ למוצר: ₪{withDisc.toFixed(2)}
+                    סה״כ למוצר: ₪{withDisc.toFixed(2)}
                   </p>
                 </div>
 
@@ -113,7 +126,7 @@ export default function OrderItemList({
                       it.inStock ? "bg-green-500 text-white" : "bg-gray-300"
                     }`}
                   >
-                    {it.inStock ? "✔️ במלאי" : "❌ חסר"}
+                    {it.inStock ? "✔️ במלאי" : "❌ חסר"}
                   </button>
 
                   <Link
@@ -134,21 +147,17 @@ export default function OrderItemList({
   const discount = before - after;
 
   return (
-    <div
-      className={`border p-4 rounded shadow ${
-        isTest ? "bg-yellow-100 border-yellow-400" : ""
-      }`}
-    >
-      <h2 className="text-lg font-bold mb-4">פרטי מוצרים</h2>
+    <div className={`border rounded shadow p-4 ${testStyle || completedStyle}`}>
+      <h2 className="text-lg font-bold mb-4">פרטי מוצרים</h2>
 
       {content}
 
       <div className="text-right mt-6 space-y-2 border-t pt-4">
-        <p>סה״כ לפני הנחה: ₪{before.toFixed(2)}</p>
-        <p>סה״כ הנחה: ₪{discount.toFixed(2)}</p>
-        <p>סה״כ הזמנה: ₪{after.toFixed(2)}</p>
+        <p>סה״כ לפני הנחה: ₪{before.toFixed(2)}</p>
+        <p>סה״כ הנחה: ₪{discount.toFixed(2)}</p>
+        <p>סה״כ הזמנה: ₪{after.toFixed(2)}</p>
         <p className="text-xl font-bold text-pink-700">
-          סה״כ לתשלום בפועל: ₪{actual.toFixed(2)}
+          סה״כ לתשלום בפועל: ₪{actual.toFixed(2)}
         </p>
       </div>
     </div>
