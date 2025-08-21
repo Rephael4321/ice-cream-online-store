@@ -1,33 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ImageGrid from "./ui/image-grid";
+import UploadImage from "@/components/cms/entities/image/upload";
+import UploadFolder from "@/components/cms/entities/image/upload-folder";
 
 export type ProductImage = {
   key: string;
   url: string;
   size: number;
   updated_at: string | null;
-  name?: string; // display name (if API provides it)
+  name?: string;
 };
+
+const PAGE_SIZE = 50;
 
 export default function ProductImagesList() {
   const [images, setImages] = useState<ProductImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
+
   const [sort, setSort] = useState<"name" | "updated" | "size">("updated");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
+
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
-  async function fetchImages() {
+  const fetchingRef = useRef(false);
+
+  async function fetchBatch(opts: { reset?: boolean } = {}) {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    const nextOffset = opts.reset ? 0 : offset;
+
     try {
-      const res = await fetch(`/api/products/unused-images`, {
+      const qs = new URLSearchParams({
+        sort,
+        order,
+        offset: String(nextOffset),
+        limit: String(PAGE_SIZE),
+        // prefix: "images/", // optional filter if you add it
+      });
+      const res = await fetch(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
       });
       const data = await res.json();
-      setImages(data.images || []);
+
+      if (opts.reset) {
+        setImages(data.images || []);
+      } else {
+        setImages((prev) => [...prev, ...(data.images || [])]);
+      }
+
+      const got = Array.isArray(data.images) ? data.images.length : 0;
+      const newOffset = nextOffset + got;
+
+      setOffset(newOffset);
+      setTotal(Number(data.total || 0));
+      setHasMore(newOffset < Number(data.total || 0));
       setLastRefreshed(new Date().toLocaleString("he-IL"));
     } finally {
+      fetchingRef.current = false;
       setLoading(false);
       setReloading(false);
     }
@@ -35,46 +71,53 @@ export default function ProductImagesList() {
 
   // Initial load
   useEffect(() => {
-    fetchImages();
-    // NOTE: no dependency on sort/order → no refetch on organize
+    fetchBatch({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div>טוען תמונות…</div>;
+  // When sort/order changes → reset & refetch
+  useEffect(() => {
+    setLoading(true);
+    setOffset(0);
+    setHasMore(true);
+    fetchBatch({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort, order]);
+
+  if (loading && images.length === 0) return <div>טוען תמונות…</div>;
 
   return (
-    <div dir="rtl" className="p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+    <div dir="rtl" className="p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold">תמונות לא בשימוש</h1>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Sorting Controls (organize locally only) */}
-          <div className="flex gap-2">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as any)}
-              className="border px-2 py-1 rounded"
-              title="שיטת קיבוץ/מיון"
-            >
-              <option value="updated">לפי עדכון אחרון</option>
-              <option value="name">לפי שם</option>
-              <option value="size">לפי גודל</option>
-            </select>
-            <select
-              value={order}
-              onChange={(e) => setOrder(e.target.value as any)}
-              className="border px-2 py-1 rounded"
-              title="סדר"
-            >
-              <option value="desc">יורד</option>
-              <option value="asc">עולה</option>
-            </select>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sort controls */}
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as any)}
+            className="border px-2 py-1 rounded"
+            title="שיטת קיבוץ/מיון"
+          >
+            <option value="updated">לפי עדכון אחרון</option>
+            <option value="name">לפי שם</option>
+            <option value="size">לפי גודל</option>
+          </select>
+          <select
+            value={order}
+            onChange={(e) => setOrder(e.target.value as any)}
+            className="border px-2 py-1 rounded"
+            title="סדר"
+          >
+            <option value="desc">יורד</option>
+            <option value="asc">עולה</option>
+          </select>
 
-          {/* Reload button */}
+          {/* Refresh */}
           <button
             onClick={() => {
               setReloading(true);
-              fetchImages();
+              fetchBatch({ reset: true });
             }}
             className={`px-3 py-1.5 rounded border ${
               reloading ? "opacity-70 cursor-wait" : "hover:bg-gray-50"
@@ -85,7 +128,6 @@ export default function ProductImagesList() {
             {reloading ? "מרענן…" : "רענן"}
           </button>
 
-          {/* Last refreshed hint */}
           {lastRefreshed && (
             <span className="text-xs text-gray-500">
               עודכן לאחרונה: {lastRefreshed}
@@ -94,8 +136,27 @@ export default function ProductImagesList() {
         </div>
       </div>
 
-      {/* Organize client-side */}
+      {/* Uploaders */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <UploadImage onUpload={() => fetchBatch({ reset: true })} />
+        <UploadFolder onUpload={() => fetchBatch({ reset: true })} />
+      </div>
+
+      {/* Server sorts; grid groups locally for UI only */}
       <ImageGrid images={images} groupBy={sort} order={order} />
+
+      {/* Load more */}
+      {hasMore && (
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => fetchBatch()}
+            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+            disabled={fetchingRef.current}
+          >
+            טען עוד ({offset}/{total})
+          </button>
+        </div>
+      )}
     </div>
   );
 }

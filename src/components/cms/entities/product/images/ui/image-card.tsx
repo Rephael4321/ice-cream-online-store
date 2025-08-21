@@ -3,9 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default function ImageCard({ image }: { image: ProductImage }) {
-  // If API added `name`, prefer it; fallback to filename
   const displayName =
-    // @ts-ignore — allow optional name
     (image as any).name ?? image.key.split("/").pop() ?? image.key;
 
   return (
@@ -19,6 +17,7 @@ export default function ImageCard({ image }: { image: ProductImage }) {
             src={image.url}
             alt={displayName}
             fill
+            unoptimized // ✅ disables Next.js optimization for these images
             className="object-contain rounded"
             sizes="(max-width: 768px) 50vw, 25vw"
           />
