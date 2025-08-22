@@ -16,7 +16,7 @@ interface Product {
   saleQuantity: number | null;
   salePrice: number | null;
   categories: string[] | null;
-  image_use_count?: number; // server-provided
+  image_use_count?: number;
 }
 
 type SortKey =
@@ -35,13 +35,12 @@ const PAGE_SIZE = 48;
 export default function ListProduct() {
   const [items, setItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reloading, setReloading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("id");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -50,16 +49,13 @@ export default function ListProduct() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showDuplicatesPanel, setShowDuplicatesPanel] = useState(false);
 
-  // stable ref to input for optional refocus (but we keep it mounted anyway)
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const fetchingRef = useRef(false);
 
-  // --- Helpers ---
   const updateUrlParam = (q: string) => {
     const url = new URL(window.location.href);
     if (q) url.searchParams.set("q", q);
     else url.searchParams.delete("q");
-    // Use history API to avoid any rerender that could cause focus loss
     window.history.replaceState(null, "", url.toString());
   };
 
@@ -71,11 +67,13 @@ export default function ListProduct() {
 
     const qs = new URLSearchParams({
       q: search,
-      sort: sortKey,
-      order: sortOrder,
       offset: String(nextOffset),
       limit: String(PAGE_SIZE),
     });
+    if (sortKey) {
+      qs.set("sort", sortKey);
+      qs.set("order", sortOrder);
+    }
 
     try {
       const res = await fetch(`/api/products?${qs.toString()}`, {
@@ -104,17 +102,10 @@ export default function ListProduct() {
     } finally {
       fetchingRef.current = false;
       setLoading(false);
-      setReloading(false);
       setLoadingMore(false);
-      // keep focus where it was
-      if (searchInputRef.current && document.activeElement === document.body) {
-        // only refocus if nothing is focused (usually not needed)
-        searchInputRef.current.focus();
-      }
     }
   }
 
-  // --- Init: hydrate search from URL, then first fetch ---
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const initialSearch = params.get("q") || "";
@@ -122,14 +113,11 @@ export default function ListProduct() {
   }, []);
 
   useEffect(() => {
-    // first fetch after initial search set (mount)
     setLoading(true);
     fetchBatch({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, sortKey, sortOrder]);
 
-  // --- Duplicates (computed from the currently loaded page; server also tags rows with counts over full filtered set) ---
-  // We'll trust server-provided image_use_count for accuracy, but keep this map for quick checks.
   const duplicateImageMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of items) {
@@ -159,12 +147,10 @@ export default function ListProduct() {
     Object.keys(duplicateGroups).length > 0 ||
     items.some((p) => (p.image_use_count ?? 0) > 1);
 
-  // --- Handlers ---
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearch(newValue);
     updateUrlParam(newValue);
-    // reset pagination and refetch (effect above handles)
     setOffset(0);
     setHasMore(true);
     setLoading(true);
@@ -176,14 +162,8 @@ export default function ListProduct() {
       setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      // sensible defaults
-      if (key === "created_at" || key === "updated_at" || key === "id") {
-        setSortOrder("desc");
-      } else {
-        setSortOrder("asc");
-      }
+      setSortOrder("asc");
     }
-    // reset pagination
     setOffset(0);
     setHasMore(true);
     setLoading(true);
@@ -194,7 +174,6 @@ export default function ListProduct() {
 
   return (
     <div className="p-6 space-y-6" dir="rtl">
-      {/* Duplicate warning */}
       {hasDuplicates && (
         <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-md shadow flex justify-between items-center">
           <span>⚠️ נמצאו תמונות כפולות בתוצאות המסוננות.</span>
@@ -213,7 +192,6 @@ export default function ListProduct() {
           {Object.entries(duplicateGroups).map(([image, group]) => (
             <div key={image} className="border rounded p-3 space-y-2">
               <div className="flex items-center gap-3">
-                {/* fallback size; images are optional */}
                 <Image
                   src={image}
                   alt="Duplicate"
@@ -223,14 +201,6 @@ export default function ListProduct() {
                 />
                 <span className="text-gray-600">
                   {group.length} פריטים מהדף הנוכחי משתמשים בתמונה זו
-                  {(() => {
-                    // try to show global count if available
-                    const any = group[0];
-                    const totalForImage = any?.image_use_count;
-                    return totalForImage && totalForImage > group.length ? (
-                      <span> (סה״כ במסנן: {totalForImage})</span>
-                    ) : null;
-                  })()}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -249,7 +219,6 @@ export default function ListProduct() {
         </div>
       )}
 
-      {/* Header / Controls */}
       <div className="flex justify-between items-center gap-4 flex-wrap">
         <h1 className="text-2xl font-bold">רשימת מוצרים</h1>
 
@@ -305,27 +274,9 @@ export default function ListProduct() {
               </div>
             )}
           </div>
-
-          {/* Refresh */}
-          <button
-            onClick={() => {
-              setReloading(true);
-              setOffset(0);
-              setHasMore(true);
-              fetchBatch({ reset: true });
-            }}
-            className={`text-sm px-3 py-1 rounded border ${
-              reloading ? "opacity-70 cursor-wait" : "hover:bg-gray-50"
-            }`}
-            disabled={reloading}
-            title="רענון מהשרת"
-          >
-            {reloading ? "מרענן…" : "רענן"}
-          </button>
         </div>
       </div>
 
-      {/* Grid */}
       {items.length === 0 ? (
         <p className="text-gray-500 p-4">לא נמצאו מוצרים.</p>
       ) : (
@@ -375,7 +326,6 @@ export default function ListProduct() {
         </div>
       )}
 
-      {/* Batching controls */}
       {hasMore && (
         <div className="flex justify-center">
           <button
