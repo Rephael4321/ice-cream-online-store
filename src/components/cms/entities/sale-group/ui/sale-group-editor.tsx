@@ -23,7 +23,7 @@ interface SaleGroupEditorProps {
 
 type SelectorItem = { id: number; name: string; image: string };
 
-// Robust base name extractor that tolerates unknown inputs
+// ✅ Robust base name extractor with decodeURIComponent
 function baseNameFromUnknown(input: unknown): string {
   const url =
     typeof input === "string"
@@ -35,11 +35,19 @@ function baseNameFromUnknown(input: unknown): string {
       : "";
 
   if (!url) return "";
-  // strip query/hash then get filename and remove extension
+
   const clean = url.split(/[?#]/)[0];
-  const file = clean.split("/").pop() ?? "";
-  const dot = file.lastIndexOf(".");
-  return dot === -1 ? file : file.slice(0, dot);
+  const encodedFile = clean.split("/").pop() ?? "";
+
+  try {
+    const decoded = decodeURIComponent(encodedFile);
+    const dot = decoded.lastIndexOf(".");
+    return dot === -1 ? decoded : decoded.slice(0, dot);
+  } catch {
+    // fallback if decoding fails
+    const dot = encodedFile.lastIndexOf(".");
+    return dot === -1 ? encodedFile : encodedFile.slice(0, dot);
+  }
 }
 
 export function SaleGroupEditor({
@@ -53,11 +61,9 @@ export function SaleGroupEditor({
 }: SaleGroupEditorProps) {
   const router = useRouter();
 
-  // Committed fields
   const [name, setName] = useState(initialName ?? "");
   const [image, setImage] = useState<string>(initialImage ?? ""); // full S3 URL
 
-  // Image selector state (draft text shown in the input)
   const [imageDraft, setImageDraft] = useState<string>(
     baseNameFromUnknown(initialImage)
   );
@@ -66,7 +72,7 @@ export function SaleGroupEditor({
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState(initialCategories || []);
 
-  // Load S3 image list (supports string[] or {url/key/name}[] or {image}[])
+  // Load S3 image list
   useEffect(() => {
     (async () => {
       try {
@@ -78,8 +84,11 @@ export function SaleGroupEditor({
           ? (data
               .map((entry, idx) => {
                 if (typeof entry === "string") {
-                  const name = baseNameFromUnknown(entry);
-                  return { id: idx, name, image: entry };
+                  return {
+                    id: idx,
+                    name: baseNameFromUnknown(entry),
+                    image: entry,
+                  };
                 }
                 if (entry && typeof entry === "object") {
                   const obj = entry as any;
@@ -101,7 +110,6 @@ export function SaleGroupEditor({
               .filter(Boolean) as SelectorItem[])
           : [];
 
-        // Ensure current image (if any) is present in list so selector shows its label
         if (image && !items.find((i) => i.image === image)) {
           items.push({
             id: -1,
@@ -129,13 +137,12 @@ export function SaleGroupEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim() || null,
-          image: fullImagePath || null, // full S3 URL (or null)
+          image: fullImagePath || null,
         }),
       });
 
       if (!res.ok) throw new Error();
       showToast("קבוצת מבצע עודכנה בהצלחה", "success");
-      // router.refresh(); // optional
     } catch {
       showToast("אירעה שגיאה בעדכון הקבוצה", "error");
     } finally {
@@ -184,7 +191,6 @@ export function SaleGroupEditor({
                 setImage("");
                 return;
               }
-              // Free-typed value (ImageSelector may pass { id:"", name:"typed" })
               if (
                 typeof item !== "object" ||
                 !("image" in item) ||
@@ -195,13 +201,12 @@ export function SaleGroupEditor({
                 setImageDraft(typed);
                 return;
               }
-              // Real selection from list
               const pickedUrl: string = item.image;
               const pickedName: string =
                 item.name || baseNameFromUnknown(pickedUrl);
-              setImage(pickedUrl); // commit S3 URL
-              setImageDraft(pickedName); // show label
-              setName((prev) => prev || pickedName); // convenience default
+              setImage(pickedUrl);
+              setImageDraft(pickedName);
+              setName((prev) => prev || pickedName);
             }}
             getDisplayValue={(val) => val}
             disabled={loading}
