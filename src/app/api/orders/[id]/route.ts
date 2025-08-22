@@ -1,7 +1,7 @@
+// src/app/api/orders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
-import { z } from "zod";
 
 type OrderRow = {
   orderId: number;
@@ -41,13 +41,14 @@ type OrderItemRow = {
   afterItemSale: number | null;
 };
 
+/* -------------------- GET /api/orders/:id -------------------- */
 async function getOrder(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
-    console.warn("❌ Invalid order ID:", params.id);
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
@@ -75,7 +76,6 @@ async function getOrder(
 
     const order = orderResult.rows[0];
     if (!order) {
-      console.warn("❌ Order not found or is not visible");
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
@@ -89,16 +89,13 @@ async function getOrder(
          oi.sale_price     AS "salePrice",
          oi.product_image  AS "productImage",
          oi.in_stock       AS "inStock",
-         -- storage (best-effort)
          sa.name           AS "storageName",
          sa.sort_order     AS "storageSort",
-         -- snapshot columns
          oi.group_id           AS "groupId",
          oi.group_bundle_qty   AS "groupBundleQty",
          oi.group_sale_price   AS "groupSalePrice",
          oi.group_unit_price   AS "groupUnitPrice",
          oi.group_discount     AS "groupDiscount",
-         -- convenience computed amounts
          (oi.quantity * oi.unit_price) AS "baseTotal",
          CASE
            WHEN oi.sale_quantity IS NOT NULL AND oi.sale_price IS NOT NULL THEN
@@ -116,55 +113,54 @@ async function getOrder(
       [orderId]
     );
 
-    return NextResponse.json({
-      order,
-      items: itemsResult.rows,
-    });
-  } catch (err: unknown) {
-    console.error("❌ Error fetching order:", err);
+    return NextResponse.json({ order, items: itemsResult.rows });
+  } catch (err) {
     const error = err instanceof Error ? err.message : "Failed to fetch order";
     return NextResponse.json({ error }, { status: 500 });
   }
 }
 
-/** PATCH supports ONLY:
+/* -------------------- PATCH /api/orders/:id -------------------- */
+/**
+ * Supports ONLY:
  *  - { isTest: boolean }
- *  - { name?: string, address?: string } (at least one present)
- *  For payment/status use:
- *   - PATCH /api/orders/:id/payment
- *   - PATCH /api/orders/:id/status
+ *  - { name?: string | null, address?: string | null }
+ *    - Empty string "" is treated as null (delete)
+ *    - Omitting a field leaves it unchanged
+ * For payment/status use:
+ *  - PATCH /api/orders/:id/payment
+ *  - PATCH /api/orders/:id/status
  */
-const TestSchema = z.object({ isTest: z.boolean() });
-const ClientSchema = z
-  .object({
-    name: z.string().trim().min(1).optional(),
-    address: z.string().trim().min(1).optional(),
-  })
-  .refine((v) => typeof v.name === "string" || typeof v.address === "string", {
-    message: "At least one of 'name' or 'address' is required",
-  });
+function normalizeToNullOrString(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined; // not provided
+  if (v === null) return null; // explicit delete
+  if (typeof v === "string") {
+    const t = v.trim();
+    return t === "" ? null : t; // "" => delete (NULL)
+  }
+  // invalid type
+  return undefined;
+}
 
 async function updateOrder(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
-  let body: unknown;
+  let body: any;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Hard fail if someone tries to update these here
-  if (
-    typeof (body as any)?.isPaid !== "undefined" ||
-    typeof (body as any)?.isReady !== "undefined"
-  ) {
+  // Guard: payment/status must use dedicated endpoints
+  if (body?.isPaid !== undefined || body?.isReady !== undefined) {
     return NextResponse.json(
       {
         error:
@@ -175,20 +171,27 @@ async function updateOrder(
     );
   }
 
-  // 1) Mark/unmark test
-  const testParsed = TestSchema.safeParse(body);
-  if (testParsed.success) {
+  // 1) Test flag
+  if (Object.prototype.hasOwnProperty.call(body ?? {}, "isTest")) {
+    if (typeof body.isTest !== "boolean") {
+      return NextResponse.json(
+        { error: "`isTest` must be a boolean" },
+        { status: 400 }
+      );
+    }
     try {
       const result = await pool.query(
-        `UPDATE orders SET is_test = $1, updated_at = now() WHERE id = $2 RETURNING is_test AS "isTest"`,
-        [testParsed.data.isTest, orderId]
+        `UPDATE orders
+           SET is_test = $1, updated_at = now()
+         WHERE id = $2
+         RETURNING is_test AS "isTest"`,
+        [body.isTest, orderId]
       );
       if (result.rowCount === 0) {
         return NextResponse.json({ error: "Order not found" }, { status: 404 });
       }
       return NextResponse.json({ isTest: result.rows[0].isTest });
-    } catch (err) {
-      console.error("❌ Error updating is_test:", err);
+    } catch {
       return NextResponse.json(
         { error: "Failed to update order" },
         { status: 500 }
@@ -196,64 +199,77 @@ async function updateOrder(
     }
   }
 
-  // 2) Update client details (name/address)
-  const clientParsed = ClientSchema.safeParse(body);
-  if (clientParsed.success) {
-    try {
-      const orderRes = await pool.query<{ client_id: number }>(
-        `SELECT client_id FROM orders WHERE id = $1`,
-        [orderId]
-      );
-      if (orderRes.rowCount === 0) {
-        return NextResponse.json({ error: "Order not found" }, { status: 404 });
-      }
-      const clientId = orderRes.rows[0].client_id;
+  // 2) Client details
+  const name = normalizeToNullOrString(body?.name);
+  const address = normalizeToNullOrString(body?.address);
 
-      const { name, address } = clientParsed.data;
-
-      await pool.query(
-        `UPDATE clients
-           SET name = COALESCE($1, name),
-               address = COALESCE($2, address)
-         WHERE id = $3`,
-        [name ?? null, address ?? null, clientId]
-      );
-
-      const clientResult = await pool.query(
-        `SELECT name, address, phone FROM clients WHERE id = $1`,
-        [clientId]
-      );
-
-      return NextResponse.json({
-        name: clientResult.rows[0].name,
-        address: clientResult.rows[0].address,
-        phone: clientResult.rows[0].phone,
-      });
-    } catch (err) {
-      console.error("❌ Error updating client details:", err);
-      return NextResponse.json(
-        { error: "Failed to update client" },
-        { status: 500 }
-      );
-    }
+  // If neither field is present, it's not a supported payload
+  if (name === undefined && address === undefined) {
+    return NextResponse.json(
+      {
+        error:
+          "Unsupported body. Provide at least one of { name, address } (use empty string to clear).",
+      },
+      { status: 400 }
+    );
   }
 
-  // 3) Unsupported body
-  return NextResponse.json(
-    {
-      error:
-        "Unsupported body. This endpoint only supports { isTest } or { name, address }. " +
-        "For payment use /payment, for readiness use /status.",
-    },
-    { status: 400 }
-  );
+  try {
+    const orderRes = await pool.query<{ client_id: number }>(
+      `SELECT client_id FROM orders WHERE id = $1`,
+      [orderId]
+    );
+    if (orderRes.rowCount === 0 || !orderRes.rows[0].client_id) {
+      return NextResponse.json(
+        { error: "Order not found or has no client attached" },
+        { status: 404 }
+      );
+    }
+    const clientId = orderRes.rows[0].client_id;
+
+    // Build dynamic UPDATE
+    const setParts: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+
+    if (name !== undefined) {
+      setParts.push(`name = $${i++}`);
+      values.push(name); // string or null
+    }
+    if (address !== undefined) {
+      setParts.push(`address = $${i++}`);
+      values.push(address); // string or null
+    }
+    setParts.push(`updated_at = now()`);
+
+    await pool.query(
+      `UPDATE clients
+         SET ${setParts.join(", ")}
+       WHERE id = $${i}`,
+      [...values, clientId]
+    );
+
+    const clientResult = await pool.query(
+      `SELECT name, address, phone FROM clients WHERE id = $1`,
+      [clientId]
+    );
+
+    return NextResponse.json(clientResult.rows[0]);
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to update client" },
+      { status: 500 }
+    );
+  }
 }
 
+/* -------------------- DELETE /api/orders/:id -------------------- */
 async function deleteOrder(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
@@ -264,8 +280,7 @@ async function deleteOrder(
       [orderId]
     );
     return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("Error soft-deleting order:", err);
+  } catch {
     return NextResponse.json(
       { error: "Failed to delete order" },
       { status: 500 }

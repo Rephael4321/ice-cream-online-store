@@ -34,6 +34,10 @@ type Item = {
 
 type ExtendedItem = Item & { inStock: boolean };
 
+// presence-check helper (key presence, not truthiness)
+const has = (obj: any, key: string) =>
+  obj != null && Object.prototype.hasOwnProperty.call(obj, key);
+
 export default function ViewOrder() {
   const id = useParams()?.id as string | undefined;
 
@@ -85,7 +89,7 @@ export default function ViewOrder() {
           items: Item[];
         };
 
-        const enriched = raw.map((it: any) => ({
+        const enriched = (raw || []).map((it: any) => ({
           ...it,
           unitPrice: +it.unitPrice,
           salePrice: it.salePrice !== null ? +it.salePrice : null,
@@ -143,7 +147,6 @@ export default function ViewOrder() {
     }
   };
 
-  // NEW: split endpoints
   const togglePaid = async () => {
     if (!order) return;
     try {
@@ -222,31 +225,37 @@ export default function ViewOrder() {
     }
   };
 
+  // ✅ IMPORTANT: respects explicit null from API (so clearing "" shows immediately)
   const handleUpdateClient = async () => {
     if (!order) return;
+    const payload = {
+      name: newName.trim(), // "" → API converts to null and returns { name: null }
+      address: newAddr.trim(),
+    };
     try {
       const r = await fetch(`/api/orders/${order.orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newName.trim(),
-          address: newAddr.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
+
       setOrder((o) =>
         o
           ? {
               ...o,
-              clientName: data.name ?? o.clientName,
-              clientAddress: data.address ?? o.clientAddress,
-              clientPhone: data.phone ?? o.clientPhone,
-              isPaid: data.isPaid ?? o.isPaid,
-              isReady: data.isReady ?? o.isReady,
+              clientName: has(data, "name") ? data.name : o.clientName,
+              clientAddress: has(data, "address")
+                ? data.address
+                : o.clientAddress,
+              clientPhone: has(data, "phone") ? data.phone : o.clientPhone,
+              isPaid: has(data, "isPaid") ? data.isPaid : o.isPaid,
+              isReady: has(data, "isReady") ? data.isReady : o.isReady,
             }
           : o
       );
+
       toast.success("📝 עודכן בהצלחה");
       setEditOpen(false);
     } catch {
@@ -281,7 +290,6 @@ export default function ViewOrder() {
         onNotifyWhatsApp={handleNotifyAndWhatsApp}
       />
 
-      {/* pass isPaid/isReady so the list can use the SAME highlight rules */}
       <OrderItemList
         items={items}
         isTest={!!order.isTest}
