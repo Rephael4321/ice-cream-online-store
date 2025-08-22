@@ -1,36 +1,120 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
 import Link from "next/link";
 import Image from "next/image";
 
 interface Product {
-  id: string;
+  id: number;
   name: string;
-  price: string | number;
-  image?: string;
-  saleQuantity?: number | string;
-  salePrice?: string | number;
-  created_at?: string;
-  updated_at?: string;
-  in_stock?: boolean;
-  categories?: string[];
+  price: number;
+  image: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  in_stock: boolean | null;
+  saleQuantity: number | null;
+  salePrice: number | null;
+  categories: string[] | null;
+  image_use_count?: number; // server-provided
 }
 
+type SortKey =
+  | "id"
+  | "name"
+  | "price"
+  | "sale"
+  | "created_at"
+  | "updated_at"
+  | "in_stock"
+  | "categories";
+type SortOrder = "asc" | "desc";
+
+const PAGE_SIZE = 48;
+
 export default function ListProduct() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [items, setItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloading, setReloading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortAsc, setSortAsc] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>("id");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showDuplicatesPanel, setShowDuplicatesPanel] = useState(false);
 
-  const router = useRouter();
+  // stable ref to input for optional refocus (but we keep it mounted anyway)
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const fetchingRef = useRef(false);
 
+  // --- Helpers ---
+  const updateUrlParam = (q: string) => {
+    const url = new URL(window.location.href);
+    if (q) url.searchParams.set("q", q);
+    else url.searchParams.delete("q");
+    // Use history API to avoid any rerender that could cause focus loss
+    window.history.replaceState(null, "", url.toString());
+  };
+
+  async function fetchBatch(opts: { reset?: boolean } = {}) {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    const nextOffset = opts.reset ? 0 : offset;
+
+    const qs = new URLSearchParams({
+      q: search,
+      sort: sortKey,
+      order: sortOrder,
+      offset: String(nextOffset),
+      limit: String(PAGE_SIZE),
+    });
+
+    try {
+      const res = await fetch(`/api/products?${qs.toString()}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Failed to load products");
+      }
+      const data = await res.json();
+      const list: Product[] = data.products || [];
+      const totalFromServer = Number(data.total || 0);
+
+      if (opts.reset) {
+        setItems(list);
+      } else {
+        setItems((prev) => [...prev, ...list]);
+      }
+
+      const newOffset = nextOffset + list.length;
+      setOffset(newOffset);
+      setTotal(totalFromServer);
+      setHasMore(newOffset < totalFromServer);
+    } catch (e: any) {
+      setError(e?.message || "Unexpected error");
+    } finally {
+      fetchingRef.current = false;
+      setLoading(false);
+      setReloading(false);
+      setLoadingMore(false);
+      // keep focus where it was
+      if (searchInputRef.current && document.activeElement === document.body) {
+        // only refocus if nothing is focused (usually not needed)
+        searchInputRef.current.focus();
+      }
+    }
+  }
+
+  // --- Init: hydrate search from URL, then first fetch ---
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const initialSearch = params.get("q") || "";
@@ -38,120 +122,82 @@ export default function ListProduct() {
   }, []);
 
   useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const res = await fetch("/api/products");
-        if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצרים");
-        const data = await res.json();
-        setProducts((data.products ?? data).reverse());
-      } catch (err) {
-        setError((err as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchProducts();
-  }, []);
+    // first fetch after initial search set (mount)
+    setLoading(true);
+    fetchBatch({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, sortKey, sortOrder]);
 
-  // Map: image -> count
+  // --- Duplicates (computed from the currently loaded page; server also tags rows with counts over full filtered set) ---
+  // We'll trust server-provided image_use_count for accuracy, but keep this map for quick checks.
   const duplicateImageMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (const p of products) {
+    for (const p of items) {
       if (p.image) {
-        map.set(p.image, (map.get(p.image) ?? 0) + 1);
+        const count = Math.max(
+          p.image_use_count ?? 0,
+          (map.get(p.image) ?? 0) + 1
+        );
+        map.set(p.image, count);
       }
     }
     return map;
-  }, [products]);
+  }, [items]);
 
-  // Extract actual duplicates
   const duplicateGroups = useMemo(() => {
     const groups: Record<string, Product[]> = {};
-    for (const p of products) {
-      if (p.image && (duplicateImageMap.get(p.image) ?? 0) > 1) {
+    for (const p of items) {
+      if (p.image && (p.image_use_count ?? 0) > 1) {
         if (!groups[p.image]) groups[p.image] = [];
         groups[p.image].push(p);
       }
     }
     return groups;
-  }, [products, duplicateImageMap]);
+  }, [items]);
 
-  const hasDuplicates = Object.keys(duplicateGroups).length > 0;
+  const hasDuplicates =
+    Object.keys(duplicateGroups).length > 0 ||
+    items.some((p) => (p.image_use_count ?? 0) > 1);
 
-  const filtered = useMemo(() => {
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.id.toString().includes(search)
-    );
-  }, [products, search]);
-
-  const sorted = useMemo(() => {
-    const list = [...filtered];
-    if (!sortKey) return list;
-
-    return list.sort((a, b) => {
-      let aVal: any = null;
-      let bVal: any = null;
-
-      switch (sortKey) {
-        case "id":
-        case "price":
-          aVal = Number(a[sortKey]);
-          bVal = Number(b[sortKey]);
-          break;
-        case "name":
-          aVal = a.name?.toLowerCase() ?? "";
-          bVal = b.name?.toLowerCase() ?? "";
-          break;
-        case "sale":
-          aVal = Number(a.saleQuantity ?? 0) * Number(a.salePrice ?? 0);
-          bVal = Number(b.saleQuantity ?? 0) * Number(b.salePrice ?? 0);
-          break;
-        case "created_at":
-        case "updated_at":
-          aVal = new Date(a[sortKey] ?? "").getTime();
-          bVal = new Date(b[sortKey] ?? "").getTime();
-          break;
-        case "in_stock":
-          aVal = a.in_stock ? 1 : 0;
-          bVal = b.in_stock ? 1 : 0;
-          break;
-        case "categories":
-          aVal = (a.categories?.[0] || "").toLowerCase();
-          bVal = (b.categories?.[0] || "").toLowerCase();
-          break;
-        default:
-          return 0;
-      }
-
-      if (aVal < bVal) return sortAsc ? -1 : 1;
-      if (aVal > bVal) return sortAsc ? 1 : -1;
-      return 0;
-    });
-  }, [filtered, sortKey, sortAsc]);
-
+  // --- Handlers ---
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearch(newValue);
-    const params = new URLSearchParams(window.location.search);
-    if (newValue) {
-      params.set("q", newValue);
-    } else {
-      params.delete("q");
-    }
-    router.replace(`?${params.toString()}`);
+    updateUrlParam(newValue);
+    // reset pagination and refetch (effect above handles)
+    setOffset(0);
+    setHasMore(true);
+    setLoading(true);
   };
 
-  if (loading) return <p className="p-4">טוען מוצרים...</p>;
+  const toggleSort = (key: SortKey) => {
+    setShowSortMenu(false);
+    if (key === sortKey) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // sensible defaults
+      if (key === "created_at" || key === "updated_at" || key === "id") {
+        setSortOrder("desc");
+      } else {
+        setSortOrder("asc");
+      }
+    }
+    // reset pagination
+    setOffset(0);
+    setHasMore(true);
+    setLoading(true);
+  };
+
+  if (loading && items.length === 0) return <p className="p-4">טוען מוצרים…</p>;
   if (error) return <p className="p-4 text-red-500">שגיאה: {error}</p>;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Duplicate warning message */}
+    <div className="p-6 space-y-6" dir="rtl">
+      {/* Duplicate warning */}
       {hasDuplicates && (
         <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-md shadow flex justify-between items-center">
-          <span>⚠️ נמצאו תמונות כפולות — יש מוצרים שמשתמשים באותה תמונה.</span>
+          <span>⚠️ נמצאו תמונות כפולות בתוצאות המסוננות.</span>
           <button
             onClick={() => setShowDuplicatesPanel((s) => !s)}
             className="text-sm px-3 py-1 bg-yellow-200 rounded hover:bg-yellow-300"
@@ -161,13 +207,13 @@ export default function ListProduct() {
         </div>
       )}
 
-      {/* Duplicates panel */}
-      {showDuplicatesPanel && (
+      {showDuplicatesPanel && hasDuplicates && (
         <div className="bg-white border rounded-md shadow p-4 space-y-6">
           <h2 className="text-lg font-bold mb-2">מוצרים עם תמונות כפולות</h2>
           {Object.entries(duplicateGroups).map(([image, group]) => (
             <div key={image} className="border rounded p-3 space-y-2">
               <div className="flex items-center gap-3">
+                {/* fallback size; images are optional */}
                 <Image
                   src={image}
                   alt="Duplicate"
@@ -176,7 +222,15 @@ export default function ListProduct() {
                   className="rounded object-contain w-14 h-14"
                 />
                 <span className="text-gray-600">
-                  {group.length} מוצרים משתמשים בתמונה זו
+                  {group.length} פריטים מהדף הנוכחי משתמשים בתמונה זו
+                  {(() => {
+                    // try to show global count if available
+                    const any = group[0];
+                    const totalForImage = any?.image_use_count;
+                    return totalForImage && totalForImage > group.length ? (
+                      <span> (סה״כ במסנן: {totalForImage})</span>
+                    ) : null;
+                  })()}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -195,66 +249,147 @@ export default function ListProduct() {
         </div>
       )}
 
+      {/* Header / Controls */}
       <div className="flex justify-between items-center gap-4 flex-wrap">
         <h1 className="text-2xl font-bold">רשימת מוצרים</h1>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Input
+            ref={searchInputRef}
             type="text"
-            placeholder="חפש מוצר לפי שם או מספר..."
+            placeholder="חפש מוצר לפי שם או מספר…"
             value={search}
             onChange={handleSearchChange}
             className="max-w-sm"
           />
+
+          <div className="relative">
+            <button
+              className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+              onClick={() => setShowSortMenu((s) => !s)}
+            >
+              מיון
+            </button>
+
+            {showSortMenu && (
+              <div className="absolute left-0 z-10 mt-2 bg-white border shadow rounded w-64 p-2 space-y-2 text-sm">
+                {(
+                  [
+                    ["id", "מזהה"],
+                    ["name", "שם"],
+                    ["price", "מחיר"],
+                    ["sale", "מבצע (סה״כ)"],
+                    ["created_at", "נוצר בתאריך"],
+                    ["updated_at", "עודכן בתאריך"],
+                    ["in_stock", "סטוק"],
+                    ["categories", "קטגוריה"],
+                  ] as [SortKey, string][]
+                ).map(([key, label]) => (
+                  <div
+                    key={key}
+                    className="flex justify-between items-center hover:bg-gray-100 px-2 py-1 rounded cursor-pointer"
+                  >
+                    <span>{label}</span>
+                    <button
+                      onClick={() => toggleSort(key)}
+                      className="text-blue-600 text-xs hover:underline"
+                    >
+                      {sortKey === key
+                        ? sortOrder === "asc"
+                          ? "⬆️"
+                          : "⬇️"
+                        : "מיין"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Refresh */}
+          <button
+            onClick={() => {
+              setReloading(true);
+              setOffset(0);
+              setHasMore(true);
+              fetchBatch({ reset: true });
+            }}
+            className={`text-sm px-3 py-1 rounded border ${
+              reloading ? "opacity-70 cursor-wait" : "hover:bg-gray-50"
+            }`}
+            disabled={reloading}
+            title="רענון מהשרת"
+          >
+            {reloading ? "מרענן…" : "רענן"}
+          </button>
         </div>
       </div>
 
-      {/* Products grid */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {sorted.map((product) => {
-          const isDuplicate =
-            !!product.image && (duplicateImageMap.get(product.image) ?? 0) > 1;
+      {/* Grid */}
+      {items.length === 0 ? (
+        <p className="text-gray-500 p-4">לא נמצאו מוצרים.</p>
+      ) : (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {items.map((p) => {
+            const isDuplicate =
+              !!p.image &&
+              (p.image_use_count ?? duplicateImageMap.get(p.image) ?? 0) > 1;
+            return (
+              <Link
+                key={p.id}
+                href={`/products/${p.id}`}
+                className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02] relative"
+              >
+                {p.image && (
+                  <Image
+                    src={p.image}
+                    alt={p.name}
+                    width={120}
+                    height={120}
+                    className="rounded-xl object-contain w-24 h-24"
+                  />
+                )}
+                <div className="text-xs text-gray-400 text-center">
+                  ID: {p.id}
+                </div>
+                <div className="mt-1 font-bold text-center">{p.name}</div>
+                <div className="text-gray-700 text-sm text-center">
+                  ₪{Number(p.price).toFixed(2)}
+                </div>
+                {p.salePrice != null && p.saleQuantity != null && (
+                  <div className="text-green-600 text-sm text-center">
+                    מבצע: {p.saleQuantity} ב־ ₪{Number(p.salePrice).toFixed(2)}
+                  </div>
+                )}
+                {p.in_stock === false && (
+                  <div className="text-red-600 text-xs mt-1">אזל מהמלאי</div>
+                )}
+                {isDuplicate && (
+                  <div className="absolute top-2 right-2 text-[10px] px-2 py-1 bg-red-600 text-white rounded-full shadow font-bold">
+                    🔁 כפול
+                  </div>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
-          return (
-            <Link
-              key={product.id}
-              href={`/products/${product.id}`}
-              className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02] relative"
-            >
-              {product.image && (
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  width={120}
-                  height={120}
-                  className="rounded-xl object-contain w-24 h-24"
-                />
-              )}
-              <div className="text-xs text-gray-400 text-center">
-                ID: {product.id}
-              </div>
-              <div className="mt-1 font-bold text-center">{product.name}</div>
-              <div className="text-gray-700 text-sm text-center">
-                ₪{Number(product.price).toFixed(2)}
-              </div>
-              {product.salePrice && product.saleQuantity && (
-                <div className="text-green-600 text-sm text-center">
-                  מבצע: {product.saleQuantity} ב־ ₪
-                  {Number(product.salePrice).toFixed(2)}
-                </div>
-              )}
-              {product.in_stock === false && (
-                <div className="text-red-600 text-xs mt-1">אזל מהמלאי</div>
-              )}
-              {isDuplicate && (
-                <div className="absolute top-2 right-2 text-xs px-2 py-1 bg-red-600 text-white rounded-full shadow font-bold">
-                  ⚠️ תמונה בשימוש כפול
-                </div>
-              )}
-            </Link>
-          );
-        })}
-      </div>
+      {/* Batching controls */}
+      {hasMore && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => {
+              setLoadingMore(true);
+              fetchBatch();
+            }}
+            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+            disabled={loadingMore}
+          >
+            {loadingMore ? "טוען…" : `טען עוד (${offset}/${total})`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
