@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { Label } from "@/components/cms/ui/label";
+import { showToast } from "@/components/cms/ui/toast";
 import Image from "next/image";
-import ImageSelector from "@/components/cms/ui/image-selector";
 import Category from "@/components/cms/entities/product/ui/category";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 import SaleGroupPriceConflictModal from "@/components/cms/entities/sale-group/ui/sale-group-price-conflict-modal";
@@ -53,12 +53,27 @@ type ConflictState = null | {
   nextSalePrice: number | null;
 };
 
-// Helpers for filenames / display names
+// ---------- helpers like in new-product ----------
 const stripExt = (s: string) => s.replace(/\.[^/.]+$/, "");
-const fileFromPath = (p: string) => {
-  const last = p.split("/").pop() || p;
-  return decodeURIComponent(last);
+const baseName = (urlOrName: string) => {
+  if (!urlOrName) return "";
+  const file = (urlOrName.split("/").pop() || urlOrName).split("?")[0];
+  let decoded = file;
+  try {
+    decoded = decodeURIComponent(file);
+  } catch {}
+  return stripExt(decoded);
 };
+
+type ProductImage = {
+  key?: string;
+  url: string;
+  size?: number;
+  updated_at?: string | null;
+  name?: string;
+};
+
+const PAGE_SIZE = 50;
 
 export default function EditProduct({ params }: ParamsProps) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -71,20 +86,13 @@ export default function EditProduct({ params }: ParamsProps) {
   const [conflict, setConflict] = useState<ConflictState>(null);
   const [modalBusy, setModalBusy] = useState(false);
 
-  // S3 images for selector (normalized list: {id, name, image})
-  const [imageItems, setImageItems] = useState<
-    { id: number; name: string; image: string }[]
-  >([]);
-
-  // free-typing input text for the image selector
-  const [imageDraft, setImageDraft] = useState("");
-
+  // ---------- load product & categories ----------
   useEffect(() => {
     async function fetchAll() {
       try {
         const { id } = await params;
 
-        // 1) product
+        // product
         const res = await fetch(`/api/products/${id}`, { cache: "no-store" });
         if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצר");
         const data = await res.json();
@@ -94,78 +102,29 @@ export default function EditProduct({ params }: ParamsProps) {
           id: loaded.id,
           name: loaded.name,
           price: loaded.price,
-          image: loaded.image || "", // full S3 URL
+          image: loaded.image || "",
           saleQuantity: loaded.sale?.quantity ?? "",
           salePrice: loaded.sale?.price ?? "",
           inStock: loaded.in_stock,
           storage_area_id: loaded.storage_area_id ?? null,
         });
 
-        // Initialize the draft so the input shows the filename (not URL)
-        const currentUrl = loaded.image || "";
-        const currentName = currentUrl
-          ? stripExt(fileFromPath(currentUrl))
-          : "";
-        setImageDraft(currentName);
-
-        // 2) product categories
+        // categories
         const catRes = await fetch(`/api/products/${loaded.id}/categories`, {
           cache: "no-store",
         });
         const catData = await catRes.json();
         setCategories(catData.categories || []);
-
-        // 3) S3 image list (accept both legacy string[] and new {url,key,name}[])
-        const imageRes = await fetch("/api/images", { cache: "no-store" });
-        const rawData: unknown = imageRes.ok ? await imageRes.json() : [];
-
-        type ApiItem = string | { url: string; key?: string; name?: string };
-
-        const items =
-          (Array.isArray(rawData) ? (rawData as ApiItem[]) : []).map(
-            (it, idx) => {
-              if (typeof it === "string") {
-                // legacy: plain URL
-                return {
-                  id: idx,
-                  name: stripExt(fileFromPath(it)),
-                  image: it,
-                };
-              } else {
-                // new: { url, key?, name? } — prefer index display name
-                const url = it.url;
-                const display = stripExt(
-                  it.name ?? fileFromPath(it.key ?? it.url)
-                );
-                return {
-                  id: idx,
-                  name: display,
-                  image: url,
-                };
-              }
-            }
-          ) ?? [];
-
-        // ensure current product image is in the list so the selector can show its name
-        if (loaded.image && !items.find((i) => i.image === loaded.image)) {
-          items.push({
-            id: -1,
-            name: stripExt(fileFromPath(loaded.image)),
-            image: loaded.image,
-          });
-        }
-
-        setImageItems(items);
       } catch (err) {
         setError((err as Error).message);
       } finally {
         setLoading(false);
       }
     }
-
     fetchAll();
   }, [params]);
 
+  // ---------- stock toggle ----------
   const handleToggleStock = async () => {
     if (!product) return;
 
@@ -180,18 +139,18 @@ export default function EditProduct({ params }: ParamsProps) {
           inStock: newStock,
         }),
       });
-
       if (!res.ok) throw new Error("שגיאה בעדכון מלאי");
       setProduct({ ...product, inStock: newStock });
-    } catch (err) {
+      showToast(newStock ? "הוחזר למלאי" : "סומן כחסר במלאי", "success");
+    } catch (err: any) {
       console.error(err);
-      alert("שגיאה בעדכון המלאי");
+      showToast(err.message || "שגיאה בעדכון המלאי", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // --- compute payload (+ normalize numbers) ---
+  // ---------- payload compute (unchanged) ----------
   function computeUpdatePayload(p: ProductDetail): {
     payload: ProductUpdatePayload;
     nextPrice: number;
@@ -218,7 +177,7 @@ export default function EditProduct({ params }: ParamsProps) {
     const payload: ProductUpdatePayload = {
       name: p.name,
       price: priceNum,
-      image: fullImagePath || null, // already URL
+      image: fullImagePath || null,
     };
 
     let nextSaleQty: number | null | undefined = undefined;
@@ -238,11 +197,9 @@ export default function EditProduct({ params }: ParamsProps) {
       (isValidQuantity && isSalePriceEmpty) ||
       (isValidSalePrice && isQuantityEmpty)
     ) {
-      // half-filled -> don't touch existing DB sale
       nextSaleQty = undefined;
       nextSalePrice = undefined;
     } else {
-      // invalid -> clear
       setProduct((prev) =>
         prev ? { ...prev, saleQuantity: "", salePrice: "" } : prev
       );
@@ -277,7 +234,7 @@ export default function EditProduct({ params }: ParamsProps) {
 
     const { name, id } = product;
     if (!name.trim() || isNaN(Number(product.price))) {
-      alert("חובה למלא שם ומחיר");
+      showToast("חובה למלא שם ומחיר", "error");
       return;
     }
 
@@ -301,7 +258,7 @@ export default function EditProduct({ params }: ParamsProps) {
 
       if (!v.inGroup || !v.conflicts?.any) {
         await saveNormally(id, payload);
-        alert("מוצר נשמר!");
+        showToast("מוצר נשמר!", "success");
         return;
       }
 
@@ -312,15 +269,131 @@ export default function EditProduct({ params }: ParamsProps) {
         nextSaleQty,
         nextSalePrice,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("תקלה בשמירת מוצר!");
+      showToast(err.message || "תקלה בשמירת מוצר!", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  // modal actions
+  // ---------- IMAGE PICK UX (identical to new-product) ----------
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const deviceInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function uploadSelectedFile(file: File) {
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/images/upload", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+      const data = await res.json();
+      const url: string =
+        data.url || data.Location || data.file?.url || data.image?.url;
+      if (!url) throw new Error("Upload succeeded but no URL returned");
+
+      setProduct((prev) => (prev ? { ...prev, image: url } : prev));
+      showToast("התמונה הועלתה בהצלחה", "success");
+    } catch (e: any) {
+      console.error(e);
+      showToast(`שגיאה בהעלאת תמונה: ${e.message || e}`, "error");
+    }
+  }
+
+  const onCameraPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.currentTarget.value = "";
+    if (file) uploadSelectedFile(file);
+  };
+
+  const onDevicePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.currentTarget.value = "";
+    if (file) uploadSelectedFile(file);
+  };
+
+  // ----- App gallery modal -----
+  const [appGalleryOpen, setAppGalleryOpen] = useState(false);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [loadingImgs, setLoadingImgs] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [sort, setSort] = useState<"name" | "updated" | "size">("updated");
+  const [order, setOrder] = useState<"asc" | "desc">("desc");
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [filter, setFilter] = useState("");
+
+  const fetchingRef = useRef(false);
+
+  async function fetchBatch(opts: { reset?: boolean } = {}) {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    const nextOffset = opts.reset ? 0 : offset;
+
+    try {
+      const qs = new URLSearchParams({
+        sort,
+        order,
+        offset: String(nextOffset),
+        limit: String(PAGE_SIZE),
+      });
+      const res = await fetch(`/api/products/unused-images?${qs}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      const next = (data.images || []) as ProductImage[];
+
+      if (opts.reset) {
+        setImages(next);
+      } else {
+        setImages((prev) => [...prev, ...next]);
+      }
+
+      const got = Array.isArray(next) ? next.length : 0;
+      const newOffset = nextOffset + got;
+      setOffset(newOffset);
+      setTotal(Number(data.total || 0));
+      setHasMore(newOffset < Number(data.total || 0));
+    } finally {
+      fetchingRef.current = false;
+      setLoadingImgs(false);
+      setReloading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (appGalleryOpen && images.length === 0 && !loadingImgs) {
+      setLoadingImgs(true);
+      setOffset(0);
+      setHasMore(true);
+      fetchBatch({ reset: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appGalleryOpen]);
+
+  const filteredImages = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return images;
+    return images.filter((i) =>
+      (i.name || baseName(i.url)).toLowerCase().includes(q)
+    );
+  }, [filter, images]);
+
+  const pickFromAppGallery = (it: ProductImage) => {
+    setProduct((prev) => (prev ? { ...prev, image: it.url } : prev));
+    setAppGalleryOpen(false);
+  };
+
+  // ---------- modal actions (RESTORED, using toasts) ----------
   async function doDetach() {
     if (!product || !conflict) return;
     setModalBusy(true);
@@ -336,10 +409,10 @@ export default function EditProduct({ params }: ParamsProps) {
         }),
       });
       setConflict(null);
-      alert("הוסר מהקבוצה ועודכן בהצלחה");
-    } catch (e) {
+      showToast("הוסר מהקבוצה ועודכן בהצלחה", "success");
+    } catch (e: any) {
       console.error(e);
-      alert("תקלה בעדכון");
+      showToast(e.message || "תקלה בעדכון", "error");
     } finally {
       setModalBusy(false);
     }
@@ -360,15 +433,16 @@ export default function EditProduct({ params }: ParamsProps) {
         }),
       });
       setConflict(null);
-      alert("עודכן לכלל מוצרי הקבוצה + נתוני הקבוצה");
-    } catch (e) {
+      showToast("עודכן לכלל מוצרי הקבוצה + נתוני הקבוצה", "success");
+    } catch (e: any) {
       console.error(e);
-      alert("תקלה בעדכון");
+      showToast(e.message || "תקלה בעדכון", "error");
     } finally {
       setModalBusy(false);
     }
   }
 
+  // ---------- render ----------
   const previewSrc = product?.image || "";
 
   if (loading) return <p>טוען מוצר...</p>;
@@ -395,28 +469,6 @@ export default function EditProduct({ params }: ParamsProps) {
         )}
 
         <div className="w-full md:w-1/2 space-y-4">
-          <ImageSelector
-            items={imageItems}
-            value={imageDraft} // free-typing draft
-            onChange={(item) => {
-              if (!item) {
-                setImageDraft("");
-                return;
-              }
-              // When typing: ImageSelector passes { id:"", name:"typed" }
-              if (!("image" in item) || !item.image) {
-                setImageDraft(item.name);
-                return;
-              }
-              // When selecting a real item: commit the URL and show its name
-              setProduct((prev) =>
-                prev ? { ...prev, image: item.image } : prev
-              );
-              setImageDraft(item.name);
-            }}
-            disabled={saving}
-          />
-
           <ProductStorageSelector
             productId={Number(product.id)}
             initialStorageAreaId={product.storage_area_id}
@@ -531,11 +583,11 @@ export default function EditProduct({ params }: ParamsProps) {
                   method: "DELETE",
                 });
                 if (!res.ok) throw new Error("ארעה תקלה במחיקת המוצר");
-                alert("מוצר נמחק!");
+                showToast("מוצר נמחק!", "success");
                 window.location.href = "/products";
-              } catch (err) {
+              } catch (err: any) {
                 console.error(err);
-                alert("תקלה במחיקת מוצר");
+                showToast(err.message || "תקלה במחיקת מוצר", "error");
               } finally {
                 setSaving(false);
               }
@@ -546,20 +598,215 @@ export default function EditProduct({ params }: ParamsProps) {
           </Button>
         </div>
 
-        <div className="w-full md:w-1/2">
-          {previewSrc && (
-            <div className="relative w-full h-96 border rounded-md">
+        {/* RIGHT = preview + FOUR BUTTONS (same as new-product) */}
+        <aside className="w-full md:w-1/2 space-y-4">
+          <div className="relative w-full h-96 border rounded-md bg-white">
+            {previewSrc ? (
               <Image
                 src={previewSrc}
                 alt={product.name}
                 fill
                 className="object-contain rounded-md"
                 sizes="(max-width: 768px) 100vw, 50vw"
+                unoptimized
               />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-gray-400">
+                אין תמונה נבחרת
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 1) Camera */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={saving}
+              className="w-full"
+              title="צלם והעלה"
+            >
+              📸 צילום
+            </Button>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={onCameraPick}
+            />
+
+            {/* 2) Phone gallery (device) */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => deviceInputRef.current?.click()}
+              disabled={saving}
+              className="w-full"
+              title="בחר מהגלריה (מהמכשיר)"
+            >
+              🖼️ גלריה
+            </Button>
+            <input
+              ref={deviceInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onDevicePick}
+            />
+
+            {/* 3) Google Images */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                window.open(
+                  `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
+                    product.name || "ice cream"
+                  )}`,
+                  "_blank",
+                  "noopener,noreferrer"
+                )
+              }
+              disabled={saving}
+              className="w-full"
+              title="חפש בגוגל תמונות"
+            >
+              🔎 Google
+            </Button>
+
+            {/* 4) Open APP gallery (modal) */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAppGalleryOpen(true)}
+              disabled={saving}
+              className="w-full"
+              title="פתח ספריית תמונות מהאפליקציה"
+            >
+              📁 ספריית אפליקציה
+            </Button>
+          </div>
+        </aside>
       </form>
+
+      {/* ---- APP GALLERY MODAL ---- */}
+      {appGalleryOpen && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setAppGalleryOpen(false)}
+          />
+          <div className="absolute inset-x-0 top-12 mx-auto max-w-5xl bg-white rounded-lg shadow-lg border p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2 className="text-lg font-semibold">ספריית האפליקציה</h2>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="סינון לפי שם…"
+                  className="h-8 w-48"
+                />
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as any)}
+                  className="border px-2 py-1 rounded h-8"
+                  title="מיון"
+                >
+                  <option value="updated">עדכון אחרון</option>
+                  <option value="name">שם</option>
+                  <option value="size">גודל</option>
+                </select>
+                <select
+                  value={order}
+                  onChange={(e) => setOrder(e.target.value as any)}
+                  className="border px-2 py-1 rounded h-8"
+                  title="סדר"
+                >
+                  <option value="desc">יורד</option>
+                  <option value="asc">עולה</option>
+                </select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReloading(true);
+                    setOffset(0);
+                    setHasMore(true);
+                    setLoadingImgs(true);
+                    fetchBatch({ reset: true });
+                  }}
+                  disabled={reloading}
+                >
+                  {reloading ? "מרענן…" : "רענן"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setAppGalleryOpen(false)}
+                >
+                  סגור
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[65vh] overflow-auto pr-1">
+              {loadingImgs && images.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-8">
+                  טוען…
+                </div>
+              )}
+              {images.length > 0 &&
+                (filteredImages.length > 0 ? filteredImages : []).map((it) => {
+                  const name = it.name || baseName(it.url);
+                  const isActive = product?.image === it.url;
+                  return (
+                    <button
+                      key={it.url}
+                      type="button"
+                      onClick={() => pickFromAppGallery(it)}
+                      className={`relative w-full h-28 border rounded overflow-hidden ${
+                        isActive
+                          ? "ring-2 ring-emerald-500"
+                          : "hover:ring-2 hover:ring-blue-400"
+                      }`}
+                      title={name}
+                    >
+                      <Image
+                        src={it.url}
+                        alt={name}
+                        fill
+                        className="object-contain bg-white"
+                        unoptimized
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-white/80 text-[10px] px-1 py-0.5 truncate">
+                        {name}
+                      </div>
+                    </button>
+                  );
+                })}
+
+              {!loadingImgs &&
+                images.length > 0 &&
+                filteredImages.length === 0 && (
+                  <div className="col-span-full text-center text-gray-500 py-8">
+                    אין תוצאות תואמות
+                  </div>
+                )}
+            </div>
+
+            {hasMore && (
+              <div className="flex justify-center mt-3">
+                <Button onClick={() => fetchBatch()} disabled={loadingImgs}>
+                  טען עוד ({offset}/{total})
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {conflict && (
         <SaleGroupPriceConflictModal
