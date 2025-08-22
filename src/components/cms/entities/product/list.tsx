@@ -27,6 +27,7 @@ export default function ListProduct() {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showDuplicatesPanel, setShowDuplicatesPanel] = useState(false);
 
   const router = useRouter();
 
@@ -52,6 +53,7 @@ export default function ListProduct() {
     fetchProducts();
   }, []);
 
+  // Map: image -> count
   const duplicateImageMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of products) {
@@ -61,6 +63,20 @@ export default function ListProduct() {
     }
     return map;
   }, [products]);
+
+  // Extract actual duplicates
+  const duplicateGroups = useMemo(() => {
+    const groups: Record<string, Product[]> = {};
+    for (const p of products) {
+      if (p.image && (duplicateImageMap.get(p.image) ?? 0) > 1) {
+        if (!groups[p.image]) groups[p.image] = [];
+        groups[p.image].push(p);
+      }
+    }
+    return groups;
+  }, [products, duplicateImageMap]);
+
+  const hasDuplicates = Object.keys(duplicateGroups).length > 0;
 
   const filtered = useMemo(() => {
     return products.filter(
@@ -72,7 +88,6 @@ export default function ListProduct() {
 
   const sorted = useMemo(() => {
     const list = [...filtered];
-
     if (!sortKey) return list;
 
     return list.sort((a, b) => {
@@ -133,6 +148,53 @@ export default function ListProduct() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Duplicate warning message */}
+      {hasDuplicates && (
+        <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-md shadow flex justify-between items-center">
+          <span>⚠️ נמצאו תמונות כפולות — יש מוצרים שמשתמשים באותה תמונה.</span>
+          <button
+            onClick={() => setShowDuplicatesPanel((s) => !s)}
+            className="text-sm px-3 py-1 bg-yellow-200 rounded hover:bg-yellow-300"
+          >
+            {showDuplicatesPanel ? "סגור רשימת כפולים" : "הצג כפולים"}
+          </button>
+        </div>
+      )}
+
+      {/* Duplicates panel */}
+      {showDuplicatesPanel && (
+        <div className="bg-white border rounded-md shadow p-4 space-y-6">
+          <h2 className="text-lg font-bold mb-2">מוצרים עם תמונות כפולות</h2>
+          {Object.entries(duplicateGroups).map(([image, group]) => (
+            <div key={image} className="border rounded p-3 space-y-2">
+              <div className="flex items-center gap-3">
+                <Image
+                  src={image}
+                  alt="Duplicate"
+                  width={60}
+                  height={60}
+                  className="rounded object-contain w-14 h-14"
+                />
+                <span className="text-gray-600">
+                  {group.length} מוצרים משתמשים בתמונה זו
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {group.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/products/${p.id}`}
+                    className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 text-sm"
+                  >
+                    #{p.id} {p.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex justify-between items-center gap-4 flex-wrap">
         <h1 className="text-2xl font-bold">רשימת מוצרים</h1>
 
@@ -144,188 +206,55 @@ export default function ListProduct() {
             onChange={handleSearchChange}
             className="max-w-sm"
           />
-
-          <div className="relative">
-            <button
-              className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
-              onClick={() => setShowSortMenu((s) => !s)}
-            >
-              מיון
-            </button>
-
-            {showSortMenu && (
-              <div className="absolute left-0 z-10 mt-2 bg-white border shadow rounded w-64 p-2 space-y-2 text-sm">
-                {[
-                  ["id", "מזהה"],
-                  ["name", "שם"],
-                  ["price", "מחיר"],
-                  ["sale", "מבצע (סה״כ)"],
-                  ["created_at", "נוצר בתאריך"],
-                  ["updated_at", "עודכן בתאריך"],
-                  ["in_stock", "סטוק"],
-                  ["categories", "קטגוריה"],
-                ].map(([key, label]) => (
-                  <div
-                    key={key}
-                    className="flex justify-between items-center hover:bg-gray-100 px-2 py-1 rounded cursor-pointer"
-                  >
-                    <span>{label}</span>
-                    <button
-                      onClick={() => {
-                        setSortKey(key);
-                        setSortAsc((prev) => {
-                          if (key === sortKey) return !prev;
-                          if (key === "created_at" || key === "updated_at")
-                            return false; // default: descending
-                          return true; // default: ascending
-                        });
-                        setShowSortMenu(false);
-                      }}
-                      className="text-blue-600 text-xs hover:underline"
-                    >
-                      {sortKey === key ? (sortAsc ? "⬆️" : "⬇️") : "מיין"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
-      {sorted.length === 0 ? (
-        <p className="text-gray-500 p-4">לא נמצאו מוצרים.</p>
-      ) : sortKey === "categories" ? (
-        // --- Grouped by Category View ---
-        <div className="space-y-10">
-          {(() => {
-            const grouped = sorted.reduce<Record<string, Product[]>>(
-              (acc, product) => {
-                const key = product.categories?.[0] || "ללא קטגוריה";
-                if (!acc[key]) acc[key] = [];
-                acc[key].push(product);
-                return acc;
-              },
-              {}
-            );
+      {/* Products grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {sorted.map((product) => {
+          const isDuplicate =
+            !!product.image && (duplicateImageMap.get(product.image) ?? 0) > 1;
 
-            const entries = Object.entries(grouped);
-
-            // Ensure "ללא קטגוריה" is always last
-            const sortedEntries = entries.sort(([a], [b]) => {
-              if (a === "ללא קטגוריה") return 1;
-              if (b === "ללא קטגוריה") return -1;
-              return a.localeCompare(b, "he"); // Optional: Hebrew-aware sort
-            });
-
-            return sortedEntries.map(([category, group]) => (
-              <div key={category}>
-                <h2 className="text-xl font-bold mb-4 border-b pb-1">
-                  {category}
-                </h2>
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                  {group.map((product) => {
-                    const isDuplicate =
-                      !!product.image &&
-                      (duplicateImageMap.get(product.image) ?? 0) > 1;
-
-                    return (
-                      <Link
-                        key={product.id}
-                        href={`/products/${product.id}`}
-                        className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02] relative"
-                      >
-                        {product.image && (
-                          <Image
-                            src={product.image}
-                            alt={product.name}
-                            width={120}
-                            height={120}
-                            className="rounded-xl object-contain w-24 h-24"
-                          />
-                        )}
-                        <div className="text-xs text-gray-400 text-center">
-                          ID: {product.id}
-                        </div>
-                        <div className="mt-1 font-bold text-center">
-                          {product.name}
-                        </div>
-                        <div className="text-gray-700 text-sm text-center">
-                          ₪{Number(product.price).toFixed(2)}
-                        </div>
-                        {product.salePrice && product.saleQuantity && (
-                          <div className="text-green-600 text-sm text-center">
-                            מבצע: {product.saleQuantity} ב־ ₪
-                            {Number(product.salePrice).toFixed(2)}
-                          </div>
-                        )}
-                        {product.in_stock === false && (
-                          <div className="text-red-600 text-xs mt-1">
-                            אזל מהמלאי
-                          </div>
-                        )}
-                        {isDuplicate && (
-                          <div className="absolute top-2 right-2 text-xs px-2 py-1 bg-red-500 text-white rounded-full shadow">
-                            🔁 כפול
-                          </div>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
+          return (
+            <Link
+              key={product.id}
+              href={`/products/${product.id}`}
+              className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02] relative"
+            >
+              {product.image && (
+                <Image
+                  src={product.image}
+                  alt={product.name}
+                  width={120}
+                  height={120}
+                  className="rounded-xl object-contain w-24 h-24"
+                />
+              )}
+              <div className="text-xs text-gray-400 text-center">
+                ID: {product.id}
               </div>
-            ));
-          })()}
-        </div>
-      ) : (
-        // --- Normal Flat Grid View ---
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {sorted.map((product) => {
-            const isDuplicate =
-              !!product.image &&
-              (duplicateImageMap.get(product.image) ?? 0) > 1;
-
-            return (
-              <Link
-                key={product.id}
-                href={`/products/${product.id}`}
-                className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02] relative"
-              >
-                {product.image && (
-                  <Image
-                    src={product.image}
-                    alt={product.name}
-                    width={120}
-                    height={120}
-                    className="rounded-xl object-contain w-24 h-24"
-                  />
-                )}
-                <div className="text-xs text-gray-400 text-center">
-                  ID: {product.id}
+              <div className="mt-1 font-bold text-center">{product.name}</div>
+              <div className="text-gray-700 text-sm text-center">
+                ₪{Number(product.price).toFixed(2)}
+              </div>
+              {product.salePrice && product.saleQuantity && (
+                <div className="text-green-600 text-sm text-center">
+                  מבצע: {product.saleQuantity} ב־ ₪
+                  {Number(product.salePrice).toFixed(2)}
                 </div>
-                <div className="mt-1 font-bold text-center">{product.name}</div>
-                <div className="text-gray-700 text-sm text-center">
-                  ₪{Number(product.price).toFixed(2)}
+              )}
+              {product.in_stock === false && (
+                <div className="text-red-600 text-xs mt-1">אזל מהמלאי</div>
+              )}
+              {isDuplicate && (
+                <div className="absolute top-2 right-2 text-xs px-2 py-1 bg-red-600 text-white rounded-full shadow font-bold">
+                  ⚠️ תמונה בשימוש כפול
                 </div>
-                {product.salePrice && product.saleQuantity && (
-                  <div className="text-green-600 text-sm text-center">
-                    מבצע: {product.saleQuantity} ב־ ₪
-                    {Number(product.salePrice).toFixed(2)}
-                  </div>
-                )}
-                {product.in_stock === false && (
-                  <div className="text-red-600 text-xs mt-1">אזל מהמלאי</div>
-                )}
-                {isDuplicate && (
-                  <div className="absolute top-2 right-2 text-xs px-2 py-1 bg-red-500 text-white rounded-full shadow">
-                    🔁 כפול
-                  </div>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      )}
+              )}
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
