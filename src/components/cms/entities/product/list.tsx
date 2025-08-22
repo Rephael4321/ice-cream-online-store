@@ -226,7 +226,7 @@ export default function ListProduct() {
           <Input
             ref={searchInputRef}
             type="text"
-            placeholder="חפש מוצר לפי שם או מספר…"
+            placeholder="חפש לפי מזהה, שם או מחיר…"
             value={search}
             onChange={handleSearchChange}
             className="max-w-sm"

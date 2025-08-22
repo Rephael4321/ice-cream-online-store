@@ -34,11 +34,19 @@ function sanitizeSortOrder(o: string | null): SortOrder {
   return o === "asc" ? "asc" : "desc";
 }
 
+// Extract a numeric value for price matching ("12", "₪12.5", "12,5", etc.)
+function parsePriceCandidate(q: string): number | null {
+  const cleaned = q.replace(/[^\d.,-]/g, "").replace(/,/g, ".");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function listProducts(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    const q = (url.searchParams.get("q") || "").trim();
-    const sort = sanitizeSortKey(url.searchParams.get("sort"));
+    const qRaw = (url.searchParams.get("q") || "").trim();
+    const sort = url.searchParams.get("sort"); // may be null (only when user chose)
     const order = sanitizeSortOrder(url.searchParams.get("order"));
     const offset = Math.max(
       0,
@@ -49,29 +57,46 @@ async function listProducts(req: NextRequest) {
       Math.max(1, parseInt(url.searchParams.get("limit") || "48", 10) || 48)
     );
 
-    // Build WHERE (server-side filter)
-    const whereClauses: string[] = [];
+    const sortKey = sort ? sanitizeSortKey(sort) : null;
+
+    // WHERE (ID + name + price (text/number))
+    const whereParts: string[] = [];
     const params: any[] = [];
-    if (q) {
-      params.push(`%${q}%`);
-      params.push(`%${q}%`);
-      whereClauses.push(
-        `(p.name ILIKE $${params.length - 1} OR p.id::text ILIKE $${
-          params.length
-        })`
+
+    if (qRaw) {
+      const nameParam = `%${qRaw}%`;
+      const idParam = `%${qRaw}%`;
+      const priceTextParam = `%${qRaw.replace(/[,]/g, ".")}%`;
+
+      params.push(nameParam);
+      const nameSql = `p.name ILIKE $${params.length}`;
+
+      params.push(idParam);
+      const idSql = `p.id::text ILIKE $${params.length}`;
+
+      params.push(priceTextParam);
+      const priceLikeSql = `p.price::text ILIKE $${params.length}`;
+
+      const qNum = parsePriceCandidate(qRaw);
+      let priceEqSql = "";
+      if (qNum !== null) {
+        params.push(qNum);
+        priceEqSql = ` OR p.price = $${params.length}`;
+      }
+
+      whereParts.push(
+        `(${nameSql} OR ${idSql} OR ${priceLikeSql}${priceEqSql})`
       );
     }
-    const whereSql = whereClauses.length
-      ? `WHERE ${whereClauses.join(" AND ")}`
+
+    const whereSql = whereParts.length
+      ? `WHERE ${whereParts.join(" AND ")}`
       : "";
 
-    // Sorting (server)
-    // Special cases:
-    // - sale => COALESCE(s.quantity,0)*COALESCE(s.sale_price,0)
-    // - categories => first category name (MIN over agg)
-    // We’ll compute order columns in an outer SELECT.
+    // ORDER BY (only when user chose a sort; otherwise stable id desc)
     const orderSql = (() => {
-      switch (sort) {
+      if (!sortKey) return `ORDER BY f.id DESC`; // <- fixed alias (was p.id)
+      switch (sortKey) {
         case "id":
           return `ORDER BY id ${order}`;
         case "name":
@@ -93,8 +118,8 @@ async function listProducts(req: NextRequest) {
       }
     })();
 
-    // We use a CTE "filtered" first, then compute image counts over the filtered set.
-    const sql = `
+    // Page query: filter -> aggregate -> count duplicate images within filtered set
+    const pageSql = `
       WITH filtered AS (
         SELECT
           p.id,
@@ -115,16 +140,11 @@ async function listProducts(req: NextRequest) {
         ${whereSql}
         GROUP BY p.id, s.quantity, s.sale_price
       ),
-      -- image counts over filtered set
       counts AS (
         SELECT image, COUNT(*) AS use_count
         FROM filtered
         WHERE image IS NOT NULL AND image <> ''
         GROUP BY image
-      ),
-      total_cte AS (
-        SELECT COUNT(*) AS total
-        FROM filtered
       )
       SELECT
         f.id,
@@ -147,26 +167,18 @@ async function listProducts(req: NextRequest) {
       LIMIT ${limit};
     `;
 
-    // Get page rows + separate total in one round trip
+    // Total count (no duplicates): filter only on products; no need to join sales/categories
+    const totalSql = `
+      SELECT COUNT(*)::int AS total
+      FROM products p
+      ${whereSql};
+    `;
+
     const client = await pool.connect();
     try {
-      const pagePromise = client.query(sql, params);
-      const totalPromise = client.query(
-        `
-        WITH filtered AS (
-          SELECT p.id
-          FROM products p
-          LEFT JOIN sales s ON s.product_id = p.id
-          ${whereSql}
-          GROUP BY p.id, s.quantity, s.sale_price
-        )
-        SELECT COUNT(*)::int AS total FROM filtered;
-        `,
-        params
-      );
       const [pageRes, totalRes] = await Promise.all([
-        pagePromise,
-        totalPromise,
+        client.query(pageSql, params),
+        client.query(totalSql, params),
       ]);
       const total = totalRes.rows?.[0]?.total ?? 0;
 
@@ -197,7 +209,6 @@ async function createProduct(req: NextRequest) {
       );
     }
 
-    // Prevent exact same image duplication at creation time (UI still shows dupes across existing)
     const existing = await pool.query(
       "SELECT id FROM products WHERE image = $1 LIMIT 1",
       [image]
