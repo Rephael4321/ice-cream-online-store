@@ -5,8 +5,8 @@ import { useParams } from "next/navigation";
 import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
-import Image from "next/image";
 import { SaleGroupEditor } from "./ui/sale-group-editor";
+import Image from "next/image";
 
 type SaleGroup = {
   id: number;

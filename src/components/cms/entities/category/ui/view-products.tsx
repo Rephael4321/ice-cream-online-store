@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/cms/ui/input";
 import Image from "next/image";
-import Link from "next/link";
 import SaleGroupCard from "./ui/sale-group-card";
+import ProductSaleGroupMenu from "@/components/cms/entities/sale-group/ui/product-sale-group-menu";
 
 type ProductItem = {
   type: "product";
@@ -36,8 +37,11 @@ type SaleGroupItem = {
 };
 
 type Item = ProductItem | SaleGroupItem;
+type ApiCategoryItems = { items: Item[] };
 
 export default function ViewProducts({ name }: { name: string }) {
+  const router = useRouter();
+
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -45,16 +49,18 @@ export default function ViewProducts({ name }: { name: string }) {
   useEffect(() => {
     const enc = encodeURIComponent(name);
     fetch(`/api/categories/name/${enc}/items`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => setItems(data.items))
+      .then((res) => res.json() as Promise<ApiCategoryItems>)
+      .then((data) => setItems(Array.isArray(data.items) ? data.items : []))
       .finally(() => setLoading(false));
   }, [name]);
 
-  const filtered = useMemo(() => {
-    return items.filter((item) =>
-      item.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [items, search]);
+  const filtered = useMemo(
+    () =>
+      items.filter((item) =>
+        item.name.toLowerCase().includes(search.toLowerCase())
+      ),
+    [items, search]
+  );
 
   if (loading) return <p>טוען פריטים...</p>;
 
@@ -77,31 +83,49 @@ export default function ViewProducts({ name }: { name: string }) {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {filtered.map((item) =>
             item.type === "product" ? (
-              <Link
+              // OUTER CARD (does NOT transform)
+              <div
                 key={`product-${item.id}`}
-                href={`/products/${item.id}`} // product routes still id-based — OK
-                className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02]"
+                className="group relative border rounded-xl bg-white cursor-pointer"
+                onClick={() => router.push(`/products/${item.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/products/${item.id}`);
+                  }
+                }}
               >
-                {item.image ? (
-                  <Image
-                    src={item.image}
-                    alt={item.name}
-                    width={120}
-                    height={120}
-                    className="rounded-xl object-contain w-24 h-24"
-                  />
-                ) : null}
-                <div className="mt-2 font-bold text-center">{item.name}</div>
-                <div className="text-gray-700 text-sm text-center">
-                  ₪{Number(item.price).toFixed(2)}
-                </div>
-                {item.sale_price !== null && (
-                  <div className="text-green-600 font-semibold text-sm text-center">
-                    מבצע: ₪{Number(item.sale_price).toFixed(2)} (
-                    {item.sale_quantity} יח')
+                {/* Top-right sale-group trigger — stays OUTSIDE the scaled wrapper */}
+                <ProductSaleGroupMenu productId={item.id} />
+
+                {/* INNER WRAPPER (this is what scales / animates) */}
+                <div className="content p-4 rounded-xl shadow-md transition-transform transition-shadow duration-150 ease-out group-hover:shadow-xl group-hover:scale-[1.02] origin-top-right flex flex-col items-center">
+                  {item.image ? (
+                    <Image
+                      src={item.image}
+                      alt={item.name}
+                      width={120}
+                      height={120}
+                      className="rounded-xl object-contain w-24 h-24 pointer-events-none"
+                    />
+                  ) : null}
+
+                  <div className="mt-2 font-bold text-center pointer-events-none">
+                    {item.name}
                   </div>
-                )}
-              </Link>
+                  <div className="text-gray-700 text-sm text-center pointer-events-none">
+                    ₪{Number(item.price).toFixed(2)}
+                  </div>
+                  {item.sale_price !== null && (
+                    <div className="text-green-600 font-semibold text-sm text-center pointer-events-none">
+                      מבצע: ₪{Number(item.sale_price).toFixed(2)} (
+                      {item.sale_quantity} יח')
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <SaleGroupCard key={`group-${item.id}`} group={item} />
             )
