@@ -14,6 +14,16 @@ type Category = {
   multi_item_sort_order?: number;
 };
 
+// Normalize: remove surrounding spaces, replace any whitespace with "-",
+// collapse multiple dashes, and trim leading/trailing dashes.
+function normalizeName(input: string): string {
+  return String(input || "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 async function getCategories(req: NextRequest) {
   try {
     const fullView = req.nextUrl.searchParams.get("full") === "true";
@@ -42,7 +52,7 @@ async function getCategories(req: NextRequest) {
 
     const sanitized = result.rows.map((cat) => ({
       ...cat,
-      name: cat.name.replace(/-/g, " "),
+      name: (cat.name ?? "").trim(),
     }));
 
     return NextResponse.json({ categories: sanitized });
@@ -83,6 +93,14 @@ async function createCategory(req: NextRequest) {
       );
     }
 
+    const normalizedName = normalizeName(name);
+    if (!normalizedName) {
+      return NextResponse.json(
+        { error: "Invalid name after normalization" },
+        { status: 400 }
+      );
+    }
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -95,18 +113,19 @@ async function createCategory(req: NextRequest) {
          (name, type, image, description, parent_id, show_in_menu)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [name, type, image, description, parentIdOrNull, visible]
+        [normalizedName, type, image, description, parentIdOrNull, visible]
       );
 
       const categoryId = result.rows[0].id;
+
       if (parent_id) {
         await client.query(
           `INSERT INTO category_multi_items (category_id, target_type, target_id, sort_order)
-     VALUES ($1, 'category', $2, (
-       SELECT COALESCE(MAX(sort_order), -1) + 1
-       FROM category_multi_items
-       WHERE target_type = 'category' AND category_id = $1
-     ))`,
+           VALUES ($1, 'category', $2, (
+             SELECT COALESCE(MAX(sort_order), -1) + 1
+             FROM category_multi_items
+             WHERE target_type = 'category' AND category_id = $1
+           ))`,
           [parent_id, categoryId]
         );
       }
@@ -182,6 +201,14 @@ async function updateCategory(req: NextRequest) {
       );
     }
 
+    const normalizedName = normalizeName(name);
+    if (!normalizedName) {
+      return NextResponse.json(
+        { error: "Invalid name after normalization" },
+        { status: 400 }
+      );
+    }
+
     const categoryId = Number(id);
     const parentIdOrNull = parent_id ? Number(parent_id) : null;
     const visible = type === "collection" ? true : !!show_in_menu;
@@ -194,7 +221,15 @@ async function updateCategory(req: NextRequest) {
         `UPDATE categories
          SET name = $1, type = $2, image = $3, description = $4, parent_id = $5, show_in_menu = $6
          WHERE id = $7`,
-        [name, type, image, description, parentIdOrNull, visible, categoryId]
+        [
+          normalizedName,
+          type,
+          image,
+          description,
+          parentIdOrNull,
+          visible,
+          categoryId,
+        ]
       );
 
       if (type === "sale") {

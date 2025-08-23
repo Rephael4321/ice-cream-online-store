@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import ViewCategories from "./ui/view-categories";
-import OrganizeCategories from "./ui/organize-categories";
 import { Button } from "@/components/cms/ui/button";
 import Link from "next/link";
+import ViewCategories from "./ui/view-categories";
+import OrganizeCategories from "./ui/organize-categories";
 
 export default function ListCategories() {
   const [mode, setMode] = useState<"view" | "organize">("view");

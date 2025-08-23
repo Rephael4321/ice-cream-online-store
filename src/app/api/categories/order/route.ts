@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import pool from "@/lib/db";
 
 async function organizeCategoryItems(req: NextRequest) {
   try {
-    const { categoryOrder } = await req.json();
+    const body = await req.json();
 
-    if (!Array.isArray(categoryOrder)) {
+    // Validate and coerce to number[]
+    const raw = body?.categoryOrder as unknown;
+    if (!Array.isArray(raw)) {
       return NextResponse.json(
-        { error: "Missing categoryOrder array" },
+        { error: "Missing/invalid categoryOrder (expected array)" },
+        { status: 400 }
+      );
+    }
+
+    const categoryOrder: number[] = (raw as unknown[]).map((x) => Number(x));
+    if (categoryOrder.some((v: number) => Number.isNaN(v))) {
+      return NextResponse.json(
+        { error: "categoryOrder must contain only numeric IDs" },
         { status: 400 }
       );
     }
@@ -17,27 +27,21 @@ async function organizeCategoryItems(req: NextRequest) {
     try {
       await client.query("BEGIN");
 
-      for (let i = 0; i < categoryOrder.length; i++) {
-        const categoryId = categoryOrder[i];
-
-        const res = await client.query(
-          `UPDATE category_multi_items
-           SET sort_order = $1, updated_at = NOW()
-           WHERE target_type = 'category' AND target_id = $2 AND category_id IS NULL`,
-          [i, categoryId]
-        );
-
-        if (res.rowCount === 0) {
-          await client.query(
-            `INSERT INTO category_multi_items (
-               category_id, target_type, target_id, sort_order, created_at, updated_at
-             ) VALUES (
-               NULL, 'category', $1, $2, NOW(), NOW()
-             )`,
-            [categoryId, i]
-          );
-        }
-      }
+      // Update global category order via categories.sort_order
+      await client.query(
+        `
+        WITH new_order AS (
+          SELECT id::int, (ord::int - 1) AS sort_order
+          FROM unnest($1::int[]) WITH ORDINALITY AS t(id, ord)
+        )
+        UPDATE categories AS c
+        SET sort_order = n.sort_order,
+            updated_at = NOW()
+        FROM new_order AS n
+        WHERE c.id = n.id
+        `,
+        [categoryOrder]
+      );
 
       await client.query("COMMIT");
       return NextResponse.json({ success: true });

@@ -51,15 +51,14 @@ type SaleGroupItem = {
 
 type Item = ProductItem | SaleGroupItem;
 
-export default function OrganizeProducts({ id }: { id: string }) {
+export default function OrganizeProducts({ name }: { name: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/categories/${id}/products`, {
-      cache: "no-store",
-    })
+    const enc = encodeURIComponent(name);
+    fetch(`/api/categories/name/${enc}/items`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         const sorted = data.items.sort(
@@ -68,15 +67,12 @@ export default function OrganizeProducts({ id }: { id: string }) {
         setItems(sorted);
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [name]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 5,
-      },
+      activationConstraint: { delay: 200, tolerance: 5 },
     })
   );
 
@@ -86,21 +82,20 @@ export default function OrganizeProducts({ id }: { id: string }) {
 
     const oldIndex = items.findIndex((i) => i.id === active.id);
     const newIndex = items.findIndex((i) => i.id === over.id);
-    const reordered = arrayMove(items, oldIndex, newIndex);
-    setItems(reordered);
+    setItems(arrayMove(items, oldIndex, newIndex));
   }
 
   async function saveOrder() {
     setSaving(true);
     try {
+      const enc = encodeURIComponent(name);
       const order = items.map((item) => ({ id: item.id, type: item.type }));
-      const res = await fetch(`/api/categories/${id}/products/order`, {
+      const res = await fetch(`/api/categories/name/${enc}/products/order`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ order }),
       });
-
       if (!res.ok) throw new Error("Failed to save order");
       alert("הסדר נשמר בהצלחה!");
     } catch (err) {
@@ -116,7 +111,7 @@ export default function OrganizeProducts({ id }: { id: string }) {
   return (
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">סידור פריטים בקטגוריה {id}</h1>
+        <h1 className="text-xl font-bold">סידור פריטים בקטגוריה {name}</h1>
         <Button onClick={saveOrder} disabled={saving}>
           {saving ? "שומר..." : "שמור סדר"}
         </Button>
@@ -149,11 +144,7 @@ export default function OrganizeProducts({ id }: { id: string }) {
 function SortableProduct({ product }: { product: ProductItem }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: product.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <div
@@ -169,7 +160,6 @@ function SortableProduct({ product }: { product: ProductItem }) {
       >
         ≡
       </div>
-
       <Image
         src={product.image}
         alt={product.name}
@@ -177,7 +167,6 @@ function SortableProduct({ product }: { product: ProductItem }) {
         height={96}
         className="rounded-xl object-contain w-24 h-24"
       />
-
       <div className="flex-1 space-y-2">
         <div className="font-bold text-2xl">{product.name}</div>
         <div className="text-lg text-gray-700">
@@ -197,11 +186,7 @@ function SortableProduct({ product }: { product: ProductItem }) {
 function SortableSaleGroup({ group }: { group: SaleGroupItem }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: group.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <div

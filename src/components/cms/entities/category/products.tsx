@@ -5,13 +5,13 @@ import { Button } from "@/components/cms/ui/button";
 import ViewProducts from "./ui/view-products";
 import OrganizeProducts from "./ui/organize-products";
 
-export default function ProductsByCategory({ id }: { id: string }) {
+export default function ProductsByCategory({ name }: { name: string }) {
   const [mode, setMode] = useState<"view" | "organize">("view");
 
   return (
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">מוצרים בקטגוריה {id}</h1>
+        <h1 className="text-xl font-bold">מוצרים בקטגוריה {name}</h1>
         <div className="space-x-2">
           <Button
             variant={mode === "view" ? "default" : "outline"}
@@ -29,9 +29,9 @@ export default function ProductsByCategory({ id }: { id: string }) {
       </div>
 
       {mode === "view" ? (
-        <ViewProducts id={id} />
+        <ViewProducts name={name} />
       ) : (
-        <OrganizeProducts id={id} />
+        <OrganizeProducts name={name} />
       )}
     </div>
   );

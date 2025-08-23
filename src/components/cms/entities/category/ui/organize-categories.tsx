@@ -16,8 +16,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import Image from "next/image";
 import { Button } from "@/components/cms/ui/button";
+import Image from "next/image";
 
 // Raw shape from API
 interface RawCategory {

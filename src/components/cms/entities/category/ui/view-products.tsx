@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { Input } from "@/components/cms/ui/input";
 import Image from "next/image";
 import Link from "next/link";
-import { Input } from "@/components/cms/ui/input";
 import SaleGroupCard from "./ui/sale-group-card";
 
 type ProductItem = {
@@ -37,17 +37,18 @@ type SaleGroupItem = {
 
 type Item = ProductItem | SaleGroupItem;
 
-export default function ViewProducts({ id }: { id: string }) {
+export default function ViewProducts({ name }: { name: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch(`/api/categories/${id}/products`, { cache: "no-store" })
+    const enc = encodeURIComponent(name);
+    fetch(`/api/categories/name/${enc}/items`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => setItems(data.items))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [name]);
 
   const filtered = useMemo(() => {
     return items.filter((item) =>
@@ -60,7 +61,7 @@ export default function ViewProducts({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold">מוצרים מקטגוריה</h1>
+        <h1 className="text-2xl font-bold">מוצרים בקטגוריה {name}</h1>
         <Input
           type="text"
           placeholder="חפש מוצר או קבוצה..."
@@ -78,7 +79,7 @@ export default function ViewProducts({ id }: { id: string }) {
             item.type === "product" ? (
               <Link
                 key={`product-${item.id}`}
-                href={`/products/${item.id}`}
+                href={`/products/${item.id}`} // product routes still id-based — OK
                 className="border p-4 rounded-xl shadow-md bg-white flex flex-col items-center transition hover:shadow-xl hover:scale-[1.02]"
               >
                 {item.image ? (

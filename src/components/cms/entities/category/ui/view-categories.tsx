@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Button } from "@/components/cms/ui/button";
+import Image from "next/image";
 
 type Category = {
   id: number;
@@ -55,7 +55,9 @@ export default function ViewCategories() {
               <td className="px-4 py-2 border-t text-center">
                 <div
                   className="w-16 h-16 mx-auto relative cursor-pointer"
-                  onClick={() => router.push(`/categories/${cat.id}`)}
+                  onClick={() =>
+                    router.push(`/categories/${encodeURIComponent(cat.name)}`)
+                  }
                 >
                   <Image
                     src={cat.image}
@@ -71,7 +73,9 @@ export default function ViewCategories() {
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    router.push(`/categories/${cat.id}/products`);
+                    router.push(
+                      `/categories/${encodeURIComponent(cat.name)}/products`
+                    );
                   }}
                 >
                   הצג מוצרים
@@ -108,7 +112,9 @@ export default function ViewCategories() {
           >
             <div
               className="w-full h-40 relative cursor-pointer"
-              onClick={() => router.push(`/categories/${cat.id}`)}
+              onClick={() =>
+                router.push(`/categories/${encodeURIComponent(cat.name)}`)
+              }
             >
               <Image
                 src={cat.image}
@@ -140,7 +146,11 @@ export default function ViewCategories() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push(`/categories/${cat.id}/products`)}
+              onClick={() =>
+                router.push(
+                  `/categories/${encodeURIComponent(cat.name)}/products`
+                )
+              }
             >
               הצג מוצרים
             </Button>
