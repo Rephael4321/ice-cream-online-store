@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { verifyJWT } from "@/lib/jwt";
 import SingleProduct from "@/components/store/single-product";
-import SaleGroupCluster from "@/components/store/sale-group-cluster"; // NEW
+import SaleGroupCluster from "@/components/store/sale-group-cluster";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactElement } from "react";
@@ -39,7 +39,7 @@ interface Product {
   image?: string | null;
   inStock: boolean;
   sale?: Sale | null;
-  // NEW: raw sale-group info even if not the chosen sale
+  // raw sale-group info even if not the chosen sale
   saleGroup?: {
     id: number;
     name: string | null;
@@ -66,12 +66,12 @@ export default async function ProductsByCategory({ params }: Props) {
   // For UI
   const displayName = raw.replace(/-/g, " ");
 
-  // Admin flag (unchanged)
+  // Admin flag
   const cookieStore = cookies();
   const token = (await cookieStore).get("token")?.value;
   const isAdmin = !!(token && verifyJWT(token));
 
-  // Child categories view
+  // Try child categories first (unchanged)
   const childrenRes = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
     { cache: "no-store" }
@@ -81,11 +81,11 @@ export default async function ProductsByCategory({ params }: Props) {
     const children: Category[] = childrenData.children || [];
     if (children.length > 0) {
       return (
-        <div className="p-4">
+        <div className="p-4 max-w-full overflow-x-hidden">
           <h1 className="text-3xl sm:text-4xl font-bold text-pink-700 text-center mb-8">
             {displayName}
           </h1>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 w-full">
             {children.map((cat) => (
               <Link
                 key={cat.id}
@@ -140,7 +140,6 @@ export default async function ProductsByCategory({ params }: Props) {
   const products: Product[] = data.products || [];
 
   if (products.length === 0) {
-    console.warn("⚠️ [ProductsByCategory] No products found for:", slug);
     return <div className="p-4">לא נמצאו מוצרים בקטגוריה.</div>;
   }
 
@@ -183,85 +182,86 @@ export default async function ProductsByCategory({ params }: Props) {
   const clusteredIds = new Set<number>();
   validClusters.forEach((c) => c.items.forEach((p) => clusteredIds.add(p.id)));
 
+  // Build content keeping original order: clusters become a single full-width grid item,
+  // non-clustered products render as normal grid items so multiple cards show per row.
+  const content: ReactElement[] = [];
+  let i = 0;
+  while (i < products.length) {
+    const p = products[i];
+    const clusterForHere = validClusters.find((c) => c.firstIndex === i);
+
+    if (clusterForHere) {
+      content.push(
+        <div
+          key={`clusterwrap-${clusterForHere.groupId}-${i}`}
+          className="col-span-full"
+        >
+          <SaleGroupCluster
+            title={
+              clusterForHere.groupName
+                ? `מבצע קבוצתי: ${clusterForHere.groupName}`
+                : `מבצע קבוצתי`
+            }
+            subtitle={`קחו ${
+              clusterForHere.amount
+            } ב־₪${clusterForHere.price.toFixed(2)}`}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
+              {clusterForHere.items.map((prod) => (
+                <SingleProduct
+                  key={`p-${prod.id}`}
+                  id={prod.id}
+                  productImage={prod.image || "/ice-scream.png"}
+                  productName={prod.name}
+                  productPrice={prod.price ?? 0}
+                  inStock={prod.inStock}
+                  sale={prod.sale ?? undefined}
+                  isAdmin={isAdmin}
+                />
+              ))}
+            </div>
+          </SaleGroupCluster>
+        </div>
+      );
+
+      // skip over all products in this cluster in the outer list
+      i += clusterForHere.items.length;
+      continue;
+    }
+
+    // not the head of any cluster → render single as a normal grid item
+    if (!clusteredIds.has(p.id)) {
+      content.push(
+        <SingleProduct
+          key={`p-${p.id}`}
+          id={p.id}
+          productImage={p.image || "/ice-scream.png"}
+          productName={p.name}
+          productPrice={p.price ?? 0}
+          inStock={p.inStock}
+          sale={p.sale ?? undefined}
+          isAdmin={isAdmin}
+        />
+      );
+    }
+
+    i += 1;
+  }
+
   return (
     <>
       <div className="flex justify-center mt-10">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-pink-700">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-pink-700 text-center">
           {displayName}
         </h1>
       </div>
 
-      <div className="px-4 sm:px-8 py-10 space-y-8">
-        {/* walk original order; when hitting the first member of a cluster, render the cluster instead */}
-        {(() => {
-          const content: ReactElement[] = [];
-          let i = 0;
-          while (i < products.length) {
-            const p = products[i];
-            const clusterForHere = validClusters.find(
-              (c) => c.firstIndex === i
-            );
-
-            if (clusterForHere) {
-              content.push(
-                <SaleGroupCluster
-                  key={`cluster-${clusterForHere.groupId}-${i}`}
-                  title={
-                    clusterForHere.groupName
-                      ? `מבצע קבוצתי: ${clusterForHere.groupName}`
-                      : `מבצע קבוצתי`
-                  }
-                  subtitle={`קחו ${
-                    clusterForHere.amount
-                  } ב־₪${clusterForHere.price.toFixed(2)}`}
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {clusterForHere.items.map((prod) => (
-                      <SingleProduct
-                        key={`p-${prod.id}`}
-                        id={prod.id}
-                        productImage={prod.image || "/ice-scream.png"}
-                        productName={prod.name}
-                        productPrice={prod.price ?? 0}
-                        inStock={prod.inStock}
-                        sale={prod.sale ?? undefined}
-                        isAdmin={isAdmin}
-                      />
-                    ))}
-                  </div>
-                </SaleGroupCluster>
-              );
-
-              // skip over all products in this cluster in the outer list
-              i += clusterForHere.items.length;
-              continue;
-            }
-
-            // not the head of any cluster → render single (but keep same grid spacing)
-            if (!clusteredIds.has(p.id)) {
-              content.push(
-                <div
-                  key={`singlewrap-${p.id}`}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                >
-                  <SingleProduct
-                    key={`p-${p.id}`}
-                    id={p.id}
-                    productImage={p.image || "/ice-scream.png"}
-                    productName={p.name}
-                    productPrice={p.price ?? 0}
-                    inStock={p.inStock}
-                    sale={p.sale ?? undefined}
-                    isAdmin={isAdmin}
-                  />
-                </div>
-              );
-            }
-
-            i += 1;
-          }
-          return content;
-        })()}
+      {/* OUTER WRAPPER — prevents x-axis overflow */}
+      <div className="px-4 sm:px-8 py-10 max-w-full overflow-x-hidden">
+        {/* OUTER GRID — multiple products per row on wide screens */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
+          {content}
+        </div>
       </div>
     </>
   );
