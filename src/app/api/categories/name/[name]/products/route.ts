@@ -13,6 +13,47 @@ type ProductRow = {
   sort_order: number | null;
 };
 
+type GroupSaleRow = {
+  product_id: number;
+  group_id: number;
+  group_name: string | null;
+  group_quantity: number | null;
+  group_sale_price: number | string | null;
+};
+
+function pickBestSale(
+  candidates: Array<null | {
+    source: "category" | "product" | "group";
+    amount: number;
+    price: number;
+    meta?: any;
+  }>
+) {
+  // Filter valid
+  const valid = candidates.filter(
+    (s): s is NonNullable<typeof s> =>
+      !!s &&
+      Number.isFinite(s.amount) &&
+      s.amount > 0 &&
+      Number.isFinite(s.price)
+  );
+
+  if (valid.length === 0) return null;
+
+  // Compare by unit price, then by total price (tie-breaker), then prefer group > category > product (deterministic)
+  const rank = { group: 0, category: 1, product: 2 } as const;
+
+  valid.sort((a, b) => {
+    const ua = a.price / a.amount;
+    const ub = b.price / b.amount;
+    if (ua !== ub) return ua - ub;
+    if (a.price !== b.price) return a.price - b.price;
+    return rank[a.source] - rank[b.source];
+  });
+
+  return valid[0];
+}
+
 async function getProductsByCategoryName(
   _req: NextRequest,
   context: { params: Promise<{ name: string }> }
@@ -21,19 +62,19 @@ async function getProductsByCategoryName(
     const { name } = await context.params;
     const slug = decodeURIComponent(name);
 
+    // Resolve category
     const categoryRes = await pool.query<{ id: number }>(
       `SELECT id FROM categories
        WHERE LOWER(REPLACE(name, ' ', '-')) = LOWER($1)
        LIMIT 1`,
       [slug]
     );
-
     if (categoryRes.rowCount === 0) {
       return NextResponse.json({ products: [] }, { status: 200 });
     }
-
     const categoryId = categoryRes.rows[0].id;
 
+    // Base product list
     const itemsResult = await pool.query<ProductRow>(
       `
       SELECT 
@@ -53,11 +94,11 @@ async function getProductsByCategoryName(
       `,
       [categoryId]
     );
-
     const products = itemsResult.rows;
-
     const productIds = products.map((p) => p.id);
-    let saleMap = new Map<
+
+    // Category-based sales (per product)
+    let categorySaleMap = new Map<
       number,
       { amount: number; price: number; category: { id: number; name: string } }
     >();
@@ -81,16 +122,16 @@ async function getProductsByCategoryName(
         [productIds]
       );
 
-      saleMap = new Map();
+      categorySaleMap = new Map();
       for (const row of categorySalesResult.rows) {
         const priceNum =
           row.sale_price != null ? Number(row.sale_price) : undefined;
-        const existing = saleMap.get(row.productId);
+        const existing = categorySaleMap.get(row.productId);
         if (
           !existing ||
           (priceNum !== undefined && priceNum < existing.price)
         ) {
-          saleMap.set(row.productId, {
+          categorySaleMap.set(row.productId, {
             amount: Number(row.quantity),
             price: Number(priceNum),
             category: {
@@ -102,41 +143,122 @@ async function getProductsByCategoryName(
       }
     }
 
-    const finalProducts = products.map((product) => {
-      const categorySale = saleMap.get(product.id);
+    // NEW: sale-group membership & sale values
+    let groupSaleMap = new Map<
+      number,
+      {
+        id: number;
+        name: string | null;
+        amount: number | null;
+        price: number | null;
+      }
+    >();
 
+    if (productIds.length > 0) {
+      const groupRes = await pool.query<GroupSaleRow>(
+        `
+        SELECT 
+          psg.product_id,
+          sg.id           AS group_id,
+          sg.name         AS group_name,
+          sg.quantity     AS group_quantity,
+          sg.sale_price   AS group_sale_price
+        FROM product_sale_groups psg
+        JOIN sale_groups sg ON sg.id = psg.sale_group_id
+        WHERE psg.product_id = ANY($1::int[])
+        `,
+        [productIds]
+      );
+
+      for (const r of groupRes.rows) {
+        groupSaleMap.set(r.product_id, {
+          id: r.group_id,
+          name: r.group_name,
+          amount: r.group_quantity != null ? Number(r.group_quantity) : null,
+          price: r.group_sale_price != null ? Number(r.group_sale_price) : null,
+        });
+      }
+    }
+
+    // Build final list with BEST sale + saleGroup info for UI grouping
+    const finalProducts = products.map((product) => {
+      const basePrice = product.price != null ? Number(product.price) : null;
+
+      const cat = categorySaleMap.get(product.id);
+      const grp = groupSaleMap.get(product.id);
+
+      const best = pickBestSale([
+        cat
+          ? {
+              source: "category" as const,
+              amount: cat.amount,
+              price: cat.price,
+              meta: { category: cat.category },
+            }
+          : null,
+        product.productSaleQuantity != null && product.productSalePrice != null
+          ? {
+              source: "product" as const,
+              amount: Number(product.productSaleQuantity),
+              price: Number(product.productSalePrice),
+            }
+          : null,
+        grp?.amount && grp.price
+          ? {
+              source: "group" as const,
+              amount: grp.amount,
+              price: grp.price,
+              meta: { group: grp.id, groupName: grp.name ?? null },
+            }
+          : null,
+      ]);
+
+      // shape expected by storefront
       let sale: {
         amount: number;
         price: number;
-        fromCategory: boolean;
+        fromCategory?: boolean;
         category?: { id: number; name: string };
+        fromGroup?: boolean; // NEW (optional)
+        group?: { id: number; name: string | null }; // NEW (optional)
       } | null = null;
 
-      if (categorySale) {
+      if (best) {
         sale = {
-          amount: categorySale.amount,
-          price: categorySale.price,
-          fromCategory: true,
-          category: categorySale.category,
+          amount: best.amount,
+          price: best.price,
         };
-      } else if (
-        product.productSaleQuantity != null &&
-        product.productSalePrice != null
-      ) {
-        sale = {
-          amount: Number(product.productSaleQuantity),
-          price: Number(product.productSalePrice),
-          fromCategory: false,
-        };
+        if (best.source === "category") {
+          sale.fromCategory = true;
+          sale.category = best.meta?.category;
+        } else if (best.source === "group") {
+          (sale as any).fromGroup = true;
+          (sale as any).group = {
+            id: best.meta?.group,
+            name: best.meta?.groupName ?? null,
+          };
+        }
       }
+
+      // always expose saleGroup for grouping UI, even if not the winning sale
+      const saleGroup = grp
+        ? {
+            id: grp.id,
+            name: grp.name ?? null,
+            amount: grp.amount ?? null,
+            price: grp.price ?? null,
+          }
+        : null;
 
       return {
         id: product.id,
         name: product.name,
-        price: product.price != null ? Number(product.price) : null,
+        price: basePrice,
         image: product.image,
         inStock: product.in_stock ?? true,
-        sale,
+        sale, // chosen / best sale
+        saleGroup, // raw group info for UI clustering
+        sortOrder: product.sort_order ?? 0,
       };
     });
 
