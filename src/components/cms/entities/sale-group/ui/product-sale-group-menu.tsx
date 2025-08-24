@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { showToast } from "@/components/cms/ui/toast";
 
-type SaleGroupSummary = { id: number; name: string | null };
+type SaleGroupSummary = {
+  id: number;
+  name: string | null;
+  price?: number | null;
+  sale_price?: number | null;
+  quantity?: number | null;
+};
 type ApiSaleGroupList = { saleGroups?: SaleGroupSummary[] };
 
 /** Shared event bus so only one menu is open at a time */
@@ -17,48 +23,48 @@ const BUS = getBus();
 
 export default function ProductSaleGroupMenu({
   productId,
+  initialGroupId = null,
+  onChange,
 }: {
   productId: number;
+  initialGroupId?: number | null;
+  onChange?: (
+    newGroupId: number | null,
+    meta?: {
+      name?: string | null;
+      price?: number | null;
+      sale_price?: number | null;
+      quantity?: number | null;
+    }
+  ) => void;
 }) {
   const btnRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
     null
   );
 
   const [saleGroups, setSaleGroups] = useState<SaleGroupSummary[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(
+    initialGroupId ?? null
+  );
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // keep selection synced if parent updates initialGroupId
+    setSelectedGroupId(initialGroupId ?? null);
+  }, [initialGroupId]);
 
   async function ensureSaleGroups() {
     if (saleGroups.length) return;
     try {
       const res = await fetch("/api/sale-groups", { cache: "no-store" });
       const data = (await res.json()) as ApiSaleGroupList;
+      // If your /api/sale-groups can return name/price/sale_price/quantity — great.
+      // If not, we still at least get id/name for the menu.
       setSaleGroups(Array.isArray(data.saleGroups) ? data.saleGroups : []);
     } catch {
       showToast("שגיאה בטעינת קבוצות מבצע", "error");
-    }
-  }
-
-  async function loadMembership() {
-    try {
-      for (const g of saleGroups) {
-        const res = await fetch(`/api/sale-groups/${g.id}/items`, {
-          cache: "no-store",
-        });
-        if (!res.ok) continue;
-        const arr = (await res.json()) as { id: number }[];
-        if (arr.some((p) => p.id === productId)) {
-          setSelectedGroupId(g.id);
-          return;
-        }
-      }
-      setSelectedGroupId(null);
-    } catch {
-      /* ignore */
     }
   }
 
@@ -67,23 +73,50 @@ export default function ProductSaleGroupMenu({
     const prev = selectedGroupId;
     try {
       if (prev === groupId) {
-        await fetch(`/api/sale-groups/${groupId}/items/${productId}`, {
-          method: "DELETE",
-        });
+        // remove
+        const res = await fetch(
+          `/api/sale-groups/${groupId}/items/${productId}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) throw new Error();
         setSelectedGroupId(null);
+        onChange?.(null);
         showToast("🗑️ הוסר מקבוצת המבצע", "success");
       } else {
-        await fetch(`/api/sale-groups/${groupId}/items/${productId}`, {
-          method: "POST",
-        });
+        // add (optionally the server may reject if not compatible)
+        const res = await fetch(
+          `/api/sale-groups/${groupId}/items/${productId}`,
+          { method: "POST" }
+        );
+        if (!res.ok) {
+          const err = await safeJson<{ error?: string }>(res);
+          throw new Error(err?.error || "שגיאה בהוספה לקבוצת מבצע");
+        }
         setSelectedGroupId(groupId);
+        const meta = saleGroups.find((g) => g.id === groupId);
+        onChange?.(groupId, {
+          name: meta?.name ?? null,
+          price: meta?.price ?? null,
+          sale_price: meta?.sale_price ?? null,
+          quantity: meta?.quantity ?? null,
+        });
         showToast("✔️ המוצר נוסף לקבוצת המבצע", "success");
       }
-    } catch {
+    } catch (e: any) {
       setSelectedGroupId(prev);
-      showToast("שגיאה בשינוי קבוצת המבצע", "error");
+      showToast(e?.message || "שגיאה בשינוי קבוצת המבצע", "error");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function safeJson<T = unknown>(res: Response): Promise<T | null> {
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) return null;
+    try {
+      return (await res.json()) as T;
+    } catch {
+      return null;
     }
   }
 
@@ -100,14 +133,13 @@ export default function ProductSaleGroupMenu({
   };
 
   const openMenu = () => {
-    // tell others to close
     BUS.dispatchEvent(new CustomEvent("sg:open", { detail: { productId } }));
     setOpen(true);
     measureAndSet();
-    ensureSaleGroups().then(loadMembership);
+    ensureSaleGroups();
   };
 
-  // close on outside click (anywhere not inside button or menu)
+  // close on outside click
   useEffect(() => {
     if (!open) return;
 
@@ -117,9 +149,7 @@ export default function ProductSaleGroupMenu({
       if (t.closest?.("[data-sg-menu]")) return;
       closeMenu();
     }
-
     function onScrollOrResize() {
-      // keep position fresh while open
       measureAndSet();
     }
 
@@ -134,7 +164,7 @@ export default function ProductSaleGroupMenu({
     };
   }, [open]);
 
-  // close if another ProductSaleGroupMenu opens
+  // single-menu policy
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ productId: number }>).detail;
@@ -174,7 +204,6 @@ export default function ProductSaleGroupMenu({
 
       {open && menuPos && (
         <div
-          ref={menuRef}
           data-sg-menu
           className="fixed z-50 w-64 rounded-md border bg-white shadow-xl"
           style={{ top: menuPos.top, left: menuPos.left }}
@@ -195,6 +224,7 @@ export default function ProductSaleGroupMenu({
                     }`}
                     onClick={() => toggleGroup(g.id)}
                     disabled={loading}
+                    title={g.name || `קבוצה #${g.id}`}
                   >
                     <div className="truncate">{g.name || "קבוצה ללא שם"}</div>
                     <span

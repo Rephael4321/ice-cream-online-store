@@ -16,6 +16,14 @@ type ProductItem = {
   sale_price: number | null;
   sale_quantity: number | null;
   sort_order: number;
+  // NEW: sale-group summary for this product (if any)
+  group: {
+    id: number;
+    name: string | null;
+    price: number | null;
+    sale_price: number | null;
+    quantity: number | null;
+  } | null;
 };
 
 type SaleGroupItem = {
@@ -62,6 +70,15 @@ export default function ViewProducts({ name }: { name: string }) {
     [items, search]
   );
 
+  // helper to patch a product's group locally after a menu change
+  function setProductGroup(productId: number, group: ProductItem["group"]) {
+    setItems((prev) =>
+      prev.map((it) =>
+        it.type === "product" && it.id === productId ? { ...it, group } : it
+      )
+    );
+  }
+
   if (loading) return <p>טוען פריטים...</p>;
 
   return (
@@ -87,7 +104,6 @@ export default function ViewProducts({ name }: { name: string }) {
                 key={`product-${item.id}`}
                 className="group relative border rounded-xl bg-white cursor-pointer"
                 onClick={(e) => {
-                  // ignore clicks coming from the sale-group button
                   const target = e.target as HTMLElement;
                   if (target.closest?.("[data-sg-menu-button]")) return;
                   if (e.defaultPrevented) return;
@@ -103,7 +119,25 @@ export default function ViewProducts({ name }: { name: string }) {
                 }}
               >
                 {/* Dots button for sale groups */}
-                <ProductSaleGroupMenu productId={item.id} />
+                <ProductSaleGroupMenu
+                  productId={item.id}
+                  initialGroupId={item.group?.id ?? null}
+                  onChange={(newGroupId, meta) => {
+                    // update the badge immediately
+                    setProductGroup(
+                      item.id,
+                      newGroupId
+                        ? {
+                            id: newGroupId,
+                            name: meta?.name ?? null,
+                            price: meta?.price ?? null,
+                            sale_price: meta?.sale_price ?? null,
+                            quantity: meta?.quantity ?? null,
+                          }
+                        : null
+                    );
+                  }}
+                />
 
                 <div className="content p-4 rounded-xl shadow-md transition-transform transition-shadow duration-150 ease-out group-hover:shadow-xl group-hover:scale-[1.02] origin-top-right flex flex-col items-center">
                   {item.image ? (
@@ -122,6 +156,17 @@ export default function ViewProducts({ name }: { name: string }) {
                   <div className="text-gray-700 text-sm text-center pointer-events-none">
                     ₪{Number(item.price).toFixed(2)}
                   </div>
+
+                  {/* NEW: show current sale-group badge */}
+                  {item.group && (
+                    <div
+                      className="mt-2 text-xs px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 pointer-events-none"
+                      title={`קבוצת מבצע #${item.group.id}`}
+                    >
+                      בקבוצת מבצע: {item.group.name || `#${item.group.id}`}
+                    </div>
+                  )}
+
                   {item.sale_price !== null && (
                     <div className="text-green-600 font-semibold text-sm text-center pointer-events-none">
                       מבצע: ₪{Number(item.sale_price).toFixed(2)} (

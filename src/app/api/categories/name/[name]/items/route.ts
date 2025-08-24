@@ -32,7 +32,7 @@ async function getItemsByCategoryName(
     const { name } = await ctx.params;
     const slug = decodeURIComponent(name);
 
-    // 1) Resolve category by slugified name (spaces <-> dashes)
+    // 1) Resolve category
     const catRes = await pool.query<{ id: number }>(
       `
       SELECT id
@@ -44,13 +44,12 @@ async function getItemsByCategoryName(
     );
 
     if (catRes.rowCount === 0) {
-      // Keep UX smooth: same shape, empty list
       return NextResponse.json({ items: [] }, { status: 200 });
     }
 
     const categoryId = catRes.rows[0].id;
 
-    // 2) Pull product items linked to this category
+    // 2) Products in category
     const productsRes = await pool.query<ProductRow>(
       `
       SELECT
@@ -75,9 +74,11 @@ async function getItemsByCategoryName(
     const productRows = productsRes.rows;
     const productIds = productRows.map((r) => r.id);
 
-    // 3) Best category-sale per product (if any) coming from ANY 'sale' category that includes the product
-    let bestCategorySale = new Map<number, { amount: number; price: number }>();
-
+    // 3) Best category sale per product (optional, your existing logic)
+    const bestCategorySale = new Map<
+      number,
+      { amount: number; price: number }
+    >();
     if (productIds.length > 0) {
       const catSalesRes = await pool.query(
         `
@@ -106,7 +107,50 @@ async function getItemsByCategoryName(
       }
     }
 
-    // 4) Normalize product items into UI shape
+    // 4) NEW: current sale-group membership per product (global, not just this category)
+    const productGroup = new Map<
+      number,
+      {
+        id: number;
+        name: string | null;
+        price: number | null;
+        sale_price: number | null;
+        quantity: number | null;
+      }
+    >();
+
+    if (productIds.length > 0) {
+      const psgRes = await pool.query(
+        `
+        SELECT
+          psg.product_id,
+          sg.id          AS group_id,
+          sg.name        AS group_name,
+          sg.price       AS group_price,
+          sg.sale_price  AS group_sale_price,
+          sg.quantity    AS group_quantity
+        FROM product_sale_groups psg
+        JOIN sale_groups sg ON sg.id = psg.sale_group_id
+        WHERE psg.product_id = ANY ($1::int[])
+        `,
+        [productIds]
+      );
+
+      for (const r of psgRes.rows) {
+        const pid = Number(r.product_id);
+        // If you allow only one membership, last-write wins is fine; otherwise choose your rule here.
+        productGroup.set(pid, {
+          id: Number(r.group_id),
+          name: r.group_name ?? null,
+          price: r.group_price != null ? Number(r.group_price) : null,
+          sale_price:
+            r.group_sale_price != null ? Number(r.group_sale_price) : null,
+          quantity: r.group_quantity != null ? Number(r.group_quantity) : null,
+        });
+      }
+    }
+
+    // 5) Normalize product items with membership
     const productItems = productRows.map((r) => {
       const pSale = bestCategorySale.get(r.id);
       const sale_price =
@@ -118,6 +162,8 @@ async function getItemsByCategoryName(
           ? Number(r.product_sale_quantity)
           : null);
 
+      const group = productGroup.get(r.id) ?? null;
+
       return {
         type: "product" as const,
         id: r.id,
@@ -127,10 +173,12 @@ async function getItemsByCategoryName(
         sale_price: sale_price ?? null,
         sale_quantity: sale_quantity ?? null,
         sort_order: r.sort_order ?? 0,
+        // NEW: expose sale-group on the product item
+        group,
       };
     });
 
-    // 5) Pull sale_group items linked to this category
+    // 6) Sale-group items linked to this category (unchanged)
     const groupsRes = await pool.query<SaleGroupRow>(
       `
       SELECT
@@ -152,8 +200,8 @@ async function getItemsByCategoryName(
     const groupRows = groupsRes.rows;
     const groupIds = groupRows.map((g) => g.id);
 
-    // 6) Expand products per sale_group
-    let groupProducts = new Map<
+    // 7) Expand products per sale_group (unchanged)
+    const groupProducts = new Map<
       number,
       {
         id: number;
@@ -207,7 +255,7 @@ async function getItemsByCategoryName(
       products: groupProducts.get(g.id) ?? [],
     }));
 
-    // 7) Merge & sort by sort_order (NULLS LAST fallback via large number)
+    // 8) Merge & sort
     const items = [...productItems, ...saleGroupItems].sort(
       (a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9)
     );
