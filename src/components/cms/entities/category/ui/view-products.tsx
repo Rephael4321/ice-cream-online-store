@@ -16,7 +16,6 @@ type ProductItem = {
   sale_price: number | null;
   sale_quantity: number | null;
   sort_order: number;
-  // NEW: sale-group summary for this product (if any)
   group: {
     id: number;
     name: string | null;
@@ -79,6 +78,103 @@ export default function ViewProducts({ name }: { name: string }) {
     );
   }
 
+  /**
+   * Adjacency analysis
+   * - Disabled while searching (search !== '')
+   * - Works over the *filtered* list in its current order
+   * - A group is "fragmented" if it appears in >1 contiguous block
+   */
+  const adjacency = useMemo(() => {
+    const result = {
+      issues: [] as Array<{
+        groupId: number;
+        name: string | null;
+        blocks: Array<{ start: number; end: number }>; // 1-based positions
+        count: number;
+      }>,
+      fragmentedGroupIds: new Set<number>(),
+    };
+
+    if (search.trim().length > 0) return result;
+
+    // Collect sequence: only products that have a group
+    const seq: Array<{
+      idx: number; // 0-based index in filtered
+      productId: number;
+      groupId: number;
+      groupName: string | null;
+    }> = [];
+
+    filtered.forEach((item, idx) => {
+      if (item.type !== "product") return;
+      const g = item.group;
+      if (!g?.id) return;
+      seq.push({
+        idx,
+        productId: item.id,
+        groupId: g.id,
+        groupName: g.name ?? null,
+      });
+    });
+
+    if (seq.length === 0) return result;
+
+    // Build contiguous blocks per group
+    // Walk the filtered order; whenever groupId changes, we end/start blocks
+    type Block = { start: number; end: number }; // 1-based positions in filtered list
+    const blocks = new Map<number, { name: string | null; blocks: Block[] }>();
+
+    let i = 0;
+    while (i < seq.length) {
+      const currentGroup = seq[i].groupId;
+      const name = seq[i].groupName ?? null;
+
+      // Start block at the product's list position (convert to 1-based)
+      let start = seq[i].idx + 1;
+      let end = start;
+
+      // Expand while next contiguous filtered items with same groupId are encountered
+      let j = i + 1;
+      while (
+        j < seq.length &&
+        seq[j].groupId === currentGroup &&
+        seq[j].idx === seq[j - 1].idx + 1
+      ) {
+        end = seq[j].idx + 1;
+        j++;
+      }
+
+      if (!blocks.has(currentGroup)) {
+        blocks.set(currentGroup, { name, blocks: [] });
+      }
+      blocks.get(currentGroup)!.blocks.push({ start, end });
+
+      i = j;
+    }
+
+    // Any group with >1 blocks is fragmented
+    for (const [groupId, info] of blocks.entries()) {
+      if (info.blocks.length > 1) {
+        result.fragmentedGroupIds.add(groupId);
+        result.issues.push({
+          groupId,
+          name: info.name,
+          blocks: info.blocks,
+          count: info.blocks.length,
+        });
+      }
+    }
+
+    // Sort issues by group name/id for stable output
+    result.issues.sort((a, b) => {
+      const an = a.name ?? `#${a.groupId}`;
+      const bn = b.name ?? `#${b.groupId}`;
+      return an.localeCompare(bn, "he"); // Hebrew-friendly, adjust as needed
+    });
+
+    return result;
+  }, [filtered, search]);
+
   if (loading) return <p>טוען פריטים...</p>;
 
   return (
@@ -94,6 +190,29 @@ export default function ViewProducts({ name }: { name: string }) {
         />
       </div>
 
+      {/* Fragmentation banner */}
+      {adjacency.issues.length > 0 && (
+        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800">
+          <div className="font-semibold mb-1">
+            ⚠️ סידור לא רציף של קבוצות מבצע
+          </div>
+          <ul className="text-sm list-disc ms-5 space-y-1">
+            {adjacency.issues.map((iss) => (
+              <li key={iss.groupId}>
+                קבוצת <strong>{iss.name || `#${iss.groupId}`}</strong> מפוזרת ל־
+                <strong>{iss.count}</strong> בלוקים:&nbsp;
+                {iss.blocks
+                  .map((b) =>
+                    b.start === b.end ? `#${b.start}` : `#${b.start}–#${b.end}`
+                  )
+                  .join(", ")}
+                . מומלץ לעדכן את <code>sort_order</code> כדי להצמיד אותם.
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <p className="text-gray-500 p-4">לא נמצאו תוצאות.</p>
       ) : (
@@ -102,7 +221,12 @@ export default function ViewProducts({ name }: { name: string }) {
             item.type === "product" ? (
               <div
                 key={`product-${item.id}`}
-                className="group relative border rounded-xl bg-white cursor-pointer"
+                className={`group relative border rounded-xl bg-white cursor-pointer transition-shadow ${
+                  item.group?.id &&
+                  adjacency.fragmentedGroupIds.has(item.group.id)
+                    ? "ring-2 ring-red-300"
+                    : ""
+                }`}
                 onClick={(e) => {
                   const target = e.target as HTMLElement;
                   if (target.closest?.("[data-sg-menu-button]")) return;
@@ -117,6 +241,12 @@ export default function ViewProducts({ name }: { name: string }) {
                     router.push(`/products/${item.id}`);
                   }
                 }}
+                title={
+                  item.group?.id &&
+                  adjacency.fragmentedGroupIds.has(item.group.id)
+                    ? "קבוצת מבצע זו אינה רציפה ברשימה"
+                    : undefined
+                }
               >
                 {/* Dots button for sale groups */}
                 <ProductSaleGroupMenu
@@ -157,13 +287,23 @@ export default function ViewProducts({ name }: { name: string }) {
                     ₪{Number(item.price).toFixed(2)}
                   </div>
 
-                  {/* NEW: show current sale-group badge */}
                   {item.group && (
                     <div
-                      className="mt-2 text-xs px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 pointer-events-none"
-                      title={`קבוצת מבצע #${item.group.id}`}
+                      className={`mt-2 text-xs px-2 py-1 rounded-full border pointer-events-none ${
+                        item.group.id &&
+                        adjacency.fragmentedGroupIds.has(item.group.id)
+                          ? "bg-red-50 text-red-700 border-red-300"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                      title={`קבוצת מבצע #${item.group.id}${
+                        item.group.name ? ` • ${item.group.name}` : ""
+                      }`}
                     >
                       בקבוצת מבצע: {item.group.name || `#${item.group.id}`}
+                      {item.group.id &&
+                        adjacency.fragmentedGroupIds.has(item.group.id) && (
+                          <span className="ms-1">• לא רציף</span>
+                        )}
                     </div>
                   )}
 
