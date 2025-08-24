@@ -83,11 +83,16 @@ export default function ViewProducts({ name }: { name: string }) {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {filtered.map((item) =>
             item.type === "product" ? (
-              // OUTER CARD (does NOT transform)
               <div
                 key={`product-${item.id}`}
                 className="group relative border rounded-xl bg-white cursor-pointer"
-                onClick={() => router.push(`/products/${item.id}`)}
+                onClick={(e) => {
+                  // ignore clicks coming from the sale-group button
+                  const target = e.target as HTMLElement;
+                  if (target.closest?.("[data-sg-menu-button]")) return;
+                  if (e.defaultPrevented) return;
+                  router.push(`/products/${item.id}`);
+                }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -97,10 +102,9 @@ export default function ViewProducts({ name }: { name: string }) {
                   }
                 }}
               >
-                {/* Top-right sale-group trigger — stays OUTSIDE the scaled wrapper */}
+                {/* Dots button for sale groups */}
                 <ProductSaleGroupMenu productId={item.id} />
 
-                {/* INNER WRAPPER (this is what scales / animates) */}
                 <div className="content p-4 rounded-xl shadow-md transition-transform transition-shadow duration-150 ease-out group-hover:shadow-xl group-hover:scale-[1.02] origin-top-right flex flex-col items-center">
                   {item.image ? (
                     <Image
