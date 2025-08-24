@@ -24,6 +24,8 @@ type SingleProductProps = {
     category?: SaleCategoryInfo;
   };
   isAdmin?: boolean;
+  /** When true, hide the individual price/sale price block (used inside clusters) */
+  suppressPricing?: boolean;
 };
 
 export default function SingleProduct({
@@ -34,6 +36,7 @@ export default function SingleProduct({
   inStock,
   sale,
   isAdmin = false,
+  suppressPricing = false,
 }: SingleProductProps) {
   const { cartItems, addToCart, removeFromCart } = useCart();
   const router = useRouter();
@@ -128,20 +131,23 @@ export default function SingleProduct({
               {productName}
             </div>
 
-            <div className="text-gray-600">
-              {sale ? (
-                <>
-                  <div className="line-through text-red-500">
-                    {productPrice} ש״ח
-                  </div>
-                  <div className="text-green-600 font-bold">
-                    {sale.amount} ב- {sale.price} ש״ח
-                  </div>
-                </>
-              ) : (
-                <div>{productPrice} ש״ח</div>
-              )}
-            </div>
+            {/* ⛔ Hidden when suppressPricing is true */}
+            {!suppressPricing && (
+              <div className="text-gray-600">
+                {sale ? (
+                  <>
+                    <div className="line-through text-red-500">
+                      {productPrice} ש״ח
+                    </div>
+                    <div className="text-green-600 font-bold">
+                      {sale.amount} ב- {sale.price} ש״ח
+                    </div>
+                  </>
+                ) : (
+                  <div>{productPrice} ש״ח</div>
+                )}
+              </div>
+            )}
 
             {sale?.fromCategory && sale.category && !alreadyInCategoryPage && (
               <div className="mt-1 text-yellow-600">
@@ -186,7 +192,7 @@ export default function SingleProduct({
               </button>
             </div>
 
-            {/* ✅ Sale Pack Button */}
+            {/* ✅ Sale Pack Button (kept; doesn't display price text) */}
             {sale && sale.amount > 1 && (
               <button
                 onClick={handleAddSalePack}

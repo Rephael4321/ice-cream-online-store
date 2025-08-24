@@ -217,6 +217,7 @@ export default async function ProductsByCategory({ params }: Props) {
                   inStock={prod.inStock}
                   sale={prod.sale ?? undefined}
                   isAdmin={isAdmin}
+                  suppressPricing // 👈 hide individual price/sale text inside clusters
                 />
               ))}
             </div>

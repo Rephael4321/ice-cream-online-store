@@ -27,11 +27,6 @@ export default function SaleGroupCluster({
             )}
           </div>
         </div>
-
-        {/* optional CTA area; keep simple for now */}
-        {/* <button className="text-xs sm:text-sm px-3 py-1 rounded-full border border-emerald-400 text-emerald-700 hover:bg-emerald-100">
-          קנה חבילת מבצע
-        </button> */}
       </div>
 
       <div className="p-4 sm:p-6">{children}</div>
