@@ -31,12 +31,14 @@ function allocateGroupDiscounts(
     productPrice: number;
     inStock?: boolean;
     // @ts-ignore – provided by context on the item
-    saleGroup?: {
-      id: number;
-      quantity: number;
-      salePrice: number;
-      unitPrice: number | null;
-    } | null;
+    saleGroup?:
+      | {
+          id: number;
+          quantity: number;
+          salePrice: number;
+          unitPrice: number | null;
+        }
+      | null;
   }[]
 ) {
   const perItem = new Map<number, number>();
@@ -163,7 +165,15 @@ export default function Cart() {
   const { perItem: perItemGroupDiscount, total: groupDiscountTotal } =
     allocateGroupDiscounts(pricingItems);
 
-  const total = preGroupTotal - groupDiscountTotal;
+  // NEW: subtotal, delivery, grand total (client display; server is authoritative)
+  const DELIVERY_THRESHOLD = 90;
+  const DELIVERY_FEE = 10;
+
+  const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
+  const deliveryFee =
+    subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
+  const grandTotal = subtotal + deliveryFee;
+  const remainingForFree = Math.max(0, DELIVERY_THRESHOLD - subtotal);
 
   // ---------- background fetches on open/focus ----------
   useEffect(() => {
@@ -288,7 +298,7 @@ export default function Cart() {
         const data = await res.json().catch(() => ({}));
         if (
           res.status === 400 &&
-          data.error?.includes("None of the products")
+          (data as any).error?.includes("None of the products")
         ) {
           clearCart();
           toast.error("ההזמנה לא נשלחה – כל המוצרים נמחקו מהמערכת");
@@ -323,10 +333,7 @@ export default function Cart() {
       console.error("Failed to mark order as notified:", err);
     }
 
-    const phoneNumber = (process.env.NEXT_PUBLIC_PHONE || "").replace(
-      /\D/g,
-      ""
-    );
+    const phoneNumber = (process.env.NEXT_PUBLIC_PHONE || "").replace(/\D/g, "");
     const baseUrl =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
       "http://localhost:3000";
@@ -382,10 +389,24 @@ export default function Cart() {
           )}
 
           {cartItems.length > 0 && (
-            <div className="mt-4 space-y-3">
-              <p className="text-right font-bold">
-                סה״כ: {total.toFixed(2)} ש״ח
-              </p>
+            <div className="mt-4 space-y-3 text-right">
+              <div className="space-y-1">
+                <p>ביניים: {subtotal.toFixed(2)} ש״ח</p>
+                {deliveryFee > 0 ? (
+                  <p>דמי משלוח: {deliveryFee.toFixed(2)} ש״ח</p>
+                ) : (
+                  <p className="text-green-600">דמי משלוח: 0 ש״ח (מעל 90₪)</p>
+                )}
+                <p className="font-bold">
+                  סה״כ לתשלום: {grandTotal.toFixed(2)} ש״ח
+                </p>
+                {subtotal > 0 && subtotal < DELIVERY_THRESHOLD && (
+                  <p className="text-xs text-yellow-700 bg-yellow-100 rounded px-2 py-1 inline-block mt-1">
+                    הוסיפו עוד {Math.max(0, DELIVERY_THRESHOLD - subtotal).toFixed(2)} ₪ למשלוח חינם
+                  </p>
+                )}
+              </div>
+
               <button
                 onClick={initiatePayment}
                 disabled={submitting || cartItems.length === 0}

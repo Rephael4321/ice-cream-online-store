@@ -57,9 +57,15 @@ export default async function MainMenu() {
   return (
     <div className="px-4 py-12">
       {/* 🔶 Top Message Banner */}
-      <div className="text-center bg-yellow-100 text-yellow-800 font-semibold py-2 rounded-md shadow mb-6">
+      <div className="text-center bg-yellow-100 text-yellow-800 font-semibold py-2 rounded-md shadow mb-4">
         המוצרים נמכרים ביחידות בודדות בלבד. ההנחה חלה רק כאשר מוסיפים את כמות
         המבצע!
+      </div>
+
+      {/* 🚚 Delivery Fee Info */}
+      <div className="text-center bg-blue-100 text-blue-800 font-medium py-2 rounded-md shadow mb-6">
+        משלוח בעלות 10 ₪ עבור הזמנות מתחת ל־90 ₪ · בקנייה מעל 90 ₪ המשלוח חינם
+        🎉
       </div>
 
       {/* 🔄 Category Grid */}

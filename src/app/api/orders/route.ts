@@ -112,9 +112,9 @@ async function createOrder(req: NextRequest) {
         productName?: string;
         productImage?: string | null;
         quantity: number;
-        unitPrice: number; // client-provided; validated/overridden by DB
-        saleQuantity?: number | null; // client hint; DB will override if product sale exists
-        salePrice?: number | null; // client hint
+        unitPrice: number;
+        saleQuantity?: number | null;
+        salePrice?: number | null;
         inStock?: boolean;
       }>;
       isNotified?: boolean;
@@ -162,7 +162,7 @@ async function createOrder(req: NextRequest) {
       );
     }
 
-    // per-product sales (not category_sales; we accept the category price from client if present)
+    // per-product sales
     const { rows: saleRows } = await client.query(
       `SELECT product_id, quantity, sale_price FROM sales WHERE product_id = ANY($1::int[])`,
       [productIds]
@@ -235,14 +235,25 @@ async function createOrder(req: NextRequest) {
         inStock: p.inStock,
       }))
     );
-    const total = preGroupTotal - groupDiscountTotal;
 
-    // insert order (snapshot totals)
+    const subtotal = preGroupTotal - groupDiscountTotal; // NEW
+    const deliveryFee = subtotal > 0 && subtotal < 90 ? 10 : 0; // NEW
+    const total = subtotal + deliveryFee; // NEW
+
+    // insert order (snapshot totals + delivery_fee)
     const orderResult = await client.query<{ id: number }>(
-      `INSERT INTO orders (client_id, is_notified, pre_group_total, group_discount_total, total)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO orders
+         (client_id, is_notified, pre_group_total, group_discount_total, delivery_fee, total)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [clientId, isNotified, preGroupTotal, groupDiscountTotal, total]
+      [
+        clientId,
+        isNotified,
+        preGroupTotal,
+        groupDiscountTotal,
+        deliveryFee,
+        total,
+      ]
     );
     const orderId = orderResult.rows[0].id;
 
@@ -288,7 +299,9 @@ async function createOrder(req: NextRequest) {
       orderId,
       preGroupTotal,
       groupDiscountTotal,
-      total,
+      subtotal, // NEW (useful for UI/debug)
+      deliveryFee, // NEW
+      total, // includes delivery
     };
     if (missingCount > 0) {
       baseResponse.warning = `${missingCount} item(s) were not available and skipped.`;
