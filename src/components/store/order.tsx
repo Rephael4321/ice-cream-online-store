@@ -14,6 +14,7 @@ type OrderHeader = {
   isReady: boolean;
   preGroupTotal?: number | null;
   groupDiscountTotal?: number | null;
+  deliveryFee?: number | null; // ⬅️ NEW
   total?: number | null;
 };
 
@@ -130,11 +131,11 @@ export default function Order() {
     };
   });
 
-  // Prefer server snapshot totals; fallback to our derived totals
+  // Prefer server snapshot totals; fallback to derived totals
   const preGroupTotal =
     order.preGroupTotal != null
       ? Number(order.preGroupTotal)
-      : finalTotalFromItems + 0; // harmless fallback
+      : finalTotalFromItems + 0;
   const groupDiscountTotal =
     order.groupDiscountTotal != null
       ? Number(order.groupDiscountTotal)
@@ -142,8 +143,18 @@ export default function Order() {
           0,
           processed.reduce((s, it) => s + (it.perItemGroupDiscount || 0), 0)
         );
+
+  // Subtotal after discounts (no delivery)
+  const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
+
+  // Delivery fee: use snapshot if present, else derive by the rule for legacy orders
+  const derivedDelivery = subtotal > 0 && subtotal < 90 ? 10 : 0;
+  const deliveryFee =
+    order.deliveryFee != null ? Number(order.deliveryFee) : derivedDelivery;
+
+  // Final total (prefer stored; otherwise subtotal + delivery)
   const finalTotal =
-    order.total != null ? Number(order.total) : finalTotalFromItems;
+    order.total != null ? Number(order.total) : subtotal + deliveryFee;
 
   const totalSavings = Math.max(0, totalBeforeDiscount - finalTotal);
 
@@ -214,11 +225,22 @@ export default function Order() {
         ))}
       </ul>
 
-      <div className="mt-6 text-xl font-bold space-y-1 text-right rtl">
+      <div className="mt-6 text-right rtl space-y-1">
         {totalSavings > 0 && (
-          <p className="text-green-700">🎁 חסכת: ₪{totalSavings.toFixed(2)}</p>
+          <p className="text-green-700 font-medium">
+            🎁 חסכת: ₪{totalSavings.toFixed(2)}
+          </p>
         )}
-        <p>💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}</p>
+
+        {/* Breakdown */}
+        <p>ביניים: ₪{subtotal.toFixed(2)}</p>
+        <p>
+          דמי משלוח:{" "}
+          {deliveryFee > 0 ? `₪${deliveryFee.toFixed(2)}` : "₪0 (מעל 90₪)"}
+        </p>
+        <p className="text-xl font-bold">
+          💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}
+        </p>
 
         {/* Optional: show snapshot internals if present */}
         {order.preGroupTotal != null && (

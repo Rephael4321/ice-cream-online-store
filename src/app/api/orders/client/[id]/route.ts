@@ -1,4 +1,3 @@
-// app/api/orders/client/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
@@ -10,7 +9,7 @@ async function handler(
 ) {
   const { orderId, phone } = context;
 
-  // Order header incl. snapshot totals
+  // Order header incl. snapshot totals + delivery_fee
   const orderResult = await pool.query(
     `SELECT 
       o.id AS "orderId",
@@ -22,6 +21,7 @@ async function handler(
       c.phone AS "clientPhone",
       o.pre_group_total AS "preGroupTotal",
       o.group_discount_total AS "groupDiscountTotal",
+      o.delivery_fee AS "deliveryFee",           -- ⬅️ NEW
       o.total AS "total"
     FROM orders o
     JOIN clients c ON o.client_id = c.id
@@ -121,6 +121,7 @@ async function handler(
         order.preGroupTotal != null ? Number(order.preGroupTotal) : null,
       groupDiscountTotal:
         order.groupDiscountTotal != null ? Number(order.groupDiscountTotal) : 0,
+      deliveryFee: order.deliveryFee != null ? Number(order.deliveryFee) : null, // ⬅️ normalize
       total: finalTotal,
     },
     items,
