@@ -35,7 +35,6 @@ export default function OrderItemList({
     after = 0,
     actual = 0;
 
-  // highlight wrapper with SAME palette as list item
   const testStyle = isTest
     ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
     : "";
@@ -44,7 +43,6 @@ export default function OrderItemList({
       ? "bg-green-200 border-2 border-green-700 text-green-950"
       : "";
 
-  // Group items by storageName
   const grouped = new Map<string, Item[]>();
 
   for (const item of items) {
@@ -53,7 +51,6 @@ export default function OrderItemList({
     grouped.get(key)!.push(item);
   }
 
-  // Sort groups by their first item's storageSort
   const storageGroups = [...grouped.entries()].sort((a, b) => {
     const aSort = a[1][0].storageSort ?? 9999;
     const bSort = b[1][0].storageSort ?? 9999;
@@ -157,7 +154,7 @@ export default function OrderItemList({
         <p>סה״כ הנחה: ₪{discount.toFixed(2)}</p>
         <p>סה״כ הזמנה: ₪{after.toFixed(2)}</p>
         <p className="text-xl font-bold text-pink-700">
-          סה״כ לתשלום בפועל: ₪{actual.toFixed(2)}
+          סה״כ לתשלום בפועל (לפני משלוח): ₪{actual.toFixed(2)}
         </p>
       </div>
     </div>

@@ -18,6 +18,9 @@ type Order = {
   isReady: boolean;
   isTest?: boolean;
   isNotified?: boolean;
+
+  // NEW: delivery fee (nullable for legacy orders)
+  deliveryFee?: number | null;
 };
 
 type Item = {
@@ -196,8 +199,9 @@ export default function ViewOrder() {
     });
   };
 
-  const calcTotals = () => {
-    let actual = 0;
+  // Subtotal from items (after item-level sale, only in-stock)
+  const calcSubtotal = () => {
+    let subtotal = 0;
     for (const it of items) {
       let line = it.unitPrice * it.quantity;
       if (it.saleQuantity && it.salePrice && it.quantity >= it.saleQuantity) {
@@ -205,9 +209,9 @@ export default function ViewOrder() {
         const rest = it.quantity % it.saleQuantity;
         line = bundles * it.salePrice + rest * it.unitPrice;
       }
-      if (it.inStock) actual += line;
+      if (it.inStock) subtotal += line;
     }
-    return actual;
+    return subtotal;
   };
 
   const handleDelete = async () => {
@@ -266,7 +270,19 @@ export default function ViewOrder() {
   if (loading) return <p className="p-6">טוען…</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
-  const finalTotal = calcTotals();
+  // --- Delivery fee breakdown ---
+  const DELIVERY_THRESHOLD = 90;
+  const DELIVERY_FEE = 10;
+
+  const subtotal = calcSubtotal();
+  const deliveryFee =
+    order.deliveryFee != null
+      ? Number(order.deliveryFee)
+      : subtotal > 0 && subtotal < DELIVERY_THRESHOLD
+      ? DELIVERY_FEE
+      : 0;
+
+  const grandTotal = subtotal + deliveryFee;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -276,7 +292,7 @@ export default function ViewOrder() {
 
       <ClientControlPanel
         order={order}
-        finalTotal={finalTotal}
+        finalTotal={grandTotal} // includes delivery fee
         onDelete={handleDelete}
         onMarkTest={markAsTest}
         onEdit={() => {
@@ -297,6 +313,18 @@ export default function ViewOrder() {
         isReady={order.isReady}
         onToggleInStock={toggleStock}
       />
+
+      {/* NEW: Totals box incl. delivery fee */}
+      <div className="text-right rtl border rounded p-4 bg-gray-50">
+        <p>ביניים: ₪{subtotal.toFixed(2)}</p>
+        <p>
+          דמי משלוח:{" "}
+          {deliveryFee > 0 ? `₪${deliveryFee.toFixed(2)}` : "₪0 (מעל 90₪)"}
+        </p>
+        <p className="text-xl font-bold">
+          סה״כ לתשלום: ₪{grandTotal.toFixed(2)}
+        </p>
+      </div>
 
       {editOpen && (
         <div

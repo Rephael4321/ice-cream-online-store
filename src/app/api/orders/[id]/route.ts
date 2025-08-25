@@ -1,4 +1,3 @@
-// src/app/api/orders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
@@ -16,6 +15,7 @@ type OrderRow = {
   isNotified: boolean;
   preGroupTotal: number | null;
   groupDiscountTotal: number;
+  deliveryFee: number | null; // NEW
   total: number | null;
 };
 
@@ -67,6 +67,7 @@ async function getOrder(
          o.is_notified AS "isNotified",
          o.pre_group_total      AS "preGroupTotal",
          o.group_discount_total AS "groupDiscountTotal",
+         o.delivery_fee         AS "deliveryFee",   -- NEW
          o.total                AS "total"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
@@ -138,7 +139,6 @@ function normalizeToNullOrString(v: unknown): string | null | undefined {
     const t = v.trim();
     return t === "" ? null : t; // "" => delete (NULL)
   }
-  // invalid type
   return undefined;
 }
 
@@ -159,19 +159,16 @@ async function updateOrder(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Guard: payment/status must use dedicated endpoints
   if (body?.isPaid !== undefined || body?.isReady !== undefined) {
     return NextResponse.json(
       {
         error:
-          "Use dedicated endpoints for payment/status. " +
-          "Payment: PATCH /api/orders/:id/payment, Status: PATCH /api/orders/:id/status",
+          "Use dedicated endpoints for payment/status. Payment: PATCH /api/orders/:id/payment, Status: PATCH /api/orders/:id/status",
       },
       { status: 400 }
     );
   }
 
-  // 1) Test flag
   if (Object.prototype.hasOwnProperty.call(body ?? {}, "isTest")) {
     if (typeof body.isTest !== "boolean") {
       return NextResponse.json(
@@ -199,11 +196,9 @@ async function updateOrder(
     }
   }
 
-  // 2) Client details
   const name = normalizeToNullOrString(body?.name);
   const address = normalizeToNullOrString(body?.address);
 
-  // If neither field is present, it's not a supported payload
   if (name === undefined && address === undefined) {
     return NextResponse.json(
       {
@@ -227,18 +222,17 @@ async function updateOrder(
     }
     const clientId = orderRes.rows[0].client_id;
 
-    // Build dynamic UPDATE
     const setParts: string[] = [];
     const values: any[] = [];
     let i = 1;
 
     if (name !== undefined) {
       setParts.push(`name = $${i++}`);
-      values.push(name); // string or null
+      values.push(name);
     }
     if (address !== undefined) {
       setParts.push(`address = $${i++}`);
-      values.push(address); // string or null
+      values.push(address);
     }
     setParts.push(`updated_at = now()`);
 

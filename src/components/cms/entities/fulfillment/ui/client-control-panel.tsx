@@ -40,7 +40,6 @@ export default function ClientControlPanel({
   const name = order.clientName;
   const address = order.clientAddress;
 
-  // SAME standout palette as list
   const testStyle = order.isTest
     ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
     : "";
@@ -113,14 +112,12 @@ export default function ClientControlPanel({
         </div>
       </div>
 
-      {/* ───────── WhatsApp warning ───────── */}
       {!order.isTest && order.isNotified === false && (
         <div className="mt-2 p-2 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
           ⚠️ ההזמנה עדיין לא קיבלה הודעת וואטסאפ
         </div>
       )}
 
-      {/* ───────── contact ───────── */}
       <p>שם: {name ?? "—"}</p>
       <p>כתובת: {address ?? "—"}</p>
       <p>
@@ -168,7 +165,6 @@ export default function ClientControlPanel({
         </a>
       </div>
 
-      {/* ───────── edit / date ───────── */}
       <div className="mt-2">
         <button
           onClick={() => {
@@ -188,7 +184,7 @@ export default function ClientControlPanel({
           : new Date(order.createdAt).toLocaleString("he-IL")}
       </p>
 
-      {/* ───────── status buttons ───────── */}
+      {/* totals shown in page; here we just keep status controls */}
       <div className="mt-4 flex gap-4 flex-wrap">
         <button
           onClick={() => {
