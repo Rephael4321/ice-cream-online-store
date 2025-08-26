@@ -11,9 +11,6 @@ export default function ListCategories() {
 
   return (
     <div className="px-4 sm:px-6 md:px-10 max-w-7xl mx-auto">
-      <Link href="/cms" className="text-blue-600 hover:underline">
-        ← חזרה לניהול
-      </Link>
       <h1 className="text-2xl font-bold mb-4 text-purple-700 text-center">
         ניהול קטגוריות
       </h1>

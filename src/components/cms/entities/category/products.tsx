@@ -11,7 +11,7 @@ export default function ProductsByCategory({ name }: { name: string }) {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Set the shared header title (rendered by the section layout) */}
+      {/* Shared header title (rendered by the section layout) */}
       <HeaderHydrator title={`מוצרים בקטגוריה ${name}`} />
 
       {/* Page-local controls (not part of the section nav) */}

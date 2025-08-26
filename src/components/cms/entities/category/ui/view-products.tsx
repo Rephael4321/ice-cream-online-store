@@ -79,10 +79,7 @@ export default function ViewProducts({ name }: { name: string }) {
   }
 
   /**
-   * Adjacency analysis
-   * - Disabled while searching (search !== '')
-   * - Works over the *filtered* list in its current order
-   * - A group is "fragmented" if it appears in >1 contiguous block
+   * Adjacency analysis (unchanged)
    */
   const adjacency = useMemo(() => {
     const result = {
@@ -97,9 +94,8 @@ export default function ViewProducts({ name }: { name: string }) {
 
     if (search.trim().length > 0) return result;
 
-    // Collect sequence: only products that have a group
     const seq: Array<{
-      idx: number; // 0-based index in filtered
+      idx: number;
       productId: number;
       groupId: number;
       groupName: string | null;
@@ -119,9 +115,7 @@ export default function ViewProducts({ name }: { name: string }) {
 
     if (seq.length === 0) return result;
 
-    // Build contiguous blocks per group
-    // Walk the filtered order; whenever groupId changes, we end/start blocks
-    type Block = { start: number; end: number }; // 1-based positions in filtered list
+    type Block = { start: number; end: number };
     const blocks = new Map<number, { name: string | null; blocks: Block[] }>();
 
     let i = 0;
@@ -129,11 +123,9 @@ export default function ViewProducts({ name }: { name: string }) {
       const currentGroup = seq[i].groupId;
       const name = seq[i].groupName ?? null;
 
-      // Start block at the product's list position (convert to 1-based)
       let start = seq[i].idx + 1;
       let end = start;
 
-      // Expand while next contiguous filtered items with same groupId are encountered
       let j = i + 1;
       while (
         j < seq.length &&
@@ -152,7 +144,6 @@ export default function ViewProducts({ name }: { name: string }) {
       i = j;
     }
 
-    // Any group with >1 blocks is fragmented
     for (const [groupId, info] of blocks.entries()) {
       if (info.blocks.length > 1) {
         result.fragmentedGroupIds.add(groupId);
@@ -165,11 +156,10 @@ export default function ViewProducts({ name }: { name: string }) {
       }
     }
 
-    // Sort issues by group name/id for stable output
     result.issues.sort((a, b) => {
       const an = a.name ?? `#${a.groupId}`;
       const bn = b.name ?? `#${b.groupId}`;
-      return an.localeCompare(bn, "he"); // Hebrew-friendly, adjust as needed
+      return an.localeCompare(bn, "he");
     });
 
     return result;
@@ -179,8 +169,8 @@ export default function ViewProducts({ name }: { name: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold">מוצרים בקטגוריה {name}</h1>
+      {/* Only the search input here (no inner title) */}
+      <div className="flex justify-end items-center gap-4 flex-wrap">
         <Input
           type="text"
           placeholder="חפש מוצר או קבוצה..."
@@ -253,7 +243,6 @@ export default function ViewProducts({ name }: { name: string }) {
                   productId={item.id}
                   initialGroupId={item.group?.id ?? null}
                   onChange={(newGroupId, meta) => {
-                    // update the badge immediately
                     setProductGroup(
                       item.id,
                       newGroupId

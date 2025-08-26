@@ -110,8 +110,8 @@ export default function OrganizeProducts({ name }: { name: string }) {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">סידור פריטים בקטגוריה {name}</h1>
+      {/* Only a Save button (no inner title) */}
+      <div className="flex justify-end items-center">
         <Button onClick={saveOrder} disabled={saving}>
           {saving ? "שומר..." : "שמור סדר"}
         </Button>
@@ -203,8 +203,8 @@ function SortableSaleGroup({ group }: { group: SaleGroupItem }) {
         >
           ≡
         </div>
+        {/* Removed inner title; keep compact meta if you like */}
         <div className="text-right">
-          <div className="text-lg font-bold">{group.name}</div>
           <div className="text-sm text-green-600">
             מבצע: {group.quantity} ב־₪{group.sale_price.toFixed(2)}
           </div>

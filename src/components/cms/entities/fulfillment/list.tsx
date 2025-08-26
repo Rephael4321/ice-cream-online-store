@@ -238,11 +238,6 @@ export default function ListOrder() {
       )}
 
       <div className="p-6 max-w-4xl mx-auto space-y-6">
-        {/* 🔙 Go back */}
-        <Link href="/cms" className="text-blue-600 hover:underline">
-          ← חזרה לניהול
-        </Link>
-
         <h1 className="text-2xl font-bold">📦 הזמנות</h1>
 
         {/* 🔍 Filters */}
