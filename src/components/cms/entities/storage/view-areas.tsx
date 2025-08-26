@@ -1,3 +1,4 @@
+// components/cms/entities/storage/view-areas.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,6 +9,7 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -21,6 +23,7 @@ import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { Trash2, GripVertical, Check } from "lucide-react";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type StorageArea = {
   id: number;
@@ -36,10 +39,7 @@ export default function ViewStorageAreas() {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 5,
-      },
+      activationConstraint: { delay: 200, tolerance: 5 },
     })
   );
 
@@ -48,66 +48,77 @@ export default function ViewStorageAreas() {
   }, []);
 
   async function fetchAreas() {
-    const res = await fetch("/api/storage/areas");
-    const data = await res.json();
-    setAreas(data.areas || []);
+    try {
+      const res = await fetch("/api/storage/areas", { cache: "no-store" });
+      const data = await res.json();
+      setAreas(data.areas || []);
+    } catch {
+      showToast("❌ שגיאה בטעינת אזורים", "error");
+    }
   }
 
   async function addArea() {
+    if (!name.trim()) return;
     setLoading(true);
-    const res = await fetch("/api/storage/areas", {
-      method: "POST",
-      body: JSON.stringify({ name }),
-    });
+    try {
+      const res = await fetch("/api/storage/areas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
 
-    if (res.ok) {
-      showToast("אזור נוסף בהצלחה");
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error || "Failed to add");
+      }
+
+      showToast("✅ אזור נוסף בהצלחה", "success");
       setName("");
       fetchAreas();
-    } else {
-      const { error } = await res.json();
-      showToast(error || "שגיאה בהוספת אזור", "error");
+    } catch (e) {
+      showToast("❌ שגיאה בהוספת אזור", "error");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   async function deleteArea(id: number) {
-    const confirmed = confirm("האם אתה בטוח שברצונך למחוק את האזור?");
-    if (!confirmed) return;
+    if (!confirm("האם אתה בטוח שברצונך למחוק את האזור?")) return;
 
-    const res = await fetch(`/api/storage/areas/${id}`, {
-      method: "DELETE",
-    });
-
-    if (res.ok) {
-      showToast("האזור נמחק");
+    try {
+      const res = await fetch(`/api/storage/areas/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
       setAreas((prev) => prev.filter((a) => a.id !== id));
-    } else {
-      showToast("שגיאה במחיקה", "error");
+      showToast("🗑️ האזור נמחק", "success");
+    } catch {
+      showToast("❌ שגיאה במחיקה", "error");
     }
   }
 
   async function updateOrder(newOrder: StorageArea[]) {
-    const res = await fetch("/api/storage/areas/order", {
-      method: "POST",
-      body: JSON.stringify({ areas: newOrder }),
-    });
-
-    if (res.ok) {
-      showToast("סדר עודכן");
-    } else {
-      showToast("שגיאה בעדכון סדר", "error");
+    try {
+      const payload = newOrder.map((a, idx) => ({
+        id: a.id,
+        sort_order: idx, // server can also compute; send explicit for clarity
+      }));
+      const res = await fetch("/api/storage/areas/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areas: payload }),
+      });
+      if (!res.ok) throw new Error("Order update failed");
+      showToast("✅ סדר עודכן", "success");
+    } catch {
+      showToast("❌ שגיאה בעדכון סדר", "error");
     }
   }
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const oldIndex = areas.findIndex((a) => a.id === active.id);
     const newIndex = areas.findIndex((a) => a.id === over.id);
-
     const reordered = arrayMove(areas, oldIndex, newIndex);
     setAreas(reordered);
     updateOrder(reordered);
@@ -119,63 +130,71 @@ export default function ViewStorageAreas() {
     );
   }
 
-  async function saveNameChange(id: number, name: string) {
-    const res = await fetch("/api/storage/areas/order", {
-      method: "POST",
-      body: JSON.stringify({ areas: [{ id, name }] }),
-    });
-
-    if (res.ok) {
-      showToast("השם עודכן");
-    } else {
-      showToast("שגיאה בעדכון שם", "error");
+  async function saveNameChange(id: number, newName: string) {
+    try {
+      const res = await fetch("/api/storage/areas/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Same endpoint supports partial updates (name) on server
+        body: JSON.stringify({ areas: [{ id, name: newName.trim() }] }),
+      });
+      if (!res.ok) throw new Error("Rename failed");
+      showToast("✅ השם עודכן", "success");
+    } catch {
+      showToast("❌ שגיאה בעדכון שם", "error");
     }
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-purple-700 text-center">
-        ניהול אזורי אחסון
-      </h1>
+    <main
+      dir="rtl"
+      className="px-4 sm:px-6 md:px-10 max-w-3xl mx-auto relative"
+    >
+      <HeaderHydrator title="אזורי אחסון" />
 
-      <div className="space-y-3">
-        <Input
-          placeholder="שם האזור"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Button onClick={addArea} disabled={loading}>
-          הוסף אזור
-        </Button>
-      </div>
+      <div className="py-6 space-y-6">
+        {/* Add area */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="שם האזור"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && name.trim() && !loading) addArea();
+            }}
+          />
+          <Button onClick={addArea} disabled={loading || !name.trim()}>
+            הוסף אזור
+          </Button>
+        </div>
 
-      <div className="pt-6 space-y-4">
-        <h2 className="text-lg font-semibold">אזורי אחסון קיימים</h2>
-
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={areas.map((a) => a.id)}
-            strategy={verticalListSortingStrategy}
+        {/* Existing areas (DnD) */}
+        <div className="pt-2">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <ul className="space-y-2">
-              {areas.map((a) => (
-                <SortableAreaItem
-                  key={a.id}
-                  area={a}
-                  onRename={updateNameLocally}
-                  onRenameSave={saveNameChange}
-                  onDelete={deleteArea}
-                />
-              ))}
-            </ul>
-          </SortableContext>
-        </DndContext>
+            <SortableContext
+              items={areas.map((a) => a.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="space-y-2">
+                {areas.map((a) => (
+                  <SortableAreaItem
+                    key={a.id}
+                    area={a}
+                    onRename={updateNameLocally}
+                    onRenameSave={saveNameChange}
+                    onDelete={deleteArea}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -201,7 +220,7 @@ function SortableAreaItem({
 
   const [originalName, setOriginalName] = useState(area.name);
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
@@ -230,7 +249,13 @@ function SortableAreaItem({
           value={area.name}
           onChange={(e) => onRename(area.id, e.target.value)}
           onBlur={() => {
-            if (hasChanged) {
+            if (hasChanged && area.name.trim()) {
+              onRenameSave(area.id, area.name);
+              setOriginalName(area.name);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && hasChanged && area.name.trim()) {
               onRenameSave(area.id, area.name);
               setOriginalName(area.name);
             }
@@ -238,7 +263,7 @@ function SortableAreaItem({
           onTouchStart={(e) => e.stopPropagation()}
         />
 
-        {hasChanged && (
+        {hasChanged && area.name.trim() && (
           <Button
             size="icon"
             onClick={() => {
@@ -246,6 +271,7 @@ function SortableAreaItem({
               setOriginalName(area.name);
             }}
             className="text-green-600 hover:text-green-700"
+            title="שמור שם"
           >
             <Check className="w-4 h-4" />
           </Button>
@@ -256,6 +282,7 @@ function SortableAreaItem({
         variant="destructive"
         onClick={() => onDelete(area.id)}
         className="ml-2"
+        title="מחק אזור"
       >
         <Trash2 className="w-4 h-4" />
       </Button>
