@@ -26,16 +26,22 @@ export default function SectionScaffold({
         key: n.key,
         label: n.label,
         href: n.href,
-        variant: pathname?.startsWith(n.href) ? "secondary" : "outline", // active highlight
+        // active page looks "secondary"
+        variant: pathname?.startsWith(n.href) ? "secondary" : "outline",
       })),
     [cfg.nav, pathname]
   );
 
   return (
     <SectionHeaderProvider initialTitle={cfg.label} initialActions={actions}>
-      <HeaderHydrator actions={actions} />
-      <SectionHeader />
-      <div>{children}</div>
+      {/* Header container: centered + a bit of top padding */}
+      <div className="mx-auto max-w-6xl px-4 pt-4">
+        <HeaderHydrator actions={actions} />
+        <SectionHeader />
+      </div>
+
+      {/* Content container: centered to match header */}
+      <div className="mx-auto max-w-6xl px-4 pb-6">{children}</div>
     </SectionHeaderProvider>
   );
 }

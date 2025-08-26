@@ -72,12 +72,18 @@ export function SectionHeader() {
   const { header } = useSectionHeader();
   return (
     <div className="mb-6 flex items-center justify-between gap-4">
+      {/* Slightly larger title; container centering handled by scaffold */}
       <h1 className="text-2xl font-semibold">{header.title}</h1>
+
       <div className="flex flex-wrap items-center gap-2">
         {header.actions.map((a) =>
           "href" in a ? (
             <Link href={a.href} key={a.key}>
-              <Button variant={a.variant ?? "default"} disabled={a.disabled}>
+              <Button
+                className="cursor-pointer"
+                variant={a.variant ?? "default"}
+                disabled={a.disabled}
+              >
                 {a.label}
               </Button>
             </Link>
@@ -85,6 +91,7 @@ export function SectionHeader() {
             <Button
               key={a.key}
               onClick={a.onClick}
+              className="cursor-pointer"
               variant={a.variant ?? "default"}
               disabled={a.disabled}
             >
