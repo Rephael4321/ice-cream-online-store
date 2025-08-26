@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/cms/ui/button";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ViewProducts from "./ui/view-products";
 import OrganizeProducts from "./ui/organize-products";
 
@@ -10,8 +11,11 @@ export default function ProductsByCategory({ name }: { name: string }) {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">מוצרים בקטגוריה {name}</h1>
+      {/* Set the shared header title (rendered by the section layout) */}
+      <HeaderHydrator title={`מוצרים בקטגוריה ${name}`} />
+
+      {/* Page-local controls (not part of the section nav) */}
+      <div className="flex justify-end items-center">
         <div className="space-x-2">
           <Button
             variant={mode === "view" ? "default" : "outline"}

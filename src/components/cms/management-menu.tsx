@@ -1,114 +1,61 @@
 "use client";
 
 import Link from "next/link";
+import { CMS_SECTIONS, CMSSectionKey } from "@/components/cms/sections/config";
 
-const entityGroups = [
-  {
-    title: "מוצרים",
-    items: [
-      {
-        name: "מוצר חדש",
-        description: "הקם מוצר חדש במערכת.",
-        slug: "new-product",
-      },
-      {
-        name: "רשימת מוצרים",
-        description: "צפה בכל המוצרים במערכת.",
-        slug: "products",
-      },
-      {
-        name: "מוצרים שאזלו מהמלאי",
-        description: "צפה והחזר מוצרים שאזלו.",
-        slug: "products/out-of-stock",
-      },
-      {
-        name: "ניהול תמונות מוצרים",
-        description: "צפה בתמונות ובשימוש שלהן במוצרים.",
-        slug: "products/images",
-      },
-    ],
-  },
-  {
-    title: "קטגוריות",
-    items: [
-      {
-        name: "קטגוריה חדשה",
-        description: "צור קטגוריה חדשה.",
-        slug: "new-category",
-      },
-      {
-        name: "רשימת קטגוריות",
-        description: "נהל קטגוריות קיימות.",
-        slug: "categories",
-      },
-      {
-        name: "ניהול קטגוריות",
-        description: "קישור פריטים, תתי קטגוריות.",
-        slug: "link-product-to-category",
-      },
-    ],
-  },
-  {
-    title: "מבצעים",
-    items: [
-      {
-        name: "קבוצה חדשה",
-        description: "צור קבוצת מבצע חדשה.",
-        slug: "sale-groups/new",
-      },
-      {
-        name: "קבוצות מבצע",
-        description: "צפה ונהל קבוצות מבצע קיימות.",
-        slug: "sale-groups",
-      },
-    ],
-  },
-  {
-    title: "הזמנות",
-    items: [
-      {
-        name: "צפה והכן הזמנות",
-        description: "נהל את ההזמנות שנכנסו.",
-        slug: "orders",
-      },
-    ],
-  },
-  {
-    title: "לקוחות",
-    items: [
-      {
-        name: "רשימת לקוחות",
-        description: "ניהול וצפייה בפרטי לקוחות.",
-        slug: "clients",
-      },
-    ],
-  },
-  {
-    title: "תמונות",
-    items: [
-      {
-        name: "ניהול תמונות",
-        description: "העלה, מחק ושנה שמות של תמונות.",
-        slug: "images",
-      },
-      {
-        name: "מיגרציית תמונות",
-        description: "כלי לניהול ומעבר מאגרי תמונות.",
-        slug: "images-migration",
-      },
-    ],
-  },
-  {
-    title: "אחסון",
-    items: [
-      {
-        name: "ניהול אזורים",
-        description: "הגדר אזורי אחסון פיזיים למוצרים.",
-        slug: "storage-areas",
-      },
-    ],
-  },
+const SECTION_ORDER: CMSSectionKey[] = [
+  "products",
+  "categories",
+  "saleGroups",
+  "orders",
+  "clients",
+  "storage",
 ];
+
+// Hebrew descriptions per section/link key
+function describe(section: CMSSectionKey, linkKey: string): string {
+  switch (section) {
+    case "products":
+      switch (linkKey) {
+        case "new":
+          return "הקם מוצר חדש במערכת.";
+        case "list":
+          return "צפה בכל המוצרים במערכת.";
+        case "oos":
+          return "צפה והחזר מוצרים שאזלו.";
+        case "images":
+          return "צפה בתמונות ובשימוש שלהן במוצרים.";
+        default:
+          return "";
+      }
+    case "categories":
+      return linkKey === "new" ? "צור קטגוריה חדשה." : "נהל קטגוריות קיימות.";
+    case "saleGroups":
+      return linkKey === "new"
+        ? "צור קבוצת מבצע חדשה."
+        : "צפה ונהל קבוצות מבצע קיימות.";
+    case "orders":
+      return "נהל את ההזמנות שנכנסו.";
+    case "clients":
+      return "ניהול וצפייה בפרטי לקוחות.";
+    case "storage":
+      return "הגדר אזורי אחסון פיזיים למוצרים.";
+    default:
+      return "";
+  }
+}
+
+const entityGroups = SECTION_ORDER.map((key) => {
+  const sec = CMS_SECTIONS[key];
+  return {
+    title: sec.label,
+    items: sec.nav.map((n) => ({
+      name: n.label,
+      description: describe(key, n.key),
+      slug: n.href.startsWith("/") ? n.href.slice(1) : n.href,
+    })),
+  };
+});
 
 export default function ManagementMenu() {
   return (
