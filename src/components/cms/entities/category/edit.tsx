@@ -5,17 +5,18 @@ import { Input } from "@/components/cms/ui/input";
 import { Label } from "@/components/cms/ui/label";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import Image from "next/image";
 
 type CategoryType = "collection" | "sale";
 
 interface Category {
-  id: number; // can still exist in data, we just don't use it in URLs
+  id: number;
   name: string;
   type: CategoryType;
   image: string;
   description: string;
-  parent_id: number | null; // used only to preselect parent by name
+  parent_id: number | null;
   show_in_menu: 0 | 1;
   saleQuantity?: string;
   salePrice?: string;
@@ -26,7 +27,7 @@ type UpdateCategoryPayload = {
   type: CategoryType;
   image: string;
   description: string;
-  parent_name: string | null; // <— switch to names
+  parent_name: string | null; // send parent by name
   show_in_menu: 0 | 1;
   saleQuantity?: number;
   salePrice?: number;
@@ -40,7 +41,7 @@ type ProductImage = {
   name?: string;
 };
 
-type Props = { name: string }; // <— only name
+type Props = { name: string }; // only name
 
 const PAGE_SIZE = 50;
 
@@ -192,7 +193,7 @@ export default function EditCategory({ name: initialName }: Props) {
       try {
         const enc = encodeURIComponent(initialName);
 
-        // Try dedicated by-name endpoint first (you'll wire it on the server)
+        // Try dedicated by-name endpoint first
         const [detailRes, listRes] = await Promise.all([
           fetch(`/api/categories/name/${enc}`, { cache: "no-store" }).catch(
             () => null
@@ -209,7 +210,6 @@ export default function EditCategory({ name: initialName }: Props) {
 
         if (detailRes && detailRes.ok) {
           const data = await detailRes.json();
-          // expect { category: {..., saleQuantity?, salePrice?} }
           const c = data.category as Category & {
             saleQuantity?: number;
             salePrice?: number;
@@ -221,7 +221,7 @@ export default function EditCategory({ name: initialName }: Props) {
             salePrice: c.salePrice != null ? String(c.salePrice) : "",
           };
         } else {
-          // Fallback: from the list by name (temporary until your by-name endpoint exists)
+          // Fallback: from the list by name
           const c = all.categories.find((x) => x.name === initialName);
           if (c) {
             parsed = {
@@ -292,11 +292,11 @@ export default function EditCategory({ name: initialName }: Props) {
     }
 
     const payload: UpdateCategoryPayload = {
-      name: category.name.trim(), // no dash munging
+      name: category.name.trim(),
       type: category.type,
       image: category.image,
       description: category.description,
-      parent_name: selectedParentName, // <— send parent by name
+      parent_name: selectedParentName,
       show_in_menu: category.show_in_menu,
     };
     if (category.type === "sale") {
@@ -354,9 +354,18 @@ export default function EditCategory({ name: initialName }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
-      <h1 className="text-xl sm:text-2xl font-bold text-center mb-6">
-        עריכת קטגוריה — {category.name}
-      </h1>
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator
+        title={`עריכת קטגוריה — ${category.name || initialName}`}
+      />
+
+      {/* Optional page-local controls row (kept minimal here) */}
+      {/* If you want quick actions up top, you can uncomment this:
+      <div className="mt-2 mb-4 flex items-center justify-end gap-2">
+        <Button onClick={handleSubmit as any}>שמור</Button>
+        <Button onClick={handleDelete} className="bg-red-600 text-white hover:bg-red-700">מחק</Button>
+      </div>
+      */}
 
       <form
         onSubmit={handleSubmit}

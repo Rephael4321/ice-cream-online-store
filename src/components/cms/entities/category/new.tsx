@@ -11,13 +11,14 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/cms/ui/select";
-import Image from "next/image";
 import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import Image from "next/image";
 
 type CategoryForm = {
   name: string;
   type: "collection" | "sale";
-  image: string; // full S3 URL (or "")
+  image: string;
   saleQuantity: string;
   salePrice: string;
   showInMenu: boolean;
@@ -277,10 +278,10 @@ export default function NewCategory() {
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
-      <h1 className="text-xl sm:text-2xl font-bold text-center mb-6">
-        קטגוריה חדשה
-      </h1>
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title="קטגוריה חדשה" />
 
+      {/* Form */}
       <form
         onSubmit={handleSubmit}
         className="flex flex-col md:flex-row gap-6 items-start"
