@@ -7,6 +7,7 @@ import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { SaleGroupEditor } from "./ui/sale-group-editor";
 import Image from "next/image";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type SaleGroup = {
   id: number;
@@ -218,10 +219,8 @@ export default function ViewSaleGroup() {
   // -------- render ----------
   if (loading) {
     return (
-      <main className="p-6">
-        <h1 className="text-2xl font-bold text-purple-700 text-center mb-6">
-          עריכת קבוצת מבצע
-        </h1>
+      <main className="p-6" dir="rtl">
+        <HeaderHydrator title="עריכת קבוצת מבצע" />
         <p className="text-center mt-8">טוען פרטי קבוצה...</p>
       </main>
     );
@@ -229,10 +228,8 @@ export default function ViewSaleGroup() {
 
   if (!group) {
     return (
-      <main className="p-6">
-        <h1 className="text-2xl font-bold text-purple-700 text-center mb-6">
-          עריכת קבוצת מבצע
-        </h1>
+      <main className="p-6" dir="rtl">
+        <HeaderHydrator title="עריכת קבוצת מבצע" />
         <p className="text-center mt-8 text-red-600">קבוצה לא נמצאה</p>
       </main>
     );
@@ -241,10 +238,8 @@ export default function ViewSaleGroup() {
   const previewSrc = group.image || "";
 
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold text-purple-700 text-center mb-6">
-        עריכת קבוצת מבצע
-      </h1>
+    <main className="p-6" dir="rtl">
+      <HeaderHydrator title="עריכת קבוצת מבצע" />
 
       <div className="max-w-5xl mx-auto mt-6 flex flex-col md:flex-row gap-6 items-start relative">
         {savingImage && (

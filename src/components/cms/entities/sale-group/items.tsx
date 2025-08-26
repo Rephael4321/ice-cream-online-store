@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { SaleGroupItem } from "./ui/sale-group-item";
 import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type Product = {
   id: number;
@@ -53,13 +54,13 @@ export default function SaleGroupItemManager() {
   useEffect(() => {
     if (!groupId) return;
     fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold text-purple-700 mb-4 text-center">
-        ניהול מוצרים בקבוצת מבצע
-      </h1>
+    <main className="p-6" dir="rtl">
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title="ניהול מוצרים בקבוצת מבצע" />
 
       {loading ? (
         <p className="text-center mt-6">טוען מוצרים...</p>

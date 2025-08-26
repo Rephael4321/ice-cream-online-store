@@ -7,6 +7,7 @@ import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import ProductRow from "./ui/product-row";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type Product = {
   id: number;
@@ -445,9 +446,18 @@ export default function ManageSaleGroupItems() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4" dir="rtl">
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title={`ניהול קבוצת מבצע #${saleGroupId}`} />
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-xl font-bold">ניהול קבוצת מבצע #{saleGroupId}</h1>
+        <div className="w-full sm:w-auto">
+          <Input
+            placeholder="חיפוש לפי שם או מזהה"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
 
         <Button
           variant="destructive"
@@ -473,12 +483,6 @@ export default function ManageSaleGroupItems() {
             )}
         </div>
       )}
-
-      <Input
-        placeholder="חיפוש לפי שם או מזהה"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
 
       {!hasLoaded ? (
         <p className="text-muted animate-pulse">טוען מוצרים…</p>

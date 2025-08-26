@@ -5,6 +5,7 @@ import { SaleGroupCard } from "./ui/sale-group-card";
 import { showToast } from "@/components/cms/ui/toast";
 import { Button } from "@/components/cms/ui/button";
 import Link from "next/link";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type SaleGroup = {
   id: number;
@@ -24,29 +25,22 @@ export default function SaleGroupList() {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const res = await fetch("/api/sale-groups");
+        const res = await fetch("/api/sale-groups", { cache: "no-store" });
         if (!res.ok) throw new Error();
-
         const data = await res.json();
-        setGroups(data.saleGroups);
-      } catch (err) {
+        setGroups(Array.isArray(data.saleGroups) ? data.saleGroups : []);
+      } catch {
         showToast("שגיאה בטעינת קבוצות מבצע", "error");
       } finally {
         setLoading(false);
       }
     };
-
     fetchGroups();
   }, []);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-purple-700">קבוצות מבצע</h1>
-        <Link href="/sale-groups/new">
-          <Button>קבוצה חדשה</Button>
-        </Link>
-      </div>
+    <main dir="rtl" className="px-4 sm:px-6 md:px-10 max-w-7xl mx-auto">
+      <HeaderHydrator title="קבוצות מבצע" />
 
       {loading ? (
         <p className="text-center mt-8">טוען קבוצות מבצע...</p>
@@ -67,6 +61,6 @@ export default function SaleGroupList() {
           ))}
         </div>
       )}
-    </div>
+    </main>
   );
 }
