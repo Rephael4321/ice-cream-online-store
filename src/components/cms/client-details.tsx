@@ -1,10 +1,13 @@
+// components/cms/entities/client/details.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Input } from "@/components/cms/ui/input";
 import { Label } from "@/components/cms/ui/label";
 import { Button } from "@/components/cms/ui/button";
-import { useParams, useRouter } from "next/navigation";
+import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type Client = {
   id: number;
@@ -17,19 +20,23 @@ type Client = {
 export default function ClientDetails() {
   const params = useParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = String(params.id ?? "");
 
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Load client
   useEffect(() => {
+    let alive = true;
     async function fetchClient() {
+      setLoading(true);
+      setError(null);
       try {
-        const res: Response = await fetch(`/api/clients/${id}`);
+        const res = await fetch(`/api/clients/${id}`, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch client");
-        const data: any = await res.json();
+        const data = await res.json();
 
         const {
           id: clientId,
@@ -37,23 +44,34 @@ export default function ClientDetails() {
           phone = "",
           address = "",
           created_at,
-        } = data;
+          createdAt,
+        } = data || {};
 
-        setClient({
-          id: clientId,
-          name,
-          phone,
-          address,
-          createdAt: new Date(created_at).toLocaleString("he-IL"),
-        });
-      } catch (err) {
-        setError("תקלה בטעינת לקוח");
+        const created =
+          createdAt || created_at ? new Date(createdAt || created_at) : null;
+
+        if (alive) {
+          setClient({
+            id: clientId,
+            name,
+            phone,
+            address,
+            createdAt:
+              created && !isNaN(created.getTime())
+                ? created.toLocaleString("he-IL")
+                : "-",
+          });
+        }
+      } catch {
+        if (alive) setError("תקלה בטעינת לקוח");
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     }
-
-    fetchClient();
+    if (id) fetchClient();
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +85,7 @@ export default function ClientDetails() {
 
     const { name, phone, address } = client;
     if (!name.trim() || !phone.trim() || !address.trim()) {
-      alert("יש למלא את כל השדות");
+      showToast("אנא מלא את כל השדות", "warning");
       return;
     }
 
@@ -78,10 +96,13 @@ export default function ClientDetails() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, phone, address }),
       });
-      if (!res.ok) throw new Error("Failed to save");
-      alert("נשמר בהצלחה");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed");
+
+      showToast("✅ נשמר בהצלחה", "success");
+      router.refresh(); // keep list pages in sync if navigated back
     } catch {
-      alert("שגיאה בשמירה");
+      showToast("❌ שגיאה בשמירה", "error");
     } finally {
       setSaving(false);
     }
@@ -95,62 +116,78 @@ export default function ClientDetails() {
       const res = await fetch(`/api/clients/${client.id}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Delete failed");
-      alert("נמחק בהצלחה");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Delete failed");
+      showToast("🗑️ נמחק בהצלחה", "success");
       router.push("/clients");
     } catch {
-      alert("שגיאה במחיקה");
+      showToast("❌ שגיאה במחיקה", "error");
     }
   };
 
-  if (loading) return <p>טוען...</p>;
-  if (error || !client) return <p>שגיאה בטעינה</p>;
-
   return (
-    <div className="max-w-xl mx-auto p-6">
-      <h1 className="text-xl font-bold mb-6">📝 ערוך לקוח</h1>
+    <main
+      dir="rtl"
+      className="px-4 sm:px-6 md:px-10 max-w-3xl mx-auto relative"
+    >
+      <HeaderHydrator title="עריכת לקוח" />
 
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="name">שם</Label>
-          <Input
-            name="name"
-            value={client?.name ?? ""}
-            onChange={handleChange}
-          />
-        </div>
+      <div className="py-6 space-y-6">
+        {loading ? (
+          <p>טוען...</p>
+        ) : error || !client ? (
+          <p>שגיאה בטעינה</p>
+        ) : (
+          <div className="space-y-5">
+            <div>
+              <Label htmlFor="name">שם</Label>
+              <Input
+                id="name"
+                name="name"
+                value={client.name}
+                onChange={handleChange}
+                dir="auto"
+              />
+            </div>
 
-        <div>
-          <Label htmlFor="phone">טלפון</Label>
-          <Input
-            name="phone"
-            value={client?.phone ?? ""}
-            onChange={handleChange}
-          />
-        </div>
+            <div>
+              <Label htmlFor="phone">טלפון</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={client.phone}
+                onChange={handleChange}
+                inputMode="tel"
+                dir="ltr"
+              />
+            </div>
 
-        <div>
-          <Label htmlFor="address">כתובת</Label>
-          <Input
-            name="address"
-            value={client?.address ?? ""}
-            onChange={handleChange}
-          />
-        </div>
+            <div>
+              <Label htmlFor="address">כתובת</Label>
+              <Input
+                id="address"
+                name="address"
+                value={client.address}
+                onChange={handleChange}
+                dir="auto"
+              />
+            </div>
 
-        <p className="text-sm text-gray-500">נוצר בתאריך: {client.createdAt}</p>
+            <p className="text-sm text-gray-500">
+              נוצר בתאריך: {client.createdAt}
+            </p>
 
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "שומר..." : "שמור"}
-        </Button>
-
-        <Button
-          onClick={handleDelete}
-          className="bg-red-600 hover:bg-red-700 text-white"
-        >
-          מחק לקוח
-        </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "שומר..." : "שמור"}
+              </Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                מחק לקוח
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

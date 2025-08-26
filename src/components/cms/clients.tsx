@@ -1,9 +1,11 @@
+// components/cms/entities/client/list.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Button } from "@/components/cms/ui/button";
+import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type Client = {
   id: number;
@@ -19,33 +21,42 @@ export default function Clients() {
 
   const fetchClients = async () => {
     setLoading(true);
-    const res = await fetch("/api/clients");
-    const data = await res.json();
+    try {
+      const res = await fetch("/api/clients", { cache: "no-store" });
+      const data = await res.json();
 
-    const normalized = (data.clients || data).map((c: any) => {
-      const date = new Date(c.createdAt || c.created_at);
-      return {
-        id: c.id,
-        name: c.name || "",
-        phone: c.phone || "—",
-        address: c.address || "",
-        createdAt: !isNaN(date.getTime())
-          ? date.toLocaleString("he-IL")
-          : c.createdAt || c.created_at,
-      };
-    });
+      const normalized: Client[] = (data.clients || data).map((c: any) => {
+        const date = new Date(c.createdAt || c.created_at);
+        return {
+          id: c.id,
+          name: c.name || "",
+          phone: c.phone || "—",
+          address: c.address || "",
+          createdAt: !isNaN(date.getTime())
+            ? date.toLocaleString("he-IL")
+            : c.createdAt || c.created_at,
+        };
+      });
 
-    setClients(normalized);
-    setLoading(false);
+      setClients(normalized);
+    } catch {
+      showToast("❌ שגיאה בטעינת לקוחות", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchClients();
   }, []);
 
-  const handleCopy = (phone: string) => {
-    navigator.clipboard.writeText(phone);
-    toast.success("📋 מספר הועתק");
+  const handleCopy = async (phone: string) => {
+    try {
+      await navigator.clipboard.writeText(phone);
+      showToast("📋 מספר הועתק", "success");
+    } catch {
+      showToast("❌ לא הצלחנו להעתיק", "error");
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -54,61 +65,68 @@ export default function Clients() {
     try {
       const res = await fetch(`/api/clients/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      toast.success("✅ לקוח נמחק");
       setClients((prev) => prev.filter((c) => c.id !== id));
+      showToast("🗑️ לקוח נמחק", "success");
     } catch {
-      toast.error("❌ תקלה במחיקה");
+      showToast("❌ תקלה במחיקה", "error");
     }
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">👤 ניהול לקוחות</h1>
+    <main
+      dir="rtl"
+      className="px-4 sm:px-6 md:px-10 max-w-7xl mx-auto relative"
+    >
+      {/* Shared header title for the section layout */}
+      <HeaderHydrator title="לקוחות" />
 
-      {loading ? (
-        <p>טוען לקוחות...</p>
-      ) : clients.length === 0 ? (
-        <p>אין לקוחות להצגה.</p>
-      ) : (
-        <ul className="space-y-4">
-          {clients.map((client) => (
-            <li
-              key={client.id}
-              className="border rounded p-4 shadow flex justify-between items-center"
-            >
-              <div>
-                <p>שם: {client.name}</p>
-                <p>כתובת: {client.address}</p>
-                <p>
-                  טלפון:{" "}
-                  <span
-                    className="underline text-blue-600 cursor-pointer"
-                    onClick={() => handleCopy(client.phone)}
+      <div className="py-6 space-y-6">
+        {loading ? (
+          <p>טוען לקוחות...</p>
+        ) : clients.length === 0 ? (
+          <p>אין לקוחות להצגה.</p>
+        ) : (
+          <ul className="space-y-4">
+            {clients.map((client) => (
+              <li
+                key={client.id}
+                className="border rounded p-4 shadow flex justify-between items-center"
+              >
+                <div className="space-y-1">
+                  <p>שם: {client.name}</p>
+                  <p>כתובת: {client.address || "—"}</p>
+                  <p>
+                    טלפון:{" "}
+                    <span
+                      className="underline text-blue-600 cursor-pointer"
+                      onClick={() => handleCopy(client.phone)}
+                      title="העתק מספר"
+                    >
+                      {client.phone}
+                    </span>
+                  </p>
+                  <p className="text-sm text-gray-500">{client.createdAt}</p>
+                </div>
+
+                <div className="flex flex-col gap-2 items-end">
+                  <Link
+                    href={`/clients/${client.id}`}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
                   >
-                    {client.phone}
-                  </span>
-                </p>
-                <p className="text-sm text-gray-500">{client.createdAt}</p>
-              </div>
-
-              <div className="flex flex-col gap-2 items-end">
-                <Link
-                  href={`/clients/${client.id}`}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-                >
-                  צפייה
-                </Link>
-                <Button
-                  variant="destructive"
-                  onClick={() => handleDelete(client.id)}
-                >
-                  מחק
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                    צפייה
+                  </Link>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDelete(client.id)}
+                  >
+                    מחק
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </main>
   );
 }
