@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
+import { Button } from "@/components/cms/ui/button";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -174,6 +176,9 @@ export default function ListProduct() {
 
   return (
     <div className="p-6 space-y-6" dir="rtl">
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title="רשימת מוצרים" />
+
       {hasDuplicates && (
         <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-md shadow flex justify-between items-center">
           <span>⚠️ נמצאו תמונות כפולות בתוצאות המסוננות.</span>
@@ -220,9 +225,8 @@ export default function ListProduct() {
       )}
 
       <div className="flex justify-between items-center gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold">רשימת מוצרים</h1>
-
-        <div className="flex items-center gap-3">
+        {/* (Title removed; header is hydrated above) */}
+        <div className="flex items-center gap-3 ms-auto">
           <Input
             ref={searchInputRef}
             type="text"
@@ -328,16 +332,16 @@ export default function ListProduct() {
 
       {hasMore && (
         <div className="flex justify-center">
-          <button
+          <Button
             onClick={() => {
               setLoadingMore(true);
               fetchBatch();
             }}
-            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+            className="px-4 py-2"
             disabled={loadingMore}
           >
             {loadingMore ? "טוען…" : `טען עוד (${offset}/${total})`}
-          </button>
+          </Button>
         </div>
       )}
     </div>

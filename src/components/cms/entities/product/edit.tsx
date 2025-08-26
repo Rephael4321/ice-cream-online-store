@@ -9,12 +9,13 @@ import Image from "next/image";
 import Category from "@/components/cms/entities/product/ui/category";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 import SaleGroupPriceConflictModal from "@/components/cms/entities/sale-group/ui/sale-group-price-conflict-modal";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 interface ProductDetail {
   id: string;
   name: string;
   price: string | number;
-  image?: string; // full S3 URL or ""
+  image?: string;
   saleQuantity?: string | number;
   salePrice?: string | number;
   inStock: boolean;
@@ -277,7 +278,7 @@ export default function EditProduct({ params }: ParamsProps) {
     }
   };
 
-  // ---------- IMAGE PICK UX (identical to new-product) ----------
+  // ---------- IMAGE PICK UX ----------
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const deviceInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -393,7 +394,7 @@ export default function EditProduct({ params }: ParamsProps) {
     setAppGalleryOpen(false);
   };
 
-  // ---------- modal actions (RESTORED, using toasts) ----------
+  // ---------- modal actions ----------
   async function doDetach() {
     if (!product || !conflict) return;
     setModalBusy(true);
@@ -451,9 +452,8 @@ export default function EditProduct({ params }: ParamsProps) {
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
-      <h1 className="text-xl sm:text-2xl font-bold text-center mb-6">
-        ערוך מוצר
-      </h1>
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title={`עריכת מוצר — ${product?.name ?? ""}`} />
 
       <form
         onSubmit={(e) => {
@@ -598,7 +598,7 @@ export default function EditProduct({ params }: ParamsProps) {
           </Button>
         </div>
 
-        {/* RIGHT = preview + FOUR BUTTONS (same as new-product) */}
+        {/* RIGHT = preview + FOUR BUTTONS */}
         <aside className="w-full md:w-1/2 space-y-4">
           <div className="relative w-full h-96 border rounded-md bg-white">
             {previewSrc ? (

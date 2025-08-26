@@ -1,8 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { Button } from "@/components/cms/ui/button";
+import Image from "next/image";
+import Link from "next/link";
 
 type Product = {
   id: number;
@@ -40,7 +43,9 @@ export default function OutOfStockList() {
 
   return (
     <div dir="rtl" className="p-4 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-center">מוצרים שאזלו מהמלאי</h1>
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title="מוצרים שאזלו מהמלאי" />
+
       {loading ? (
         <p className="text-center">טוען...</p>
       ) : products.length === 0 ? (
@@ -56,20 +61,28 @@ export default function OutOfStockList() {
                 href={`/products/${product.id}`}
                 className="hover:opacity-80 w-full"
               >
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-40 object-contain mb-2"
-                />
+                <div className="w-full h-40 relative mb-2">
+                  <Image
+                    src={product.image}
+                    alt={product.name}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    unoptimized
+                  />
+                </div>
                 <div className="font-semibold text-lg">{product.name}</div>
-                <div className="text-sm text-gray-600">₪{product.price}</div>
+                <div className="text-sm text-gray-600">
+                  ₪{Number(product.price).toFixed(2)}
+                </div>
               </Link>
-              <button
+
+              <Button
                 onClick={() => putBackInStock(product.id)}
-                className="mt-3 bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded"
+                className="mt-3"
               >
                 החזר למלאי
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

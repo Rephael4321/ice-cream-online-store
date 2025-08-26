@@ -9,6 +9,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 import CategorySelector from "@/components/cms/entities/product/ui/category";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type ProductForm = {
   name: string;
@@ -308,21 +309,8 @@ export default function NewProduct() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
-      {/* Back */}
-      <div className="mb-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-          className="cursor-pointer"
-        >
-          ← חזור
-        </Button>
-      </div>
-
-      <h1 className="text-xl sm:text-2xl font-bold text-center mb-6">
-        מוצר חדש
-      </h1>
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title="מוצר חדש" />
 
       <form
         onSubmit={handleSubmit}

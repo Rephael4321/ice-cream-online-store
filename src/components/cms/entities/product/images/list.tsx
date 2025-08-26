@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import ImageGrid from "./ui/image-grid";
 import UploadImage from "@/components/cms/entities/image/upload";
 import UploadFolder from "@/components/cms/entities/image/upload-folder";
+import { Button } from "@/components/cms/ui/button";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 export type ProductImage = {
   key: string;
@@ -42,7 +44,6 @@ export default function ProductImagesList() {
         order,
         offset: String(nextOffset),
         limit: String(PAGE_SIZE),
-        // prefix: "images/", // optional filter if you add it
       });
       const res = await fetch(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
@@ -88,10 +89,12 @@ export default function ProductImagesList() {
 
   return (
     <div dir="rtl" className="p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-2xl font-bold">תמונות לא בשימוש</h1>
+      {/* Shared header title (rendered by the section layout) */}
+      <HeaderHydrator title="תמונות לא בשימוש" />
 
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* (Title removed; header above) */}
+        <div className="flex flex-wrap items-center gap-2 ms-auto">
           {/* Sort controls */}
           <select
             value={sort}
@@ -114,19 +117,18 @@ export default function ProductImagesList() {
           </select>
 
           {/* Refresh */}
-          <button
+          <Button
+            variant="outline"
             onClick={() => {
               setReloading(true);
               fetchBatch({ reset: true });
             }}
-            className={`px-3 py-1.5 rounded border ${
-              reloading ? "opacity-70 cursor-wait" : "hover:bg-gray-50"
-            }`}
+            className="px-3 py-1.5"
             disabled={reloading}
             title="רענון מהרשת"
           >
             {reloading ? "מרענן…" : "רענן"}
-          </button>
+          </Button>
 
           {lastRefreshed && (
             <span className="text-xs text-gray-500">
@@ -148,13 +150,13 @@ export default function ProductImagesList() {
       {/* Load more */}
       {hasMore && (
         <div className="flex justify-center mt-4">
-          <button
+          <Button
             onClick={() => fetchBatch()}
-            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+            className="px-4 py-2"
             disabled={fetchingRef.current}
           >
             טען עוד ({offset}/{total})
-          </button>
+          </Button>
         </div>
       )}
     </div>
