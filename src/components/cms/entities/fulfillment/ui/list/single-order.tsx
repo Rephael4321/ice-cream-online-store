@@ -1,8 +1,9 @@
+// components/cms/entities/order/ui/list/single-order.tsx
 "use client";
 
-import Link from "next/link";
 import { Button } from "@/components/cms/ui/button";
 import { useRef } from "react";
+import Link from "next/link";
 
 type Props = {
   order: {
@@ -43,7 +44,6 @@ export default function SingleOrder({
     ? date.toLocaleString("he-IL")
     : order.createdAt;
 
-  // 🔥 Stand-out styles
   const testStyle = order.isTest
     ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
     : "";
@@ -88,7 +88,7 @@ export default function SingleOrder({
       onTouchEnd={cancelTouch}
       onTouchMove={cancelTouch}
     >
-      {/* ✅ Selection Circle */}
+      {/* ✅ Selection Circle (RTL: right side) */}
       <div
         onClick={(e) => {
           e.stopPropagation();
@@ -98,7 +98,7 @@ export default function SingleOrder({
             onSelectToggle?.();
           }
         }}
-        className={`absolute left-4 top-4 w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-bold z-10
+        className={`absolute right-4 top-4 w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-bold z-10
           ${
             selected
               ? "bg-blue-500 text-white border-blue-500"
@@ -107,11 +107,13 @@ export default function SingleOrder({
           ${selectMode ? "block" : "hidden"} md:block`}
         style={{ cursor: "pointer" }}
         title="בחר הזמנה"
+        role="checkbox"
+        aria-checked={selected}
       >
         {selected ? "✔" : ""}
       </div>
 
-      <div className="flex justify-between items-start pl-10 gap-4">
+      <div className="flex justify-between items-start pr-10 gap-4">
         {/* 📝 Order Details */}
         <div className="flex-1">
           <p className="font-bold flex items-center gap-2">
@@ -171,6 +173,7 @@ export default function SingleOrder({
             <Link
               href={`/orders/${order.orderId}`}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 localStorage.setItem(
                   SCROLL_KEY,
@@ -179,6 +182,8 @@ export default function SingleOrder({
                     timestamp: Date.now(),
                   })
                 );
+                // ensure click-through navigation after storing scroll marker
+                window.location.href = `/orders/${order.orderId}`;
               }}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >

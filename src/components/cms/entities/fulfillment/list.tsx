@@ -1,14 +1,14 @@
+// components/cms/entities/order/list.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/cms/ui/button";
-import { toast } from "sonner";
-
-import "react-datepicker/dist/react-datepicker.css";
-
-import Link from "next/link";
+import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import SingleOrder from "./ui/list/single-order";
+import { Input } from "@/components/cms/ui/input";
 
 type Order = {
   orderId: number;
@@ -49,15 +49,19 @@ export default function ListOrder() {
     setLoading(true);
     let query = "";
     if (from && to) query = `?from=${from}&to=${to}`;
-    const res = await fetch(`/api/orders${query}`);
-    const data = await res.json();
-    setOrders(data.orders || []);
-    setHasUnnotified(
-      (data.orders || []).some(
-        (o: Order) => o.isNotified === false && o.isTest !== true
-      )
-    );
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/orders${query}`, { cache: "no-store" });
+      const data = await res.json();
+      const list: Order[] = data.orders || [];
+      setOrders(list);
+      setHasUnnotified(
+        list.some((o) => o.isNotified === false && o.isTest !== true)
+      );
+    } catch {
+      showToast("❌ שגיאה בטעינת הזמנות", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const searchOrders = async (query: string) => {
@@ -69,17 +73,19 @@ export default function ListOrder() {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/orders/search?query=${encodeURIComponent(query)}`
+        `/api/orders/search?query=${encodeURIComponent(query)}`,
+        {
+          cache: "no-store",
+        }
       );
       const data = await res.json();
-      setOrders(data.orders || []);
+      const list: Order[] = data.orders || [];
+      setOrders(list);
       setHasUnnotified(
-        (data.orders || []).some(
-          (o: Order) => o.isNotified === false && o.isTest !== true
-        )
+        list.some((o) => o.isNotified === false && o.isTest !== true)
       );
     } catch {
-      toast.error("❌ שגיאה בחיפוש");
+      showToast("❌ שגיאה בחיפוש", "error");
     } finally {
       setLoading(false);
     }
@@ -127,7 +133,7 @@ export default function ListOrder() {
     try {
       const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      toast.success("🗑️ ההזמנה נמחקה");
+      showToast("🗑️ ההזמנה נמחקה", "success");
       setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
       setSelectedOrders((prev) => {
         const updated = new Set(prev);
@@ -135,7 +141,7 @@ export default function ListOrder() {
         return updated;
       });
     } catch {
-      toast.error("❌ תקלה במחיקה");
+      showToast("❌ תקלה במחיקה", "error");
     }
   };
 
@@ -143,13 +149,11 @@ export default function ListOrder() {
     if (!confirm("האם למחוק את כל ההזמנות שנבחרו?")) return;
     const ids = Array.from(selectedOrders);
     const deleted: number[] = [];
-
     for (const id of ids) {
       const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
       if (res.ok) deleted.push(id);
     }
-
-    toast.success(`🗑️ נמחקו ${deleted.length} הזמנות`);
+    showToast(`🗑️ נמחקו ${deleted.length} הזמנות`, "success");
     setOrders((prev) => prev.filter((o) => !deleted.includes(o.orderId)));
     setSelectedOrders(new Set());
     setSelectMode(false);
@@ -171,7 +175,7 @@ export default function ListOrder() {
     });
   };
 
-  // NEW: toggles using split endpoints
+  // split endpoints
   const togglePaid = async (orderId: number, current: boolean) => {
     try {
       const r = await fetch(`/api/orders/${orderId}/payment`, {
@@ -187,7 +191,7 @@ export default function ListOrder() {
         )
       );
     } catch {
-      toast.error("❌ שגיאה בעדכון תשלום");
+      showToast("❌ שגיאה בעדכון תשלום", "error");
     }
   };
 
@@ -208,15 +212,20 @@ export default function ListOrder() {
         )
       );
     } catch {
-      toast.error("❌ שגיאה בעדכון סטטוס הזמנה");
+      showToast("❌ שגיאה בעדכון סטטוס הזמנה", "error");
     }
   };
 
   return (
-    <div className="relative">
+    <main
+      dir="rtl"
+      className="px-4 sm:px-6 md:px-10 max-w-7xl mx-auto relative"
+    >
+      <HeaderHydrator title="הזמנות" />
+
       {/* 🧭 Floating Toolbar */}
       {selectMode && (
-        <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-12 p-3 rounded shadow w-full max-w-4xl">
+        <div className="fixed top-[72px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-6 p-3 rounded shadow w-full max-w-4xl">
           <span className="text-blue-800 font-semibold">
             {selectedOrders.size} נבחרו
           </span>
@@ -237,9 +246,7 @@ export default function ListOrder() {
         </div>
       )}
 
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <h1 className="text-2xl font-bold">📦 הזמנות</h1>
-
+      <div className="py-6 space-y-6">
         {/* 🔍 Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex items-center gap-2">
@@ -255,12 +262,12 @@ export default function ListOrder() {
             />
           </div>
 
-          <input
+          <Input
             type="text"
             placeholder="חיפוש לפי שם, כתובת, טלפון או מספר הזמנה"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full sm:max-w-xs px-3 py-2 border rounded"
+            className="w-full sm:max-w-xs"
           />
         </div>
 
@@ -290,7 +297,6 @@ export default function ListOrder() {
                   setSelectMode(true);
                   toggleOrderSelection(order.orderId);
                 }}
-                // NEW: clickable status buttons
                 onTogglePaid={() => togglePaid(order.orderId, order.isPaid)}
                 onToggleReady={() => toggleReady(order.orderId, order.isReady)}
               />
@@ -298,6 +304,6 @@ export default function ListOrder() {
           </ul>
         )}
       </div>
-    </div>
+    </main>
   );
 }

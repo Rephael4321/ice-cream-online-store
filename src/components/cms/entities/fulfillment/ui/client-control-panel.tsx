@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { showToast } from "@/components/cms/ui/toast";
 
 type Props = {
   order: {
@@ -61,10 +61,7 @@ export default function ClientControlPanel({
       <div className="flex items-start justify-between">
         <h1
           title="לחץ 5 פעמים לסימון כבדיקה"
-          onClick={() => {
-            console.log("🖱️ title clicked");
-            handleTitleClick();
-          }}
+          onClick={handleTitleClick}
           className={`text-xl font-bold mb-2 select-none ${
             order.isTest ? "text-orange-700" : ""
           }`}
@@ -75,35 +72,21 @@ export default function ClientControlPanel({
         <div className="flex gap-2 flex-wrap">
           {order.isTest && (
             <button
-              onClick={() => {
-                console.log("🧪 removing test status");
-                onMarkTest(false);
-              }}
+              onClick={() => onMarkTest(false)}
               className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded"
             >
               הסר בדיקה
             </button>
           )}
           <button
-            onClick={() => {
-              console.log("🗑️ deleting order");
-              onDelete();
-            }}
+            onClick={onDelete}
             className="text-sm bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded"
           >
             🗑️ מחק הזמנה
           </button>
           {!order.isTest && order.isNotified === false && onNotifyWhatsApp && (
             <button
-              onClick={async () => {
-                try {
-                  console.log("💬 sending WhatsApp notification");
-                  await onNotifyWhatsApp();
-                } catch (err) {
-                  console.error("❌ WhatsApp notification failed:", err);
-                  toast.error("שגיאה בעדכון סטטוס וואטסאפ");
-                }
-              }}
+              onClick={onNotifyWhatsApp}
               className="text-sm bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded"
             >
               💬 שלח הודעת הזמנה
@@ -124,9 +107,10 @@ export default function ClientControlPanel({
         טלפון:&nbsp;
         <button
           onClick={() => {
-            navigator.clipboard.writeText(phone);
-            toast.success("📋 מספר הטלפון הועתק");
-            console.log("📋 phone copied to clipboard:", phone);
+            navigator.clipboard
+              .writeText(phone)
+              .then(() => showToast("📋 מספר הטלפון הועתק", "success"))
+              .catch(() => showToast("❌ כשל בהעתקה ללוח", "error"));
           }}
           className="underline text-blue-700 hover:text-blue-900"
         >
@@ -138,7 +122,6 @@ export default function ClientControlPanel({
         <a
           href={`tel:${phone}`}
           className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition"
-          onClick={() => console.log("📞 dial link clicked")}
         >
           📞 התקשר
         </a>
@@ -154,10 +137,7 @@ export default function ClientControlPanel({
           onClick={(e) => {
             if (!waPhone) {
               e.preventDefault();
-              toast.error("מספר טלפון לא זמין או לא תקין");
-              console.warn("⚠️ invalid WhatsApp number:", phone);
-            } else {
-              console.log("💬 WhatsApp message link opened:", waLink);
+              showToast("מספר טלפון לא זמין או לא תקין", "error");
             }
           }}
         >
@@ -167,10 +147,7 @@ export default function ClientControlPanel({
 
       <div className="mt-2">
         <button
-          onClick={() => {
-            console.log("✏️ opening edit form");
-            onEdit();
-          }}
+          onClick={onEdit}
           className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
         >
           ✏️ ערוך פרטי לקוח
@@ -184,13 +161,9 @@ export default function ClientControlPanel({
           : new Date(order.createdAt).toLocaleString("he-IL")}
       </p>
 
-      {/* totals shown in page; here we just keep status controls */}
       <div className="mt-4 flex gap-4 flex-wrap">
         <button
-          onClick={() => {
-            console.log("💰 toggling paid status");
-            onTogglePaid();
-          }}
+          onClick={onTogglePaid}
           className={`px-3 py-1 rounded text-white transition ${
             order.isPaid
               ? "bg-green-600 hover:bg-green-700"
@@ -201,10 +174,7 @@ export default function ClientControlPanel({
         </button>
 
         <button
-          onClick={() => {
-            console.log("📦 toggling ready status");
-            onReadyClick();
-          }}
+          onClick={onReadyClick}
           className={`px-3 py-1 rounded text-white transition ${
             order.isReady
               ? "bg-green-600 hover:bg-green-700"
@@ -213,6 +183,10 @@ export default function ClientControlPanel({
         >
           {order.isReady ? "הזמנה מוכנה ✅" : "הזמנה חדשה 🆕"}
         </button>
+      </div>
+
+      <div className="mt-4 text-lg font-bold">
+        סה״כ להזמנה (כולל משלוח): ₪{finalTotal.toFixed(2)}
       </div>
     </div>
   );

@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { toast } from "sonner";
 import Link from "next/link";
-
+import { showToast } from "@/components/cms/ui/toast";
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
 import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 
 type Order = {
   orderId: number;
@@ -18,8 +18,6 @@ type Order = {
   isReady: boolean;
   isTest?: boolean;
   isNotified?: boolean;
-
-  // NEW: delivery fee (nullable for legacy orders)
   deliveryFee?: number | null;
 };
 
@@ -66,9 +64,12 @@ export default function ViewOrder() {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
       setOrder((o) => (o ? { ...o, ...data } : o));
-      toast.success(flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר");
+      showToast(
+        flag ? "✅ ההזמנה סומנה כבדיקה" : "❌ סימון בדיקה הוסר",
+        "success"
+      );
     } catch {
-      toast.error("❌ שגיאה בעדכון סטטוס בדיקה");
+      showToast("❌ שגיאה בעדכון סטטוס בדיקה", "error");
     }
   };
 
@@ -86,7 +87,7 @@ export default function ViewOrder() {
     if (!id) return;
     (async () => {
       try {
-        const ordRes = await fetch(`/api/orders/${id}`);
+        const ordRes = await fetch(`/api/orders/${id}`, { cache: "no-store" });
         const { order: o, items: raw } = (await ordRes.json()) as {
           order: Order;
           items: Item[];
@@ -104,7 +105,7 @@ export default function ViewOrder() {
         setOrder(o);
         setItems(enriched);
       } catch {
-        toast.error("❌ שגיאה בטעינת הזמנה");
+        showToast("❌ שגיאה בטעינת הזמנה", "error");
       } finally {
         setLoad(false);
       }
@@ -118,7 +119,7 @@ export default function ViewOrder() {
       ?.replace(/[^0-9]/g, "")
       .replace(/^0/, "972");
     if (!phone) {
-      toast.error("מספר טלפון לא תקין");
+      showToast("מספר טלפון לא תקין", "error");
       return;
     }
 
@@ -146,7 +147,7 @@ export default function ViewOrder() {
       )}`;
       window.location.href = whatsappLink;
     } catch {
-      toast.error("❌ שגיאה בעדכון סטטוס וואטסאפ");
+      showToast("❌ שגיאה בעדכון סטטוס וואטסאפ", "error");
     }
   };
 
@@ -162,7 +163,7 @@ export default function ViewOrder() {
       if (!r.ok) throw new Error(data?.error || "Failed");
       setOrder((o) => (o ? { ...o, isPaid: data.isPaid ?? !o.isPaid } : o));
     } catch {
-      toast.error("❌ שגיאה בעדכון תשלום");
+      showToast("❌ שגיאה בעדכון תשלום", "error");
     }
   };
 
@@ -178,7 +179,7 @@ export default function ViewOrder() {
       if (!r.ok) throw new Error(data?.error || "Failed");
       setOrder((o) => (o ? { ...o, isReady: data.isReady ?? !o.isReady } : o));
     } catch {
-      toast.error("❌ שגיאה בעדכון סטטוס הזמנה");
+      showToast("❌ שגיאה בעדכון סטטוס הזמנה", "error");
     }
   };
 
@@ -193,7 +194,7 @@ export default function ViewOrder() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, inStock: justToggled.inStock }),
       }).catch(() => {
-        toast.error("❌ שגיאה בעדכון מלאי לפריט");
+        showToast("❌ שגיאה בעדכון מלאי לפריט", "error");
       });
       return nextState;
     });
@@ -222,10 +223,10 @@ export default function ViewOrder() {
         method: "DELETE",
       });
       if (!r.ok) throw new Error();
-      toast.success("🗑️ הזמנה נמחקה");
+      showToast("🗑️ הזמנה נמחקה", "success");
       window.location.href = "/orders";
     } catch {
-      toast.error("❌ שגיאה במחיקה");
+      showToast("❌ שגיאה במחיקה", "error");
     }
   };
 
@@ -233,7 +234,7 @@ export default function ViewOrder() {
   const handleUpdateClient = async () => {
     if (!order) return;
     const payload = {
-      name: newName.trim(), // "" → API converts to null and returns { name: null }
+      name: newName.trim(),
       address: newAddr.trim(),
     };
     try {
@@ -260,10 +261,10 @@ export default function ViewOrder() {
           : o
       );
 
-      toast.success("📝 עודכן בהצלחה");
+      showToast("📝 עודכן בהצלחה", "success");
       setEditOpen(false);
     } catch {
-      toast.error("❌ שגיאה בעדכון פרטי לקוח");
+      showToast("❌ שגיאה בעדכון פרטי לקוח", "error");
     }
   };
 
@@ -285,51 +286,58 @@ export default function ViewOrder() {
   const grandTotal = subtotal + deliveryFee;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <Link href="/orders" className="text-blue-600 hover:underline">
-        ← חזרה לרשימת הזמנות
-      </Link>
+    <main dir="rtl" className="px-4 sm:px-6 md:px-10 max-w-5xl mx-auto">
+      <HeaderHydrator title={`הזמנה #${order.orderId}`} />
 
-      <ClientControlPanel
-        order={order}
-        finalTotal={grandTotal} // includes delivery fee
-        onDelete={handleDelete}
-        onMarkTest={markAsTest}
-        onEdit={() => {
-          setNewName(order.clientName ?? "");
-          setNewAddr(order.clientAddress ?? "");
-          setEditOpen(true);
-        }}
-        onTogglePaid={togglePaid}
-        onReadyClick={toggleReady}
-        handleTitleClick={handleTitleClick}
-        onNotifyWhatsApp={handleNotifyAndWhatsApp}
-      />
+      <div className="py-6 space-y-6">
+        <Link href="/orders" className="text-blue-600 hover:underline">
+          ← חזרה לרשימת הזמנות
+        </Link>
 
-      <OrderItemList
-        items={items}
-        isTest={!!order.isTest}
-        isPaid={order.isPaid}
-        isReady={order.isReady}
-        onToggleInStock={toggleStock}
-      />
+        <ClientControlPanel
+          order={order}
+          finalTotal={grandTotal}
+          onDelete={handleDelete}
+          onMarkTest={markAsTest}
+          onEdit={() => {
+            setNewName(order.clientName ?? "");
+            setNewAddr(order.clientAddress ?? "");
+            setEditOpen(true);
+          }}
+          onTogglePaid={togglePaid}
+          onReadyClick={toggleReady}
+          handleTitleClick={handleTitleClick}
+          onNotifyWhatsApp={handleNotifyAndWhatsApp}
+        />
 
-      {/* NEW: Totals box incl. delivery fee */}
-      <div className="text-right rtl border rounded p-4 bg-gray-50">
-        <p>ביניים: ₪{subtotal.toFixed(2)}</p>
-        <p>
-          דמי משלוח:{" "}
-          {deliveryFee > 0 ? `₪${deliveryFee.toFixed(2)}` : "₪0 (מעל 90₪)"}
-        </p>
-        <p className="text-xl font-bold">
-          סה״כ לתשלום: ₪{grandTotal.toFixed(2)}
-        </p>
+        <OrderItemList
+          items={items}
+          isTest={!!order.isTest}
+          isPaid={order.isPaid}
+          isReady={order.isReady}
+          onToggleInStock={toggleStock}
+        />
+
+        {/* Totals box incl. delivery fee */}
+        <div className="text-right rtl border rounded p-4 bg-gray-50">
+          <p>ביניים: ₪{subtotal.toFixed(2)}</p>
+          <p>
+            דמי משלוח:{" "}
+            {deliveryFee > 0 ? `₪${deliveryFee.toFixed(2)}` : "₪0 (מעל 90₪)"}
+          </p>
+          <p className="text-xl font-bold">
+            סה״כ לתשלום: ₪{grandTotal.toFixed(2)}
+          </p>
+        </div>
       </div>
 
+      {/* Edit modal */}
       {editOpen && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => setEditOpen(false)}
+          aria-modal="true"
+          role="dialog"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -372,6 +380,6 @@ export default function ViewOrder() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

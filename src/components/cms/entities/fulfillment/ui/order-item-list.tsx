@@ -44,7 +44,6 @@ export default function OrderItemList({
       : "";
 
   const grouped = new Map<string, Item[]>();
-
   for (const item of items) {
     const key = item.storageName ?? "ללא מיקום";
     if (!grouped.has(key)) grouped.set(key, []);
@@ -95,6 +94,7 @@ export default function OrderItemList({
                       alt={it.productName}
                       fill
                       className="object-contain rounded border"
+                      unoptimized
                     />
                   </div>
                 )}
@@ -122,6 +122,8 @@ export default function OrderItemList({
                     className={`text-sm px-3 py-1 rounded ${
                       it.inStock ? "bg-green-500 text-white" : "bg-gray-300"
                     }`}
+                    title={it.inStock ? "סמן כחסר" : "החזר למלאי"}
+                    aria-pressed={it.inStock}
                   >
                     {it.inStock ? "✔️ במלאי" : "❌ חסר"}
                   </button>
