@@ -271,9 +271,11 @@ export default function ViewOrder() {
   if (loading) return <p className="p-6">טוען…</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
-  // --- Delivery fee breakdown ---
-  const DELIVERY_THRESHOLD = 90;
-  const DELIVERY_FEE = 10;
+  // --- Delivery fee breakdown (env-based) ---
+  const DELIVERY_THRESHOLD = Number(
+    process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
+  );
+  const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
 
   const subtotal = calcSubtotal();
   const deliveryFee =
@@ -323,7 +325,9 @@ export default function ViewOrder() {
           <p>ביניים: ₪{subtotal.toFixed(2)}</p>
           <p>
             דמי משלוח:{" "}
-            {deliveryFee > 0 ? `₪${deliveryFee.toFixed(2)}` : "₪0 (מעל 90₪)"}
+            {deliveryFee > 0
+              ? `₪${deliveryFee.toFixed(2)}`
+              : `₪0 (מעל ${DELIVERY_THRESHOLD}₪)`}
           </p>
           <p className="text-xl font-bold">
             סה״כ לתשלום: ₪{grandTotal.toFixed(2)}

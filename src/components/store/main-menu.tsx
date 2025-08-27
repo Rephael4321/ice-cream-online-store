@@ -32,6 +32,12 @@ export default async function MainMenu() {
   const token = (await cookie).get("token")?.value;
   const isAdmin = !!(token && verifyJWT(token));
 
+  // 🔧 Delivery config from env (falls back to sensible defaults)
+  const DELIVERY_THRESHOLD = Number(
+    process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD ?? 90
+  );
+  const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE ?? 10);
+
   let categories: Category[] = [];
 
   try {
@@ -62,10 +68,10 @@ export default async function MainMenu() {
         המבצע!
       </div>
 
-      {/* 🚚 Delivery Fee Info */}
+      {/* 🚚 Delivery Fee Info (from env) */}
       <div className="text-center bg-blue-100 text-blue-800 font-medium py-2 rounded-md shadow mb-6">
-        משלוח בעלות 10 ₪ עבור הזמנות מתחת ל־90 ₪ · בקנייה מעל 90 ₪ המשלוח חינם
-        🎉
+        משלוח בעלות {DELIVERY_FEE} ₪ עבור הזמנות מתחת ל־{DELIVERY_THRESHOLD} ₪ ·
+        בקנייה מעל {DELIVERY_THRESHOLD} ₪ המשלוח חינם 🎉
       </div>
 
       {/* 🔄 Category Grid */}

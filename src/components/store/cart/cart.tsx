@@ -31,14 +31,12 @@ function allocateGroupDiscounts(
     productPrice: number;
     inStock?: boolean;
     // @ts-ignore – provided by context on the item
-    saleGroup?:
-      | {
-          id: number;
-          quantity: number;
-          salePrice: number;
-          unitPrice: number | null;
-        }
-      | null;
+    saleGroup?: {
+      id: number;
+      quantity: number;
+      salePrice: number;
+      unitPrice: number | null;
+    } | null;
   }[]
 ) {
   const perItem = new Map<number, number>();
@@ -165,10 +163,13 @@ export default function Cart() {
   const { perItem: perItemGroupDiscount, total: groupDiscountTotal } =
     allocateGroupDiscounts(pricingItems);
 
-  // NEW: subtotal, delivery, grand total (client display; server is authoritative)
-  const DELIVERY_THRESHOLD = 90;
-  const DELIVERY_FEE = 10;
+  // 🔧 Delivery config from env (client-safe)
+  const DELIVERY_THRESHOLD = Number(
+    process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
+  );
+  const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
 
+  // NEW: subtotal, delivery, grand total (client display; server is authoritative)
   const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
   const deliveryFee =
     subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
@@ -333,7 +334,10 @@ export default function Cart() {
       console.error("Failed to mark order as notified:", err);
     }
 
-    const phoneNumber = (process.env.NEXT_PUBLIC_PHONE || "").replace(/\D/g, "");
+    const phoneNumber = (process.env.NEXT_PUBLIC_PHONE || "").replace(
+      /\D/g,
+      ""
+    );
     const baseUrl =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
       "http://localhost:3000";
@@ -395,14 +399,16 @@ export default function Cart() {
                 {deliveryFee > 0 ? (
                   <p>דמי משלוח: {deliveryFee.toFixed(2)} ש״ח</p>
                 ) : (
-                  <p className="text-green-600">דמי משלוח: 0 ש״ח (מעל 90₪)</p>
+                  <p className="text-green-600">
+                    דמי משלוח: 0 ש״ח (מעל {DELIVERY_THRESHOLD}₪)
+                  </p>
                 )}
                 <p className="font-bold">
                   סה״כ לתשלום: {grandTotal.toFixed(2)} ש״ח
                 </p>
                 {subtotal > 0 && subtotal < DELIVERY_THRESHOLD && (
                   <p className="text-xs text-yellow-700 bg-yellow-100 rounded px-2 py-1 inline-block mt-1">
-                    הוסיפו עוד {Math.max(0, DELIVERY_THRESHOLD - subtotal).toFixed(2)} ₪ למשלוח חינם
+                    הוסיפו עוד {remainingForFree.toFixed(2)} ₪ למשלוח חינם
                   </p>
                 )}
               </div>

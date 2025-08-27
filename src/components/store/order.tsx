@@ -14,7 +14,7 @@ type OrderHeader = {
   isReady: boolean;
   preGroupTotal?: number | null;
   groupDiscountTotal?: number | null;
-  deliveryFee?: number | null; // ⬅️ NEW
+  deliveryFee?: number | null; // ⬅️ snapshot from server if present
   total?: number | null;
 };
 
@@ -136,6 +136,7 @@ export default function Order() {
     order.preGroupTotal != null
       ? Number(order.preGroupTotal)
       : finalTotalFromItems + 0;
+
   const groupDiscountTotal =
     order.groupDiscountTotal != null
       ? Number(order.groupDiscountTotal)
@@ -147,8 +148,15 @@ export default function Order() {
   // Subtotal after discounts (no delivery)
   const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
 
+  // 🔧 Delivery config from env (fallbacks keep UI resilient)
+  const DELIVERY_THRESHOLD = Number(
+    process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
+  );
+  const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
+
   // Delivery fee: use snapshot if present, else derive by the rule for legacy orders
-  const derivedDelivery = subtotal > 0 && subtotal < 90 ? 10 : 0;
+  const derivedDelivery =
+    subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
   const deliveryFee =
     order.deliveryFee != null ? Number(order.deliveryFee) : derivedDelivery;
 
@@ -236,7 +244,9 @@ export default function Order() {
         <p>ביניים: ₪{subtotal.toFixed(2)}</p>
         <p>
           דמי משלוח:{" "}
-          {deliveryFee > 0 ? `₪${deliveryFee.toFixed(2)}` : "₪0 (מעל 90₪)"}
+          {deliveryFee > 0
+            ? `₪${deliveryFee.toFixed(2)}`
+            : `₪0 (מעל ${DELIVERY_THRESHOLD}₪)`}
         </p>
         <p className="text-xl font-bold">
           💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}

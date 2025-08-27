@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
 
+/* ---------- Constants from env ---------- */
+const DELIVERY_THRESHOLD = Number(
+  process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
+);
+const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
+
 /* ---------- Helpers: pricing math (server-authoritative) ---------- */
 
 function computePreGroupTotal(
@@ -236,9 +242,10 @@ async function createOrder(req: NextRequest) {
       }))
     );
 
-    const subtotal = preGroupTotal - groupDiscountTotal; // NEW
-    const deliveryFee = subtotal > 0 && subtotal < 90 ? 10 : 0; // NEW
-    const total = subtotal + deliveryFee; // NEW
+    const subtotal = preGroupTotal - groupDiscountTotal;
+    const deliveryFee =
+      subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
+    const total = subtotal + deliveryFee;
 
     // insert order (snapshot totals + delivery_fee)
     const orderResult = await client.query<{ id: number }>(
@@ -257,7 +264,7 @@ async function createOrder(req: NextRequest) {
     );
     const orderId = orderResult.rows[0].id;
 
-    // insert items (snapshot per-item group fields)
+    // insert items
     let missingCount = 0;
     for (const raw of items) {
       if (!validIds.has(raw.productId)) {
@@ -299,9 +306,9 @@ async function createOrder(req: NextRequest) {
       orderId,
       preGroupTotal,
       groupDiscountTotal,
-      subtotal, // NEW (useful for UI/debug)
-      deliveryFee, // NEW
-      total, // includes delivery
+      subtotal,
+      deliveryFee,
+      total,
     };
     if (missingCount > 0) {
       baseResponse.warning = `${missingCount} item(s) were not available and skipped.`;
@@ -371,6 +378,5 @@ async function listOrders(req: NextRequest) {
 }
 
 /* ---------- Exports ---------- */
-
 export const GET = withMiddleware(listOrders);
 export const POST = withMiddleware(createOrder, { skipAuth: true });
