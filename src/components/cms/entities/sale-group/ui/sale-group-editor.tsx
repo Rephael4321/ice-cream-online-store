@@ -15,8 +15,9 @@ interface SaleGroupEditorProps {
   initialPrice: number | null; // regular unit price
   initialQuantity: number | null;
   initialSalePrice: number | null; // sale price per unit
-  initialImage: string | null; // kept for API symmetry (not edited here)
+  initialImage: string | null;
   initialCategories: { id: number; name: string }[];
+  initialIncrementStep: number; // NEW
 }
 
 export function SaleGroupEditor({
@@ -25,25 +26,36 @@ export function SaleGroupEditor({
   initialPrice,
   initialQuantity,
   initialSalePrice,
-  initialImage, // eslint-disable-line @typescript-eslint/no-unused-vars
   initialCategories,
+  initialIncrementStep,
 }: SaleGroupEditorProps) {
   const router = useRouter();
 
   const [name, setName] = useState(initialName ?? "");
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState(initialCategories || []);
+  const [incrementStep, setIncrementStep] = useState<number>(
+    Math.max(1, Number(initialIncrementStep) || 1)
+  ); // NEW
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      // send only what this editor controls (avoid clobbering image)
+      const payload: Record<string, any> = {};
+      if ((name ?? "") !== (initialName ?? ""))
+        payload.name = name.trim() || null;
+      if (incrementStep !== initialIncrementStep)
+        payload.increment_step = Math.max(1, Number(incrementStep) || 1); // NEW
+
+      if (Object.keys(payload).length === 0) {
+        showToast("אין שינויים לשמירה", "info");
+        return;
+      }
+
       const res = await fetch(`/api/sale-groups/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error();
@@ -95,6 +107,25 @@ export function SaleGroupEditor({
             onChange={(e) => setName(e.target.value)}
             disabled={loading}
           />
+        </div>
+
+        {/* NEW: Increment Step */}
+        <div>
+          <Label htmlFor="incrementStep">צעד הוספה (ברירת מחדל 1)</Label>
+          <Input
+            id="incrementStep"
+            type="number"
+            min={1}
+            step={1}
+            value={incrementStep}
+            onChange={(e) =>
+              setIncrementStep(Math.max(1, Number(e.target.value || 1)))
+            }
+            disabled={loading}
+          />
+          <p className="text-[12px] text-gray-500 mt-1">
+            הכמות שנוספת לעגלה תקפוץ בערך זה בכל לחיצה בקבוצת המבצע.
+          </p>
         </div>
 
         {/* Price (read-only summary) */}

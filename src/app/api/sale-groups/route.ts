@@ -11,12 +11,13 @@ type SaleGroup = {
   price: number | null;
   created_at: string;
   updated_at: string;
+  increment_step: number;
 };
 
 async function getSaleGroups(_req: NextRequest) {
   try {
     const result = await pool.query<SaleGroup>(`
-      SELECT id, name, image, quantity, sale_price, price, created_at, updated_at
+      SELECT id, name, image, quantity, sale_price, price, created_at, updated_at, increment_step
       FROM sale_groups
       ORDER BY created_at DESC
     `);
@@ -35,13 +36,20 @@ async function getSaleGroups(_req: NextRequest) {
 
 async function createSaleGroup(req: NextRequest) {
   try {
-    const { name, quantity, sale_price, price, image } = await req.json();
+    const { name, quantity, sale_price, price, image, increment_step } =
+      await req.json();
+
+    // server-side guard: default to 1, min 1
+    const step =
+      Number.isFinite(Number(increment_step)) && Number(increment_step) >= 1
+        ? Math.floor(Number(increment_step))
+        : 1;
 
     const result = await pool.query<SaleGroup>(
       `
-      INSERT INTO sale_groups (name, quantity, sale_price, price, image)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, name, image, quantity, sale_price, price, created_at, updated_at
+      INSERT INTO sale_groups (name, quantity, sale_price, price, image, increment_step)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, name, image, quantity, sale_price, price, created_at, updated_at, increment_step
       `,
       [
         name ?? null,
@@ -49,6 +57,7 @@ async function createSaleGroup(req: NextRequest) {
         sale_price ?? null,
         price ?? null,
         image ?? null,
+        step,
       ]
     );
 

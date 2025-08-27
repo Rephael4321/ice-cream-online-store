@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
-import Image from "next/image";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import Image from "next/image";
 
 // ---- helpers
 const stripExt = (s: string) => s.replace(/\.[^/.]+$/, "");
@@ -36,6 +36,9 @@ export default function NewSaleGroupForm() {
   const [name, setName] = useState("");
   const [image, setImage] = useState(""); // full S3 URL
   const [loading, setLoading] = useState(false);
+
+  // NEW: increment step (default 1)
+  const [incrementStep, setIncrementStep] = useState<number>(1);
 
   // track images already used by sale groups (to disable picking them)
   const [usedImages, setUsedImages] = useState<Set<string>>(new Set());
@@ -185,6 +188,10 @@ export default function NewSaleGroupForm() {
       showToast("נא לבחור תמונה", "error");
       return;
     }
+    if (!Number.isFinite(incrementStep) || incrementStep < 1) {
+      showToast("צעד חייב להיות מספר חיובי (מינימום 1)", "error");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -194,6 +201,7 @@ export default function NewSaleGroupForm() {
         body: JSON.stringify({
           name: name.trim() || null,
           image,
+          increment_step: incrementStep, // NEW
         }),
       });
       if (!res.ok) throw new Error();
@@ -230,6 +238,28 @@ export default function NewSaleGroupForm() {
               disabled={loading}
               placeholder="שם ידידותי (רשות)"
             />
+          </div>
+
+          {/* NEW: increment step input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              צעד הוספה (ברירת מחדל 1)
+            </label>
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={incrementStep}
+              onChange={(e) =>
+                setIncrementStep(Math.max(1, Number(e.target.value || 1)))
+              }
+              disabled={loading}
+              placeholder="1"
+            />
+            <p className="text-[12px] text-gray-500 mt-1">
+              כשלקוחות מוסיפים פריטים מקבוצת המבצע, הכמות תעלה בקפיצות של הערך
+              הזה.
+            </p>
           </div>
 
           <Button

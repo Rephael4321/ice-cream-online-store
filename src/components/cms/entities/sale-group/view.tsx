@@ -6,8 +6,8 @@ import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { SaleGroupEditor } from "./ui/sale-group-editor";
-import Image from "next/image";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import Image from "next/image";
 
 type SaleGroup = {
   id: number;
@@ -19,6 +19,7 @@ type SaleGroup = {
   created_at: string;
   updated_at: string;
   categories: { id: number; name: string }[];
+  increment_step: number; // NEW
 };
 
 type ProductImage = {
@@ -262,6 +263,7 @@ export default function ViewSaleGroup() {
             initialPrice={group.price !== null ? Number(group.price) : null}
             initialImage={group.image}
             initialCategories={group.categories || []}
+            initialIncrementStep={group.increment_step || 1} // NEW
           />
         </div>
 
