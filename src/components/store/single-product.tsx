@@ -22,10 +22,14 @@ type SingleProductProps = {
     price: number;
     fromCategory?: boolean;
     category?: SaleCategoryInfo;
+    // fromGroup / group could exist, but not required here
   };
   isAdmin?: boolean;
   /** When true, hide the individual price/sale price block (used inside clusters) */
   suppressPricing?: boolean;
+
+  /** NEW: quantity increments for this product (e.g., group increment_step). Defaults to 1. */
+  incrementStep?: number;
 };
 
 export default function SingleProduct({
@@ -37,11 +41,14 @@ export default function SingleProduct({
   sale,
   isAdmin = false,
   suppressPricing = false,
+  incrementStep = 1,
 }: SingleProductProps) {
   const { cartItems, addToCart, removeFromCart } = useCart();
   const router = useRouter();
   const pathname = usePathname();
   const [showModal, setShowModal] = useState(false);
+
+  const step = Math.max(1, Number(incrementStep) || 1);
 
   const cartItem = cartItems.find((item) => item.id === id);
   const quantity = cartItem?.quantity || 0;
@@ -54,13 +61,28 @@ export default function SingleProduct({
     decodeURIComponent(pathname || "") ===
     `/category-products/${currentCategorySlug}`;
 
+  /**
+   * Snap helpers so qty always stays a multiple of `step` when using +/-.
+   */
+  const deltaToNextMultiple = (q: number) => {
+    const mod = q % step;
+    return mod === 0 ? step : step - mod; // add this many to reach next multiple
+  };
+
+  const deltaToPrevMultiple = (q: number) => {
+    const mod = q % step;
+    return mod === 0 ? step : mod; // remove this many to reach previous multiple (or clear if <= step)
+  };
+
   const handleAdd = () => {
     if (!inStock) return;
-    addToCart({ id, productImage, productName, productPrice, sale }, 1);
+    const delta = deltaToNextMultiple(quantity);
+    addToCart({ id, productImage, productName, productPrice, sale }, delta);
   };
 
   const handleAddSalePack = () => {
     if (!inStock || !sale) return;
+    // Add the pack amount as requested. (Step affects +/– buttons; packs add exact sale amount.)
     addToCart(
       { id, productImage, productName, productPrice, sale },
       sale.amount
@@ -68,11 +90,17 @@ export default function SingleProduct({
   };
 
   const handleRemove = () => {
-    if (quantity <= 1) {
+    if (quantity <= 0) return;
+
+    if (quantity <= step) {
+      // remove item entirely when at or below a single step
       removeFromCart(id);
-    } else {
-      addToCart({ id, productImage, productName, productPrice, sale }, -1);
+      return;
     }
+
+    // subtract to the previous multiple of step
+    const delta = -deltaToPrevMultiple(quantity);
+    addToCart({ id, productImage, productName, productPrice, sale }, delta);
   };
 
   const handleImageClick = () => {
@@ -171,6 +199,7 @@ export default function SingleProduct({
                     ? "border-gray-300 hover:border-gray-500"
                     : "border-gray-200 opacity-40 cursor-not-allowed"
                 }`}
+                title={step > 1 ? `מוסיף בקפיצות של ${step}` : undefined}
               >
                 +
               </button>
@@ -187,20 +216,29 @@ export default function SingleProduct({
                     ? "border-gray-200 opacity-40 cursor-not-allowed"
                     : "border-gray-300 hover:border-gray-500"
                 }`}
+                title={step > 1 ? `מוריד בקפיצות של ${step}` : undefined}
               >
                 –
               </button>
             </div>
 
-            {/* ✅ Sale Pack Button (kept; doesn't display price text) */}
+            {/* ✅ Sale Pack Button (kept; pack adds exactly sale.amount) */}
             {sale && sale.amount > 1 && (
               <button
                 onClick={handleAddSalePack}
                 disabled={!inStock}
                 className="mt-2 px-3 py-1 text-xs bg-green-100 text-green-700 border border-green-400 rounded hover:bg-green-200 transition"
+                title={`הוסף חבילת מבצע (${sale.amount})`}
               >
                 הוסף חבילת מבצע ({sale.amount})
               </button>
+            )}
+
+            {/* Optional tiny hint about step */}
+            {step > 1 && (
+              <div className="mt-1 text-xs text-gray-500">
+                כמות מתעדכנת בקפיצות של {step}.
+              </div>
             )}
           </div>
         </div>

@@ -28,8 +28,8 @@ interface Sale {
   price: number;
   fromCategory?: boolean;
   category?: CategoryRef;
-  fromGroup?: boolean; // NEW
-  group?: { id: number; name: string | null }; // NEW
+  fromGroup?: boolean;
+  group?: { id: number; name: string | null };
 }
 
 interface Product {
@@ -45,8 +45,10 @@ interface Product {
     name: string | null;
     amount: number | null;
     price: number | null;
+    incrementStep?: number; // NEW
   } | null;
   sortOrder?: number;
+  incrementStep?: number; // NEW (top-level convenience)
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -157,7 +159,7 @@ export default async function ProductsByCategory({ params }: Props) {
   products.forEach((p, idx) => {
     const chosenFromGroup = p.sale?.fromGroup === true;
     const g = chosenFromGroup ? p.sale?.group : null;
-    const groupInfo = chosenFromGroup ? p.saleGroup : null; // contains amount/price
+    const groupInfo = chosenFromGroup ? p.saleGroup : null; // contains amount/price/step
     if (!g?.id || !groupInfo?.amount || !groupInfo?.price) return;
 
     if (!clustersById.has(g.id)) {
@@ -191,6 +193,12 @@ export default async function ProductsByCategory({ params }: Props) {
     const clusterForHere = validClusters.find((c) => c.firstIndex === i);
 
     if (clusterForHere) {
+      // Derive a common step for the cluster (if mixed, we’ll just default to 1)
+      const clusterStep =
+        clusterForHere.items[0]?.incrementStep ??
+        clusterForHere.items[0]?.saleGroup?.incrementStep ??
+        1;
+
       content.push(
         <div
           key={`clusterwrap-${clusterForHere.groupId}-${i}`}
@@ -204,7 +212,7 @@ export default async function ProductsByCategory({ params }: Props) {
             }
             subtitle={`קחו ${
               clusterForHere.amount
-            } ב־₪${clusterForHere.price.toFixed(2)}`}
+            } ב־₪${clusterForHere.price.toFixed(2)} · צעד: ${clusterStep}`}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
               {clusterForHere.items.map((prod) => (
@@ -218,6 +226,9 @@ export default async function ProductsByCategory({ params }: Props) {
                   sale={prod.sale ?? undefined}
                   isAdmin={isAdmin}
                   suppressPricing // 👈 hide individual price/sale text inside clusters
+                  incrementStep={
+                    prod.incrementStep ?? prod.saleGroup?.incrementStep ?? 1
+                  } // NEW
                 />
               ))}
             </div>
@@ -242,6 +253,7 @@ export default async function ProductsByCategory({ params }: Props) {
           inStock={p.inStock}
           sale={p.sale ?? undefined}
           isAdmin={isAdmin}
+          incrementStep={p.incrementStep ?? p.saleGroup?.incrementStep ?? 1} // NEW
         />
       );
     }

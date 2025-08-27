@@ -19,6 +19,7 @@ type GroupSaleRow = {
   group_name: string | null;
   group_quantity: number | null;
   group_sale_price: number | string | null;
+  increment_step: number | null; // NEW
 };
 
 function pickBestSale(
@@ -40,7 +41,7 @@ function pickBestSale(
 
   if (valid.length === 0) return null;
 
-  // Compare by unit price, then by total price (tie-breaker), then prefer group > category > product (deterministic)
+  // Compare by unit price, then by total price, then prefer group > category > product
   const rank = { group: 0, category: 1, product: 2 } as const;
 
   valid.sort((a, b) => {
@@ -113,7 +114,7 @@ async function getProductsByCategoryName(
           cs.quantity,
           cs.sale_price
         FROM category_multi_items mi
-        JOIN categories c     ON c.id = mi.category_id
+        JOIN categories c      ON c.id = mi.category_id
         JOIN category_sales cs ON cs.category_id = c.id
         WHERE mi.target_type = 'product'
           AND mi.target_id = ANY($1::int[])
@@ -143,7 +144,7 @@ async function getProductsByCategoryName(
       }
     }
 
-    // NEW: sale-group membership & sale values
+    // NEW: sale-group membership & sale values (+ increment_step)
     let groupSaleMap = new Map<
       number,
       {
@@ -151,6 +152,7 @@ async function getProductsByCategoryName(
         name: string | null;
         amount: number | null;
         price: number | null;
+        incrementStep: number; // NEW
       }
     >();
 
@@ -159,10 +161,11 @@ async function getProductsByCategoryName(
         `
         SELECT 
           psg.product_id,
-          sg.id           AS group_id,
-          sg.name         AS group_name,
-          sg.quantity     AS group_quantity,
-          sg.sale_price   AS group_sale_price
+          sg.id            AS group_id,
+          sg.name          AS group_name,
+          sg.quantity      AS group_quantity,
+          sg.sale_price    AS group_sale_price,
+          sg.increment_step
         FROM product_sale_groups psg
         JOIN sale_groups sg ON sg.id = psg.sale_group_id
         WHERE psg.product_id = ANY($1::int[])
@@ -176,6 +179,10 @@ async function getProductsByCategoryName(
           name: r.group_name,
           amount: r.group_quantity != null ? Number(r.group_quantity) : null,
           price: r.group_sale_price != null ? Number(r.group_sale_price) : null,
+          incrementStep:
+            r.increment_step != null
+              ? Math.max(1, Number(r.increment_step))
+              : 1,
         });
       }
     }
@@ -219,8 +226,8 @@ async function getProductsByCategoryName(
         price: number;
         fromCategory?: boolean;
         category?: { id: number; name: string };
-        fromGroup?: boolean; // NEW (optional)
-        group?: { id: number; name: string | null }; // NEW (optional)
+        fromGroup?: boolean;
+        group?: { id: number; name: string | null };
       } | null = null;
 
       if (best) {
@@ -247,8 +254,12 @@ async function getProductsByCategoryName(
             name: grp.name ?? null,
             amount: grp.amount ?? null,
             price: grp.price ?? null,
+            incrementStep: grp.incrementStep, // NEW
           }
         : null;
+
+      // top-level convenience for UI logic
+      const incrementStep = grp?.incrementStep ?? 1; // NEW
 
       return {
         id: product.id,
@@ -259,6 +270,7 @@ async function getProductsByCategoryName(
         sale, // chosen / best sale
         saleGroup, // raw group info for UI clustering
         sortOrder: product.sort_order ?? 0,
+        incrementStep, // NEW
       };
     });
 
