@@ -2,6 +2,8 @@
 
 import { showToast } from "@/components/cms/ui/toast";
 
+type PaymentMethod = "" | "credit" | "paybox" | "cash";
+
 type Props = {
   order: {
     orderId: number;
@@ -13,13 +15,14 @@ type Props = {
     isReady: boolean;
     isTest?: boolean;
     isNotified?: boolean;
+    paymentMethod?: PaymentMethod | null; // NEW
   };
 
   finalTotal: number;
   onDelete: () => void;
   onMarkTest: (flag: boolean) => void;
   onEdit: () => void;
-  onTogglePaid: () => void;
+  onPaymentChange: (m: PaymentMethod | null) => void; // NEW
   onReadyClick: () => void;
   handleTitleClick: () => void;
   onNotifyWhatsApp?: () => Promise<void>;
@@ -31,7 +34,7 @@ export default function ClientControlPanel({
   onDelete,
   onMarkTest,
   onEdit,
-  onTogglePaid,
+  onPaymentChange, // NEW
   onReadyClick,
   handleTitleClick,
   onNotifyWhatsApp,
@@ -40,12 +43,18 @@ export default function ClientControlPanel({
   const name = order.clientName;
   const address = order.clientAddress;
 
+  // normalize current payment method for the select
+  const currentPM: PaymentMethod = (order.paymentMethod ?? "") as PaymentMethod;
+
+  // consider paid if a method is selected or legacy isPaid is true
+  const effectivePaid = currentPM !== "" || order.isPaid;
+
   const testStyle = order.isTest
     ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
     : "";
 
   const completedStyle =
-    !order.isTest && order.isPaid && order.isReady
+    !order.isTest && effectivePaid && order.isReady
       ? "bg-green-200 border-2 border-green-700 text-green-950"
       : "";
 
@@ -161,18 +170,36 @@ export default function ClientControlPanel({
           : new Date(order.createdAt).toLocaleString("he-IL")}
       </p>
 
-      <div className="mt-4 flex gap-4 flex-wrap">
-        <button
-          onClick={onTogglePaid}
-          className={`px-3 py-1 rounded text-white transition ${
-            order.isPaid
-              ? "bg-green-600 hover:bg-green-700"
-              : "bg-red-500 hover:bg-red-600"
-          }`}
-        >
-          {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
-        </button>
+      {/* Controls row */}
+      <div className="mt-4 flex gap-4 flex-wrap items-center">
+        {/* NEW: Payment method select */}
+        <div className="flex items-center gap-2">
+          <label
+            className="text-sm font-medium"
+            htmlFor={`pm-${order.orderId}`}
+          >
+            אמצעי תשלום:
+          </label>
+          <select
+            id={`pm-${order.orderId}`}
+            dir="rtl"
+            className="border px-2 py-1 rounded"
+            value={currentPM}
+            onChange={(e) => {
+              const v = e.target.value as PaymentMethod;
+              onPaymentChange(v === "" ? null : v);
+            }}
+            title="בחר אמצעי תשלום"
+            aria-label="בחר אמצעי תשלום"
+          >
+            <option value="">לא שולם</option>
+            <option value="credit">אשראי</option>
+            <option value="paybox">פייבוקס</option>
+            <option value="cash">מזומן</option>
+          </select>
+        </div>
 
+        {/* Ready toggle */}
         <button
           onClick={onReadyClick}
           className={`px-3 py-1 rounded text-white transition ${

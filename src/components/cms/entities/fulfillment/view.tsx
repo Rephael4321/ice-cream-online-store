@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { showToast } from "@/components/cms/ui/toast";
+import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import Link from "next/link";
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
 import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
-import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+
+type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
 type Order = {
   orderId: number;
@@ -19,6 +21,7 @@ type Order = {
   isTest?: boolean;
   isNotified?: boolean;
   deliveryFee?: number | null;
+  paymentMethod?: PaymentMethod | null; // NEW
 };
 
 type Item = {
@@ -151,19 +154,35 @@ export default function ViewOrder() {
     }
   };
 
-  const togglePaid = async () => {
+  // NEW: set payment method (replaces togglePaid)
+  const setPaymentMethod = async (method: PaymentMethod | null) => {
     if (!order) return;
     try {
       const r = await fetch(`/api/orders/${order.orderId}/payment`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPaid: !order.isPaid }),
+        body: JSON.stringify({ paymentMethod: method }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
-      setOrder((o) => (o ? { ...o, isPaid: data.isPaid ?? !o.isPaid } : o));
+
+      setOrder((o) =>
+        o
+          ? {
+              ...o,
+              paymentMethod:
+                (data.paymentMethod as PaymentMethod | null | undefined) ??
+                method ??
+                null,
+              isPaid:
+                typeof data.isPaid === "boolean"
+                  ? data.isPaid
+                  : method != null && method !== "",
+            }
+          : o
+      );
     } catch {
-      showToast("❌ שגיאה בעדכון תשלום", "error");
+      showToast("❌ שגיאה בעדכון אמצעי תשלום", "error");
     }
   };
 
@@ -257,6 +276,10 @@ export default function ViewOrder() {
               clientPhone: has(data, "phone") ? data.phone : o.clientPhone,
               isPaid: has(data, "isPaid") ? data.isPaid : o.isPaid,
               isReady: has(data, "isReady") ? data.isReady : o.isReady,
+              // keep paymentMethod if server returns it
+              paymentMethod: has(data, "paymentMethod")
+                ? (data.paymentMethod as PaymentMethod | null)
+                : o.paymentMethod,
             }
           : o
       );
@@ -306,7 +329,7 @@ export default function ViewOrder() {
             setNewAddr(order.clientAddress ?? "");
             setEditOpen(true);
           }}
-          onTogglePaid={togglePaid}
+          onPaymentChange={setPaymentMethod} // NEW
           onReadyClick={toggleReady}
           handleTitleClick={handleTitleClick}
           onNotifyWhatsApp={handleNotifyAndWhatsApp}

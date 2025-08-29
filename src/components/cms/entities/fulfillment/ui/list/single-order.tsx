@@ -1,9 +1,10 @@
-// components/cms/entities/order/ui/list/single-order.tsx
 "use client";
 
 import { Button } from "@/components/cms/ui/button";
 import { useRef } from "react";
 import Link from "next/link";
+
+type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
 type Props = {
   order: {
@@ -17,13 +18,14 @@ type Props = {
     clientName: string | null;
     clientAddress: string | null;
     clientPhone: string | null;
+    paymentMethod?: PaymentMethod | null; // stays
   };
   onDelete: (id: number) => void;
   selectMode?: boolean;
   selected?: boolean;
   onSelectToggle?: () => void;
   onEnterSelectMode?: () => void;
-  onTogglePaid: () => void;
+  onChangePayment: (m: PaymentMethod | null) => void;
   onToggleReady: () => void;
 };
 
@@ -36,7 +38,7 @@ export default function SingleOrder({
   selected = false,
   onSelectToggle,
   onEnterSelectMode,
-  onTogglePaid,
+  onChangePayment,
   onToggleReady,
 }: Props) {
   const date = new Date(order.createdAt);
@@ -44,12 +46,18 @@ export default function SingleOrder({
     ? date.toLocaleString("he-IL")
     : order.createdAt;
 
+  // ✅ Normalize to a local that includes "" so comparisons are valid
+  const currentPM: PaymentMethod = (order.paymentMethod ?? "") as PaymentMethod;
+
+  // ✅ No TS2367: compare the normalized value to ""
+  const effectivePaid = currentPM !== "" || order.isPaid;
+
   const testStyle = order.isTest
     ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
     : "";
 
   const completedStyle =
-    !order.isTest && order.isPaid && order.isReady
+    !order.isTest && effectivePaid && order.isReady
       ? "bg-green-200 border-2 border-green-700 text-green-950"
       : "";
 
@@ -133,23 +141,35 @@ export default function SingleOrder({
           <p>תאריך: {formatted}</p>
           <p>כמות מוצרים: {order.itemCount}</p>
 
-          {/* Clickable status buttons */}
-          <div className="mt-2 flex gap-2 flex-wrap">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePaid();
-              }}
-              className={`px-3 py-1 rounded text-white transition ${
-                order.isPaid
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-red-500 hover:bg-red-600"
-              }`}
-              title="שנה סטטוס תשלום"
+          {/* Status controls */}
+          <div className="mt-2 flex gap-2 flex-wrap items-center">
+            {/* Payment method select */}
+            <label
+              className="text-sm font-medium"
+              htmlFor={`pm-${order.orderId}`}
             >
-              {order.isPaid ? "שולם ✅" : "לא שולם ❌"}
-            </button>
+              תשלום:
+            </label>
+            <select
+              id={`pm-${order.orderId}`}
+              dir="rtl"
+              className="border px-2 py-1 rounded"
+              value={currentPM}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const v = e.target.value as PaymentMethod;
+                onChangePayment(v === "" ? null : v);
+              }}
+              title="בחר אמצעי תשלום"
+              aria-label="בחר אמצעי תשלום"
+            >
+              <option value="">לא שולם</option>
+              <option value="credit">אשראי</option>
+              <option value="paybox">פייבוקס</option>
+              <option value="cash">מזומן</option>
+            </select>
 
+            {/* Ready toggle */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -182,7 +202,6 @@ export default function SingleOrder({
                     timestamp: Date.now(),
                   })
                 );
-                // ensure click-through navigation after storing scroll marker
                 window.location.href = `/orders/${order.orderId}`;
               }}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"

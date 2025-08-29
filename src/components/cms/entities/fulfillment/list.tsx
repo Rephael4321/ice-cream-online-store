@@ -1,4 +1,3 @@
-// components/cms/entities/order/list.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -6,9 +5,11 @@ import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { Input } from "@/components/cms/ui/input";
-import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import DatePicker from "react-datepicker";
 import SingleOrder from "./ui/list/single-order";
+
+type PaymentMethod = null | "" | "credit" | "paybox" | "cash";
 
 type Order = {
   orderId: number;
@@ -21,6 +22,7 @@ type Order = {
   clientName: string | null;
   clientAddress: string | null;
   clientPhone: string | null;
+  paymentMethod?: PaymentMethod; // NEW
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -74,9 +76,7 @@ export default function ListOrder() {
     try {
       const res = await fetch(
         `/api/orders/search?query=${encodeURIComponent(query)}`,
-        {
-          cache: "no-store",
-        }
+        { cache: "no-store" }
       );
       const data = await res.json();
       const list: Order[] = data.orders || [];
@@ -175,23 +175,38 @@ export default function ListOrder() {
     });
   };
 
-  // split endpoints
-  const togglePaid = async (orderId: number, current: boolean) => {
+  // NEW: update payment method (and isPaid derived)
+  const updatePaymentMethod = async (
+    orderId: number,
+    method: PaymentMethod
+  ) => {
     try {
       const r = await fetch(`/api/orders/${orderId}/payment`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPaid: !current }),
+        body: JSON.stringify({ paymentMethod: method }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
       setOrders((prev) =>
         prev.map((o) =>
-          o.orderId === orderId ? { ...o, isPaid: data.isPaid ?? !current } : o
+          o.orderId === orderId
+            ? {
+                ...o,
+                paymentMethod:
+                  (data.paymentMethod as PaymentMethod) ?? method ?? null,
+                isPaid:
+                  typeof data.isPaid === "boolean"
+                    ? data.isPaid
+                    : method === "credit" ||
+                      method === "paybox" ||
+                      method === "cash",
+              }
+            : o
         )
       );
     } catch {
-      showToast("❌ שגיאה בעדכון תשלום", "error");
+      showToast("❌ שגיאה בעדכון אמצעי תשלום", "error");
     }
   };
 
@@ -297,7 +312,7 @@ export default function ListOrder() {
                   setSelectMode(true);
                   toggleOrderSelection(order.orderId);
                 }}
-                onTogglePaid={() => togglePaid(order.orderId, order.isPaid)}
+                onChangePayment={(m) => updatePaymentMethod(order.orderId, m)} // NEW
                 onToggleReady={() => toggleReady(order.orderId, order.isReady)}
               />
             ))}
