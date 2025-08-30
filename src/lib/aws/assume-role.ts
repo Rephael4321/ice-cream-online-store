@@ -1,16 +1,13 @@
-// lib/aws/assume-role.ts
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
 import type { AwsCredentialIdentity } from "@aws-sdk/types";
 
 type Cached = {
   creds: AwsCredentialIdentity;
-  // unix ms timestamp when we should refresh
-  refreshAt: number;
+  refreshAt: number; // unix ms timestamp when we should refresh
 };
 
 let cache: Cached | null = null;
 
-// Optional: adjust how early we refresh before actual expiration (ms)
 const REFRESH_SLOP_MS = 60_000; // 60s
 
 function now() {
@@ -68,10 +65,17 @@ export async function assumeRole(): Promise<AwsCredentialIdentity> {
   const refreshAt = new Date(c.Expiration).getTime() - REFRESH_SLOP_MS;
   cache = { creds, refreshAt };
 
+  // single, helpful print (no secrets)
+  console.log(
+    "[assumeRole] assumed:",
+    roleArn,
+    "expires:",
+    new Date(c.Expiration).toISOString()
+  );
+
   return creds;
 }
 
-// If you ever need to force a refresh (e.g., after permission changes)
 export function clearAssumedRoleCache() {
   cache = null;
 }

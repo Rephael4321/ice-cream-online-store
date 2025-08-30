@@ -3,6 +3,7 @@ import { withMiddleware } from "@/lib/api/with-middleware";
 import { getImageIndex, getS3ObjectsCached } from "@/lib/aws/images-index";
 import { listUsedImageKeys } from "@/lib/aws/image-usage";
 import { assumeRole } from "@/lib/aws/assume-role";
+import { STSClient, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,18 +34,8 @@ async function listUnusedImages(req: NextRequest) {
       throw new Error("MEDIA_BUCKET env var is missing");
     }
 
-    // If your AWS calls require STS, get credentials and pass them down.
-    let credentials: any | undefined;
-    try {
-      credentials = await assumeRole();
-    } catch (e) {
-      // If you sometimes run locally with static creds, you can ignore.
-      // Otherwise, rethrow to fail loudly.
-      // console.warn("assumeRole failed; falling back to default AWS creds");
-    }
-
+    // Params
     const { searchParams } = new URL(req.url);
-
     const sort = (searchParams.get("sort") || "updated") as SortKey;
     const order = (searchParams.get("order") || "desc") as SortOrder;
     const offset = Math.max(
@@ -59,8 +50,33 @@ async function listUnusedImages(req: NextRequest) {
           DEFAULT_LIMIT
       )
     );
-
     const prefix = searchParams.get("prefix") || "images/";
+
+    // Tiny debug
+    console.log("[unused-images] params:", {
+      prefix,
+      sort,
+      order,
+      offset,
+      limit,
+    });
+    console.log("[unused-images] bucket/region:", BUCKET, REGION);
+
+    // Assume role → print who we are
+    let credentials: any | undefined;
+    try {
+      credentials = await assumeRole();
+      console.log("[unused-images] assumeRole OK");
+      const sts = new STSClient({ region: REGION, credentials });
+      const who = await sts.send(new GetCallerIdentityCommand({}));
+      console.log("[unused-images] caller ARN:", who.Arn);
+    } catch (e: any) {
+      console.error("[unused-images] assumeRole FAILED:", e?.name, e?.message);
+      console.warn(
+        "[unused-images] proceeding with default AWS creds from env"
+      );
+      credentials = undefined; // fallback (remove if you want to fail fast)
+    }
 
     // 1) Load display names from index (fast, cached)
     const index = await getImageIndex(credentials);
@@ -77,8 +93,20 @@ async function listUnusedImages(req: NextRequest) {
       }
     }
 
-    // 2) S3 objects for size + LastModified (cached w/ TTL)
-    const s3Objects = await getS3ObjectsCached(prefix, credentials);
+    // 2) S3 objects for size + LastModified (cached w/ TTL) — with tiny error print
+    let s3Objects;
+    try {
+      s3Objects = await getS3ObjectsCached(prefix, credentials);
+    } catch (e: any) {
+      const meta = e?.$metadata || {};
+      console.error(
+        "[unused-images] S3 ListObjects failed:",
+        e?.name || "Error",
+        e?.message || String(e),
+        { httpStatusCode: meta.httpStatusCode, requestId: meta.requestId }
+      );
+      throw e;
+    }
     // s3Objects: Array<{ key: string; size: number; updatedMs: number }>
 
     // 3) Keys currently used in DB → Set<string> of "images/..."
@@ -86,8 +114,8 @@ async function listUnusedImages(req: NextRequest) {
 
     // 4) Keep only unused + map to response
     const rows = s3Objects
-      .filter((o) => !usedKeys.has(o.key))
-      .map((o) => ({
+      .filter((o: any) => !usedKeys.has(o.key))
+      .map((o: any) => ({
         key: o.key,
         url: toProxyUrl(o.key),
         name: nameByKey.get(o.key) ?? (o.key.split("/").pop() || o.key),
@@ -126,8 +154,12 @@ async function listUnusedImages(req: NextRequest) {
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (err: any) {
-    // Add a log so you can see the real reason in the server console
-    console.error("[unused-images] error:", err?.message || err, err?.stack);
+    console.error(
+      "[unused-images] error:",
+      err?.name || "Error",
+      err?.message || err,
+      err?.stack
+    );
     const message = err instanceof Error ? err.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
