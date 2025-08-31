@@ -1,3 +1,4 @@
+// app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
@@ -9,7 +10,6 @@ const DELIVERY_THRESHOLD = Number(
 const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
 
 /* ---------- Helpers: pricing math (server-authoritative) ---------- */
-
 function computePreGroupTotal(
   items: {
     quantity: number;
@@ -46,7 +46,6 @@ function allocateGroupDiscounts(
   const perItem = new Map<number, number>();
   let total = 0;
 
-  // group by saleGroup.id
   const groups = new Map<
     number,
     {
@@ -102,7 +101,6 @@ function allocateGroupDiscounts(
 }
 
 /* ---------- POST /api/orders: create with snapshots ---------- */
-
 async function createOrder(req: NextRequest) {
   const client = await pool.connect();
   try {
@@ -186,7 +184,7 @@ async function createOrder(req: NextRequest) {
       }
     }
 
-    // sale-group metadata from DB
+    // sale-group metadata
     const { rows: groupRows } = await client.query(
       `SELECT psg.product_id,
               psg.sale_group_id      AS "saleGroupId",
@@ -201,7 +199,7 @@ async function createOrder(req: NextRequest) {
     const groupByProductId = new Map<number, any>();
     for (const g of groupRows) groupByProductId.set(g.product_id, g);
 
-    // build authoritative pricing items (snapshot inputs)
+    // authoritative pricing items (snapshot inputs)
     const pricingItems = items
       .filter((i) => validIds.has(i.productId))
       .map((i) => {
@@ -315,7 +313,7 @@ async function createOrder(req: NextRequest) {
     }
     return NextResponse.json(baseResponse);
   } catch (err: unknown) {
-    await client.query("ROLLBACK");
+    await pool.query("ROLLBACK");
     console.error("Error creating order:", err);
     const error = err instanceof Error ? err.message : "Failed to create order";
     return NextResponse.json({ error }, { status: 500 });
@@ -324,8 +322,7 @@ async function createOrder(req: NextRequest) {
   }
 }
 
-/* ---------- GET /api/orders: list with snapshot totals ---------- */
-
+/* ---------- GET /api/orders: list with snapshot totals (NOW RETURNS paymentMethod) ---------- */
 async function listOrders(req: NextRequest) {
   try {
     const from = req.nextUrl.searchParams.get("from");
@@ -349,13 +346,13 @@ async function listOrders(req: NextRequest) {
         o.is_ready AS "isReady",
         o.is_test AS "isTest",
         o.is_notified AS "isNotified",
+        o.payment_method AS "paymentMethod",         -- ★ NEW
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount",
         c.name AS "clientName",
         c.address AS "clientAddress",
         c.phone AS "clientPhone",
-        -- snapshot totals (nullable for legacy orders)
         o.pre_group_total      AS "preGroupTotal",
         o.group_discount_total AS "groupDiscountTotal",
         o.total                AS "total"

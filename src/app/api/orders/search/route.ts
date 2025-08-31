@@ -1,10 +1,10 @@
+// app/api/orders/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
 async function searchOrders(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("query")?.trim() ?? "";
-
   if (!query) return NextResponse.json({ orders: [] });
 
   try {
@@ -16,6 +16,7 @@ async function searchOrders(req: NextRequest) {
         o.is_ready AS "isReady",
         o.is_test AS "isTest",
         o.is_notified AS "isNotified",
+        o.payment_method AS "paymentMethod",         -- ★ NEW
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount",

@@ -22,10 +22,14 @@ type Order = {
   clientName: string | null;
   clientAddress: string | null;
   clientPhone: string | null;
-  paymentMethod?: PaymentMethod; // NEW
+  paymentMethod?: PaymentMethod;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
+
+// ✅ reuseable normalizer for lists as well
+const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
+  v === "credit" || v === "paybox" || v === "cash" ? v : "";
 
 export default function ListOrder() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -54,7 +58,10 @@ export default function ListOrder() {
     try {
       const res = await fetch(`/api/orders${query}`, { cache: "no-store" });
       const data = await res.json();
-      const list: Order[] = data.orders || [];
+      const list: Order[] = (data.orders || []).map((o: any) => ({
+        ...o,
+        paymentMethod: sanitizePaymentMethod(o.paymentMethod),
+      }));
       setOrders(list);
       setHasUnnotified(
         list.some((o) => o.isNotified === false && o.isTest !== true)
@@ -76,10 +83,15 @@ export default function ListOrder() {
     try {
       const res = await fetch(
         `/api/orders/search?query=${encodeURIComponent(query)}`,
-        { cache: "no-store" }
+        {
+          cache: "no-store",
+        }
       );
       const data = await res.json();
-      const list: Order[] = data.orders || [];
+      const list: Order[] = (data.orders || []).map((o: any) => ({
+        ...o,
+        paymentMethod: sanitizePaymentMethod(o.paymentMethod),
+      }));
       setOrders(list);
       setHasUnnotified(
         list.some((o) => o.isNotified === false && o.isTest !== true)
@@ -193,8 +205,9 @@ export default function ListOrder() {
           o.orderId === orderId
             ? {
                 ...o,
-                paymentMethod:
-                  (data.paymentMethod as PaymentMethod) ?? method ?? null,
+                paymentMethod: sanitizePaymentMethod(
+                  (data.paymentMethod as PaymentMethod) ?? method ?? ""
+                ),
                 isPaid:
                   typeof data.isPaid === "boolean"
                     ? data.isPaid
@@ -312,7 +325,7 @@ export default function ListOrder() {
                   setSelectMode(true);
                   toggleOrderSelection(order.orderId);
                 }}
-                onChangePayment={(m) => updatePaymentMethod(order.orderId, m)} // NEW
+                onChangePayment={(m) => updatePaymentMethod(order.orderId, m)}
                 onToggleReady={() => toggleReady(order.orderId, order.isReady)}
               />
             ))}

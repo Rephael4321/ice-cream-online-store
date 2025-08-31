@@ -1,3 +1,4 @@
+// app/api/orders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
@@ -15,8 +16,9 @@ type OrderRow = {
   isNotified: boolean;
   preGroupTotal: number | null;
   groupDiscountTotal: number;
-  deliveryFee: number | null; // NEW
+  deliveryFee: number | null;
   total: number | null;
+  paymentMethod: "" | "credit" | "paybox" | "cash" | null; // ★ NEW
 };
 
 type OrderItemRow = {
@@ -65,9 +67,10 @@ async function getOrder(
          o.is_ready AS "isReady",
          o.is_test AS "isTest",
          o.is_notified AS "isNotified",
+         o.payment_method AS "paymentMethod",         -- ★ NEW
          o.pre_group_total      AS "preGroupTotal",
          o.group_discount_total AS "groupDiscountTotal",
-         o.delivery_fee         AS "deliveryFee",   -- NEW
+         o.delivery_fee         AS "deliveryFee",
          o.total                AS "total"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
@@ -126,18 +129,16 @@ async function getOrder(
  * Supports ONLY:
  *  - { isTest: boolean }
  *  - { name?: string | null, address?: string | null }
- *    - Empty string "" is treated as null (delete)
- *    - Omitting a field leaves it unchanged
  * For payment/status use:
  *  - PATCH /api/orders/:id/payment
  *  - PATCH /api/orders/:id/status
  */
 function normalizeToNullOrString(v: unknown): string | null | undefined {
-  if (v === undefined) return undefined; // not provided
-  if (v === null) return null; // explicit delete
+  if (v === undefined) return undefined;
+  if (v === null) return null;
   if (typeof v === "string") {
     const t = v.trim();
-    return t === "" ? null : t; // "" => delete (NULL)
+    return t === "" ? null : t;
   }
   return undefined;
 }

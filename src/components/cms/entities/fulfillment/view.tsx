@@ -21,7 +21,7 @@ type Order = {
   isTest?: boolean;
   isNotified?: boolean;
   deliveryFee?: number | null;
-  paymentMethod?: PaymentMethod | null; // NEW
+  paymentMethod?: PaymentMethod | null;
 };
 
 type Item = {
@@ -41,6 +41,10 @@ type ExtendedItem = Item & { inStock: boolean };
 // presence-check helper (key presence, not truthiness)
 const has = (obj: any, key: string) =>
   obj != null && Object.prototype.hasOwnProperty.call(obj, key);
+
+// ✅ normalize unknown/legacy values to the empty option
+const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
+  v === "credit" || v === "paybox" || v === "cash" ? v : "";
 
 export default function ViewOrder() {
   const id = useParams()?.id as string | undefined;
@@ -105,7 +109,11 @@ export default function ViewOrder() {
           storageSort: it.storageSort ?? null,
         }));
 
-        setOrder(o);
+        // ✅ ensure paymentMethod is a valid select value
+        setOrder({
+          ...o,
+          paymentMethod: sanitizePaymentMethod((o as any).paymentMethod),
+        });
         setItems(enriched);
       } catch {
         showToast("❌ שגיאה בטעינת הזמנה", "error");
@@ -170,10 +178,11 @@ export default function ViewOrder() {
         o
           ? {
               ...o,
-              paymentMethod:
+              paymentMethod: sanitizePaymentMethod(
                 (data.paymentMethod as PaymentMethod | null | undefined) ??
-                method ??
-                null,
+                  method ??
+                  ""
+              ),
               isPaid:
                 typeof data.isPaid === "boolean"
                   ? data.isPaid
@@ -249,13 +258,10 @@ export default function ViewOrder() {
     }
   };
 
-  // ✅ IMPORTANT: respects explicit null from API (so clearing "" shows immediately)
+  // ✅ respects explicit null from API (so clearing "" shows immediately)
   const handleUpdateClient = async () => {
     if (!order) return;
-    const payload = {
-      name: newName.trim(),
-      address: newAddr.trim(),
-    };
+    const payload = { name: newName.trim(), address: newAddr.trim() };
     try {
       const r = await fetch(`/api/orders/${order.orderId}`, {
         method: "PATCH",
@@ -276,9 +282,8 @@ export default function ViewOrder() {
               clientPhone: has(data, "phone") ? data.phone : o.clientPhone,
               isPaid: has(data, "isPaid") ? data.isPaid : o.isPaid,
               isReady: has(data, "isReady") ? data.isReady : o.isReady,
-              // keep paymentMethod if server returns it
               paymentMethod: has(data, "paymentMethod")
-                ? (data.paymentMethod as PaymentMethod | null)
+                ? sanitizePaymentMethod((data as any).paymentMethod)
                 : o.paymentMethod,
             }
           : o
@@ -329,7 +334,7 @@ export default function ViewOrder() {
             setNewAddr(order.clientAddress ?? "");
             setEditOpen(true);
           }}
-          onPaymentChange={setPaymentMethod} // NEW
+          onPaymentChange={setPaymentMethod}
           onReadyClick={toggleReady}
           handleTitleClick={handleTitleClick}
           onNotifyWhatsApp={handleNotifyAndWhatsApp}

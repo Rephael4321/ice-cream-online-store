@@ -15,14 +15,14 @@ type Props = {
     isReady: boolean;
     isTest?: boolean;
     isNotified?: boolean;
-    paymentMethod?: PaymentMethod | null; // NEW
+    paymentMethod?: PaymentMethod | null;
   };
 
   finalTotal: number;
   onDelete: () => void;
   onMarkTest: (flag: boolean) => void;
   onEdit: () => void;
-  onPaymentChange: (m: PaymentMethod | null) => void; // NEW
+  onPaymentChange: (m: PaymentMethod | null) => void;
   onReadyClick: () => void;
   handleTitleClick: () => void;
   onNotifyWhatsApp?: () => Promise<void>;
@@ -34,7 +34,7 @@ export default function ClientControlPanel({
   onDelete,
   onMarkTest,
   onEdit,
-  onPaymentChange, // NEW
+  onPaymentChange,
   onReadyClick,
   handleTitleClick,
   onNotifyWhatsApp,
@@ -52,7 +52,6 @@ export default function ClientControlPanel({
   const testStyle = order.isTest
     ? "bg-yellow-200 border-2 border-yellow-700 text-yellow-950"
     : "";
-
   const completedStyle =
     !order.isTest && effectivePaid && order.isReady
       ? "bg-green-200 border-2 border-green-700 text-green-950"
@@ -172,7 +171,7 @@ export default function ClientControlPanel({
 
       {/* Controls row */}
       <div className="mt-4 flex gap-4 flex-wrap items-center">
-        {/* NEW: Payment method select */}
+        {/* Payment method select */}
         <div className="flex items-center gap-2">
           <label
             className="text-sm font-medium"

@@ -66,12 +66,12 @@ export async function assumeRole(): Promise<AwsCredentialIdentity> {
   cache = { creds, refreshAt };
 
   // single, helpful print (no secrets)
-  console.log(
-    "[assumeRole] assumed:",
-    roleArn,
-    "expires:",
-    new Date(c.Expiration).toISOString()
-  );
+  // console.log(
+  //   "[assumeRole] assumed:",
+  //   roleArn,
+  //   "expires:",
+  //   new Date(c.Expiration).toISOString()
+  // );
 
   return creds;
 }

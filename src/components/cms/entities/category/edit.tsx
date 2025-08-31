@@ -340,7 +340,7 @@ export default function EditCategory({ name: initialName }: Props) {
       });
       if (!res.ok) throw new Error();
       showToast("הקטגוריה נמחקה בהצלחה", "success");
-      window.location.href = "/cms/categories";
+      window.location.href = "/categories";
     } catch {
       showToast("שגיאה בעת מחיקת הקטגוריה", "error");
     }

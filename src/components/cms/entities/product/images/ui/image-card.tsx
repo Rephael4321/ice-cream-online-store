@@ -8,7 +8,7 @@ export default function ImageCard({ image }: { image: ProductImage }) {
 
   return (
     <Link
-      href={`/new-product?image=${encodeURIComponent(image.url)}`}
+      href={`/products/new?image=${encodeURIComponent(image.url)}`}
       className="block"
     >
       <div className="border rounded p-2 bg-white shadow-sm hover:shadow-md transition cursor-pointer">

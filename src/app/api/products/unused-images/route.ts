@@ -53,23 +53,23 @@ async function listUnusedImages(req: NextRequest) {
     const prefix = searchParams.get("prefix") || "images/";
 
     // Tiny debug
-    console.log("[unused-images] params:", {
-      prefix,
-      sort,
-      order,
-      offset,
-      limit,
-    });
-    console.log("[unused-images] bucket/region:", BUCKET, REGION);
+    // console.log("[unused-images] params:", {
+    //   prefix,
+    //   sort,
+    //   order,
+    //   offset,
+    //   limit,
+    // });
+    // console.log("[unused-images] bucket/region:", BUCKET, REGION);
 
     // Assume role → print who we are
     let credentials: any | undefined;
     try {
       credentials = await assumeRole();
-      console.log("[unused-images] assumeRole OK");
+      // console.log("[unused-images] assumeRole OK");
       const sts = new STSClient({ region: REGION, credentials });
       const who = await sts.send(new GetCallerIdentityCommand({}));
-      console.log("[unused-images] caller ARN:", who.Arn);
+      // console.log("[unused-images] caller ARN:", who.Arn);
     } catch (e: any) {
       console.error("[unused-images] assumeRole FAILED:", e?.name, e?.message);
       console.warn(
