@@ -10,7 +10,7 @@ export default function CmsNavbar() {
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2 text-2xl font-bold text-purple-700 whitespace-nowrap"
+          className="flex items-center gap-2 text-2xl font-bold whitespace-nowrap"
         >
           <Image
             src="/favicon_io/android-chrome-192x192.png"

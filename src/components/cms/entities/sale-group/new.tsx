@@ -236,14 +236,14 @@ export default function NewSaleGroupForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={loading}
-              placeholder="שם ידידותי (רשות)"
+              placeholder=""
             />
           </div>
 
           {/* NEW: increment step input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              צעד הוספה (ברירת מחדל 1)
+              צעד הוספה
             </label>
             <Input
               type="number"
