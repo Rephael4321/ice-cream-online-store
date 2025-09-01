@@ -6,7 +6,7 @@ import Link from "next/link";
 
 interface Category {
   id: number;
-  name: string;
+  name: string; // API already returns de-sanitized (spaces), thanks to route
   type: "collection" | "sale";
   image?: string | null;
   description?: string | null;
@@ -26,6 +26,13 @@ export const metadata: Metadata = {
   title: "קטגוריות | המפנק",
   description: "בחרו קטגוריה מהמגוון שלנו",
 };
+
+// Helpers:
+// Public slug: UI-friendly, kebab + lowercase (keeps Hebrew letters, encodes later)
+// Admin slug: re-sanitize back to the persisted form (spaces -> '-'), preserve case
+const toPublicSlug = (name: string) =>
+  name.trim().replace(/\s+/g, "-").toLowerCase();
+const toAdminSanitized = (name: string) => name.trim().replace(/\s+/g, "-");
 
 export default async function MainMenu() {
   const cookie = cookies();
@@ -78,14 +85,18 @@ export default async function MainMenu() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
         {(categories.length === 0 ? Array(6).fill(null) : categories).map(
           (cat, i) => {
-            const slug = cat?.name?.replace(/\s+/g, "-").toLowerCase();
+            const publicSlug = cat ? toPublicSlug(cat.name) : "";
 
             return cat ? (
               <div
                 key={cat.id}
                 className="relative hover:scale-105 transition-transform duration-200 text-center"
               >
-                <Link href={`/category-products/${slug}`} className="block">
+                {/* Public navigation uses kebab-lower */}
+                <Link
+                  href={`/category-products/${encodeURIComponent(publicSlug)}`}
+                  className="block"
+                >
                   <div className="bg-white shadow rounded-2xl p-4 flex flex-col items-center space-y-3">
                     <div className="w-[120px] h-[120px] relative rounded-md bg-gray-100">
                       <Image
@@ -116,8 +127,11 @@ export default async function MainMenu() {
                 </Link>
 
                 {isAdmin && (
+                  // Admin edit link uses the *sanitized-back* name (spaces -> '-') as the identifier
                   <Link
-                    href={`/categories/${cat.id}`}
+                    href={`/categories/${encodeURIComponent(
+                      toAdminSanitized(cat.name)
+                    )}`}
                     className="absolute top-2 left-2 px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 shadow"
                   >
                     ערוך
