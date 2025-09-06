@@ -34,11 +34,14 @@ type OrderItemRow = {
   updatedAt: string;
   storageName: string | null;
   storageSort: number | null;
+
+  // Group snapshot (per item)
   groupId: number | null;
   groupBundleQty: number | null;
   groupSalePrice: number | null;
   groupUnitPrice: number | null;
   groupDiscount: number;
+
   baseTotal: number | null;
   afterItemSale: number | null;
 };
@@ -94,18 +97,24 @@ async function getOrder(
          oi.in_stock       AS "inStock",
          sa.name           AS "storageName",
          sa.sort_order     AS "storageSort",
+
+         -- ⬇️ group snapshot columns per item (already allocated on write)
          oi.group_id           AS "groupId",
          oi.group_bundle_qty   AS "groupBundleQty",
          oi.group_sale_price   AS "groupSalePrice",
          oi.group_unit_price   AS "groupUnitPrice",
          oi.group_discount     AS "groupDiscount",
+
          (oi.quantity * oi.unit_price) AS "baseTotal",
          CASE
-           WHEN oi.sale_quantity IS NOT NULL AND oi.sale_price IS NOT NULL THEN
-             (FLOOR(oi.quantity / oi.sale_quantity)::int * oi.sale_price)
-             + ((oi.quantity % oi.sale_quantity)::int * oi.unit_price)
+           WHEN oi.group_id IS NULL
+                AND oi.sale_quantity IS NOT NULL
+                AND oi.sale_price   IS NOT NULL
+           THEN (FLOOR(oi.quantity / oi.sale_quantity)::int * oi.sale_price)
+                + ((oi.quantity % oi.sale_quantity)::int * oi.unit_price)
            ELSE (oi.quantity * oi.unit_price)
          END AS "afterItemSale",
+
          oi.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
          oi.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt"
        FROM order_items oi

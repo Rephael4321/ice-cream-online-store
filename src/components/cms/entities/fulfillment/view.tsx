@@ -1,4 +1,3 @@
-// app/(cms)/orders/[id]/page.tsx  (ViewOrder)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +20,6 @@ type Order = {
   isReady: boolean;
   isTest?: boolean;
   isNotified?: boolean;
-  // ⬇️ include snapshot fields from DB
   preGroupTotal?: number | null;
   groupDiscountTotal?: number | null;
   deliveryFee?: number | null;
@@ -32,38 +30,48 @@ type Order = {
 type Item = {
   productId: number;
   productName: string;
-  productImage: string;
+  productImage: string | null;
   quantity: number;
   unitPrice: number;
   saleQuantity: number | null;
   salePrice: number | null;
   storageName: string | null;
   storageSort: number | null;
-  inStock?: boolean | null; // from API is nullable
+  inStock?: boolean | null;
+
+  // group snapshot (per-item)
+  groupId: number | null;
+  groupBundleQty: number | null;
+  groupSalePrice: number | null;
+  groupUnitPrice: number | null;
+  groupDiscount: number;
 };
 
 type ExtendedItem = Item & { inStock: boolean };
 
-// presence-check helper
 const has = (obj: any, key: string) =>
   obj != null && Object.prototype.hasOwnProperty.call(obj, key);
 
-// normalize payment method to a valid select value
 const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
   v === "credit" || v === "paybox" || v === "cash" ? v : "";
 
-// fallback pre-group calculator (ONLY used if snapshot is missing)
+// fallback pre-group total (if snapshot missing) — mirrors client calc
 function calcPreGroupFromItems(items: ExtendedItem[]) {
   let pre = 0;
   for (const it of items) {
-    // item-level sale (no group info here; snapshot should normally exist)
+    // per-item sale ONLY if NOT in a sale group
     let line = it.unitPrice * it.quantity;
-    if (it.saleQuantity && it.salePrice && it.quantity >= it.saleQuantity) {
+    if (
+      it.groupId == null &&
+      it.saleQuantity &&
+      it.salePrice &&
+      it.quantity >= it.saleQuantity
+    ) {
       const bundles = Math.floor(it.quantity / it.saleQuantity);
       const rest = it.quantity % it.saleQuantity;
       line = bundles * it.salePrice + rest * it.unitPrice;
     }
-    if (it.inStock !== false) pre += line;
+    pre += line; // do not filter by inStock: we mirror the client order summary
   }
   return pre;
 }
@@ -116,30 +124,53 @@ export default function ViewOrder() {
     if (!id) return;
     (async () => {
       try {
-        const ordRes = await fetch(`/api/orders/${id}`, { cache: "no-store" });
-        const { order: o, items: raw } = (await ordRes.json()) as {
-          order: Order;
-          items: Item[];
-        };
+        const res = await fetch(`/api/orders/${id}`, { cache: "no-store" });
+        const payload = await res.json();
+        const o = payload.order as any;
+        const rawItems = (payload.items as any[]) ?? [];
 
-        const enriched = (raw || []).map((it) => ({
-          ...it,
-          unitPrice: +it.unitPrice,
-          salePrice: it.salePrice !== null ? +it.salePrice : null,
-          inStock: it.inStock !== false,
+        const enriched: ExtendedItem[] = rawItems.map((it) => ({
+          productId: Number(it.productId),
+          productName: String(it.productName ?? ""),
+          productImage: it.productImage ?? null,
+          quantity: Number(it.quantity ?? 0),
+          unitPrice: Number(it.unitPrice ?? 0),
+          saleQuantity:
+            it.saleQuantity != null ? Number(it.saleQuantity) : null,
+          salePrice: it.salePrice != null ? Number(it.salePrice) : null,
           storageName: it.storageName ?? null,
           storageSort: it.storageSort ?? null,
+          inStock: it.inStock !== false,
+
+          groupId: it.groupId != null ? Number(it.groupId) : null,
+          groupBundleQty:
+            it.groupBundleQty != null ? Number(it.groupBundleQty) : null,
+          groupSalePrice:
+            it.groupSalePrice != null ? Number(it.groupSalePrice) : null,
+          groupUnitPrice:
+            it.groupUnitPrice != null ? Number(it.groupUnitPrice) : null,
+          groupDiscount: Number(it.groupDiscount ?? 0),
         }));
 
         setOrder({
-          ...o,
-          paymentMethod: sanitizePaymentMethod((o as any).paymentMethod),
-          preGroupTotal: o.preGroupTotal != null ? +o.preGroupTotal : null,
+          orderId: Number(o.orderId),
+          clientPhone: String(o.clientPhone ?? ""),
+          clientName: o.clientName ?? null,
+          clientAddress: o.clientAddress ?? null,
+          createdAt: String(o.createdAt),
+          isPaid: Boolean(o.isPaid),
+          isReady: Boolean(o.isReady),
+          isTest: Boolean(o.isTest),
+          isNotified: Boolean(o.isNotified),
+          paymentMethod: sanitizePaymentMethod(o?.paymentMethod),
+          preGroupTotal:
+            o?.preGroupTotal != null ? Number(o.preGroupTotal) : null,
           groupDiscountTotal:
-            o.groupDiscountTotal != null ? +o.groupDiscountTotal : 0,
-          deliveryFee: o.deliveryFee != null ? +o.deliveryFee : null,
-          total: o.total != null ? +o.total : null,
+            o?.groupDiscountTotal != null ? Number(o.groupDiscountTotal) : 0,
+          deliveryFee: o?.deliveryFee != null ? Number(o.deliveryFee) : null,
+          total: o?.total != null ? Number(o.total) : null,
         });
+
         setItems(enriched);
       } catch {
         showToast("❌ שגיאה בטעינת הזמנה", "error");
@@ -186,7 +217,6 @@ export default function ViewOrder() {
     }
   };
 
-  // Payment method change (server decides isPaid)
   const setPaymentMethod = async (method: PaymentMethod | null) => {
     if (!order) return;
     try {
@@ -237,29 +267,33 @@ export default function ViewOrder() {
 
   const toggleStock = async (productId: number) => {
     setItems((prev) => {
-      const nextState = prev.map((it) =>
+      const next = prev.map((it) =>
         it.productId === productId ? { ...it, inStock: !it.inStock } : it
       );
-      const justToggled = nextState.find((it) => it.productId === productId)!;
+      const just = next.find((it) => it.productId === productId)!;
       fetch(`/api/orders/${order?.orderId}/stock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, inStock: justToggled.inStock }),
-      }).catch(() => {
-        showToast("❌ שגיאה בעדכון מלאי לפריט", "error");
-      });
-      return nextState;
+        body: JSON.stringify({ productId, inStock: just.inStock }),
+      }).catch(() => showToast("❌ שגיאה בעדכון מלאי לפריט", "error"));
+      return next;
     });
   };
 
   if (loading) return <p className="p-6">טוען…</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
-  // ---- Totals: prefer DB snapshots; fall back safely ----
+  // ---- Totals — snapshot-first, mirror the client summary ----
   const DELIVERY_THRESHOLD = Number(
     process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
   );
   const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
+
+  // base (before any discounts), like client page (do NOT filter by inStock)
+  const totalBeforeDiscount = items.reduce(
+    (sum, it) => sum + it.unitPrice * it.quantity,
+    0
+  );
 
   const preGroup =
     order.preGroupTotal != null
@@ -267,8 +301,11 @@ export default function ViewOrder() {
       : calcPreGroupFromItems(items);
   const groupDisc =
     order.groupDiscountTotal != null ? Number(order.groupDiscountTotal) : 0;
+
+  // Subtotal AFTER all product discounts, BEFORE delivery
   const subtotal = Math.max(0, preGroup - groupDisc);
 
+  // Delivery fee
   const deliveryFee =
     order.deliveryFee != null
       ? Number(order.deliveryFee)
@@ -276,8 +313,12 @@ export default function ViewOrder() {
       ? DELIVERY_FEE
       : 0;
 
+  // Final (might include delivery)
   const grandTotal =
     order.total != null ? Number(order.total) : subtotal + deliveryFee;
+
+  // 🎁 Products-only savings (no delivery), same as client
+  const totalSavings = Math.max(0, totalBeforeDiscount - subtotal);
 
   return (
     <main dir="rtl" className="px-4 sm:px-6 md:px-10 max-w-5xl mx-auto">
@@ -325,15 +366,23 @@ export default function ViewOrder() {
           onToggleInStock={toggleStock}
         />
 
-        {/* Totals box (snapshot-first) */}
+        {/* Totals box — identical structure to client summary */}
         <div className="text-right rtl border rounded p-4 bg-gray-50">
           <p>ביניים: ₪{subtotal.toFixed(2)}</p>
+
           <p>
             דמי משלוח:{" "}
             {deliveryFee > 0
               ? `₪${deliveryFee.toFixed(2)}`
               : `₪0 (מעל ${DELIVERY_THRESHOLD}₪)`}
           </p>
+
+          {totalSavings > 0 && (
+            <p className="text-green-700 font-medium">
+              🎁 סה״כ חסכת: ₪{totalSavings.toFixed(2)}
+            </p>
+          )}
+
           <p className="text-xl font-bold">
             סה״כ לתשלום: ₪{grandTotal.toFixed(2)}
           </p>
