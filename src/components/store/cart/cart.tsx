@@ -1,3 +1,4 @@
+// components/cart/index.tsx
 "use client";
 
 import { useCart } from "@/context/cart-context";
@@ -7,7 +8,7 @@ import Cookies from "js-cookie";
 import CartSingleItem from "./ui/cart-single-item";
 import ConfirmOrderModal from "./ui/confirm-order-modal";
 
-// ---------- utils ----------
+/* ---------- utils ---------- */
 const normalizePhoneForDB = (input: string) => {
   let d = (input || "").replace(/\D/g, "");
   if (d.startsWith("972")) d = "0" + d.slice(3);
@@ -23,7 +24,7 @@ const formatPhonePretty = (input: string) => {
     : d;
 };
 
-// ---------- group discount allocator ----------
+/* ---------- group discount allocator (client) ---------- */
 function allocateGroupDiscounts(
   items: {
     id: number;
@@ -109,7 +110,7 @@ export default function Cart() {
     decreaseQuantity,
     updateStockStatus,
     refreshStockStatus,
-    refreshSaleGroups, // ⬅️ from context
+    refreshSaleGroups, // from context
   } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -136,8 +137,7 @@ export default function Cart() {
 
   const hasOutOfStock = cartItems.some((item) => item.inStock === false);
 
-  // ---------- totals: item-sale first, then group allocation ----------
-  // IMPORTANT: if item participates in a sale group, DO NOT apply per-item sale here.
+  /* ---------- totals: item-sale first, then group allocation ---------- */
   const preGroupTotal = cartItems
     .filter((item) => item.inStock !== false)
     .map((item) => {
@@ -163,20 +163,19 @@ export default function Cart() {
   const { perItem: perItemGroupDiscount, total: groupDiscountTotal } =
     allocateGroupDiscounts(pricingItems);
 
-  // 🔧 Delivery config from env (client-safe)
+  // Delivery config
   const DELIVERY_THRESHOLD = Number(
     process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
   );
   const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
 
-  // NEW: subtotal, delivery, grand total (client display; server is authoritative)
   const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
   const deliveryFee =
     subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
   const grandTotal = subtotal + deliveryFee;
   const remainingForFree = Math.max(0, DELIVERY_THRESHOLD - subtotal);
 
-  // ---------- background fetches on open/focus ----------
+  /* ---------- background fetches on open/focus ---------- */
   useEffect(() => {
     async function run(ids: number[]) {
       if (!ids.length) return;
@@ -230,7 +229,7 @@ export default function Cart() {
     }));
   }
 
-  // === Entry point now always leads to a confirm step ===
+  // Entry point -> confirm step
   const initiatePayment = () => {
     if (cartItems.length === 0) return;
 
@@ -439,7 +438,7 @@ export default function Cart() {
         onPhoneSave={savePhoneNumber}
         confirmPhoneModal={confirmPhoneModal}
         pendingPhone={pendingPhone || ""}
-        onPendingPhoneChange={updatePendingPhone}
+        onPendingPhoneChange={setPendingPhone}
         onConfirmPhoneClose={() => setConfirmPhoneModal(false)}
         onConfirmPhoneSend={confirmPhoneAndSend}
         showWhatsappConfirm={showWhatsappConfirm}

@@ -1,3 +1,4 @@
+// app/(cms)/orders/[id]/page.tsx  (ViewOrder)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -20,7 +21,11 @@ type Order = {
   isReady: boolean;
   isTest?: boolean;
   isNotified?: boolean;
+  // ⬇️ include snapshot fields from DB
+  preGroupTotal?: number | null;
+  groupDiscountTotal?: number | null;
   deliveryFee?: number | null;
+  total?: number | null;
   paymentMethod?: PaymentMethod | null;
 };
 
@@ -34,20 +39,37 @@ type Item = {
   salePrice: number | null;
   storageName: string | null;
   storageSort: number | null;
+  inStock?: boolean | null; // from API is nullable
 };
 
 type ExtendedItem = Item & { inStock: boolean };
 
-// presence-check helper (key presence, not truthiness)
+// presence-check helper
 const has = (obj: any, key: string) =>
   obj != null && Object.prototype.hasOwnProperty.call(obj, key);
 
-// ✅ normalize unknown/legacy values to the empty option
+// normalize payment method to a valid select value
 const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
   v === "credit" || v === "paybox" || v === "cash" ? v : "";
 
+// fallback pre-group calculator (ONLY used if snapshot is missing)
+function calcPreGroupFromItems(items: ExtendedItem[]) {
+  let pre = 0;
+  for (const it of items) {
+    // item-level sale (no group info here; snapshot should normally exist)
+    let line = it.unitPrice * it.quantity;
+    if (it.saleQuantity && it.salePrice && it.quantity >= it.saleQuantity) {
+      const bundles = Math.floor(it.quantity / it.saleQuantity);
+      const rest = it.quantity % it.saleQuantity;
+      line = bundles * it.salePrice + rest * it.unitPrice;
+    }
+    if (it.inStock !== false) pre += line;
+  }
+  return pre;
+}
+
 export default function ViewOrder() {
-  const id = useParams()?.id as string | undefined;
+  const { id } = useParams<{ id: string }>();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<ExtendedItem[]>([]);
@@ -58,7 +80,7 @@ export default function ViewOrder() {
   const [newAddr, setNewAddr] = useState("");
 
   const [clicks, setClicks] = useState(0);
-  const clickTimer = useRef<NodeJS.Timeout | null>(null);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
@@ -100,7 +122,7 @@ export default function ViewOrder() {
           items: Item[];
         };
 
-        const enriched = (raw || []).map((it: any) => ({
+        const enriched = (raw || []).map((it) => ({
           ...it,
           unitPrice: +it.unitPrice,
           salePrice: it.salePrice !== null ? +it.salePrice : null,
@@ -109,10 +131,14 @@ export default function ViewOrder() {
           storageSort: it.storageSort ?? null,
         }));
 
-        // ✅ ensure paymentMethod is a valid select value
         setOrder({
           ...o,
           paymentMethod: sanitizePaymentMethod((o as any).paymentMethod),
+          preGroupTotal: o.preGroupTotal != null ? +o.preGroupTotal : null,
+          groupDiscountTotal:
+            o.groupDiscountTotal != null ? +o.groupDiscountTotal : 0,
+          deliveryFee: o.deliveryFee != null ? +o.deliveryFee : null,
+          total: o.total != null ? +o.total : null,
         });
         setItems(enriched);
       } catch {
@@ -123,9 +149,8 @@ export default function ViewOrder() {
     })();
   }, [id]);
 
-  const handleNotifyAndWhatsApp = async (): Promise<void> => {
+  const handleNotifyAndWhatsApp = async () => {
     if (!order) return;
-
     const phone = order.clientPhone
       ?.replace(/[^0-9]/g, "")
       .replace(/^0/, "972");
@@ -153,16 +178,15 @@ export default function ViewOrder() {
         order.orderId
       } אצל המפנק. תוכל לצפות בפרטי ההזמנה כאן:\n${orderUrl}\n\nנעדכן אותך כשהיא מוכנה`;
 
-      const whatsappLink = `https://wa.me/${phone}?text=${encodeURIComponent(
+      window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(
         msg
       )}`;
-      window.location.href = whatsappLink;
     } catch {
       showToast("❌ שגיאה בעדכון סטטוס וואטסאפ", "error");
     }
   };
 
-  // NEW: set payment method (replaces togglePaid)
+  // Payment method change (server decides isPaid)
   const setPaymentMethod = async (method: PaymentMethod | null) => {
     if (!order) return;
     try {
@@ -228,84 +252,23 @@ export default function ViewOrder() {
     });
   };
 
-  // Subtotal from items (after item-level sale, only in-stock)
-  const calcSubtotal = () => {
-    let subtotal = 0;
-    for (const it of items) {
-      let line = it.unitPrice * it.quantity;
-      if (it.saleQuantity && it.salePrice && it.quantity >= it.saleQuantity) {
-        const bundles = Math.floor(it.quantity / it.saleQuantity);
-        const rest = it.quantity % it.saleQuantity;
-        line = bundles * it.salePrice + rest * it.unitPrice;
-      }
-      if (it.inStock) subtotal += line;
-    }
-    return subtotal;
-  };
-
-  const handleDelete = async () => {
-    if (!order) return;
-    if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
-    try {
-      const r = await fetch(`/api/orders/${order.orderId}`, {
-        method: "DELETE",
-      });
-      if (!r.ok) throw new Error();
-      showToast("🗑️ הזמנה נמחקה", "success");
-      window.location.href = "/orders";
-    } catch {
-      showToast("❌ שגיאה במחיקה", "error");
-    }
-  };
-
-  // ✅ respects explicit null from API (so clearing "" shows immediately)
-  const handleUpdateClient = async () => {
-    if (!order) return;
-    const payload = { name: newName.trim(), address: newAddr.trim() };
-    try {
-      const r = await fetch(`/api/orders/${order.orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data?.error || "Failed");
-
-      setOrder((o) =>
-        o
-          ? {
-              ...o,
-              clientName: has(data, "name") ? data.name : o.clientName,
-              clientAddress: has(data, "address")
-                ? data.address
-                : o.clientAddress,
-              clientPhone: has(data, "phone") ? data.phone : o.clientPhone,
-              isPaid: has(data, "isPaid") ? data.isPaid : o.isPaid,
-              isReady: has(data, "isReady") ? data.isReady : o.isReady,
-              paymentMethod: has(data, "paymentMethod")
-                ? sanitizePaymentMethod((data as any).paymentMethod)
-                : o.paymentMethod,
-            }
-          : o
-      );
-
-      showToast("📝 עודכן בהצלחה", "success");
-      setEditOpen(false);
-    } catch {
-      showToast("❌ שגיאה בעדכון פרטי לקוח", "error");
-    }
-  };
-
   if (loading) return <p className="p-6">טוען…</p>;
   if (!order) return <p className="p-6">הזמנה לא נמצאה.</p>;
 
-  // --- Delivery fee breakdown (env-based) ---
+  // ---- Totals: prefer DB snapshots; fall back safely ----
   const DELIVERY_THRESHOLD = Number(
     process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
   );
   const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
 
-  const subtotal = calcSubtotal();
+  const preGroup =
+    order.preGroupTotal != null
+      ? Number(order.preGroupTotal)
+      : calcPreGroupFromItems(items);
+  const groupDisc =
+    order.groupDiscountTotal != null ? Number(order.groupDiscountTotal) : 0;
+  const subtotal = Math.max(0, preGroup - groupDisc);
+
   const deliveryFee =
     order.deliveryFee != null
       ? Number(order.deliveryFee)
@@ -313,7 +276,8 @@ export default function ViewOrder() {
       ? DELIVERY_FEE
       : 0;
 
-  const grandTotal = subtotal + deliveryFee;
+  const grandTotal =
+    order.total != null ? Number(order.total) : subtotal + deliveryFee;
 
   return (
     <main dir="rtl" className="px-4 sm:px-6 md:px-10 max-w-5xl mx-auto">
@@ -327,7 +291,20 @@ export default function ViewOrder() {
         <ClientControlPanel
           order={order}
           finalTotal={grandTotal}
-          onDelete={handleDelete}
+          onDelete={async () => {
+            if (!order) return;
+            if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
+            try {
+              const r = await fetch(`/api/orders/${order.orderId}`, {
+                method: "DELETE",
+              });
+              if (!r.ok) throw new Error();
+              showToast("🗑️ הזמנה נמחקה", "success");
+              window.location.href = "/orders";
+            } catch {
+              showToast("❌ שגיאה במחיקה", "error");
+            }
+          }}
           onMarkTest={markAsTest}
           onEdit={() => {
             setNewName(order.clientName ?? "");
@@ -348,7 +325,7 @@ export default function ViewOrder() {
           onToggleInStock={toggleStock}
         />
 
-        {/* Totals box incl. delivery fee */}
+        {/* Totals box (snapshot-first) */}
         <div className="text-right rtl border rounded p-4 bg-gray-50">
           <p>ביניים: ₪{subtotal.toFixed(2)}</p>
           <p>
@@ -403,7 +380,55 @@ export default function ViewOrder() {
                 ביטול
               </button>
               <button
-                onClick={handleUpdateClient}
+                onClick={async () => {
+                  if (!order) return;
+                  const payload = {
+                    name: newName.trim(),
+                    address: newAddr.trim(),
+                  };
+                  try {
+                    const r = await fetch(`/api/orders/${order.orderId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+                    const data = await r.json().catch(() => ({}));
+                    if (!r.ok) throw new Error(data?.error || "Failed");
+
+                    setOrder((o) =>
+                      o
+                        ? {
+                            ...o,
+                            clientName: has(data, "name")
+                              ? data.name
+                              : o.clientName,
+                            clientAddress: has(data, "address")
+                              ? data.address
+                              : o.clientAddress,
+                            clientPhone: has(data, "phone")
+                              ? data.phone
+                              : o.clientPhone,
+                            isPaid: has(data, "isPaid")
+                              ? data.isPaid
+                              : o.isPaid,
+                            isReady: has(data, "isReady")
+                              ? data.isReady
+                              : o.isReady,
+                            paymentMethod: has(data, "paymentMethod")
+                              ? sanitizePaymentMethod(
+                                  (data as any).paymentMethod
+                                )
+                              : o.paymentMethod,
+                          }
+                        : o
+                    );
+
+                    showToast("📝 עודכן בהצלחה", "success");
+                    setEditOpen(false);
+                  } catch {
+                    showToast("❌ שגיאה בעדכון פרטי לקוח", "error");
+                  }
+                }}
                 className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white"
               >
                 שמור

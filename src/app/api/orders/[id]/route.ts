@@ -18,7 +18,7 @@ type OrderRow = {
   groupDiscountTotal: number;
   deliveryFee: number | null;
   total: number | null;
-  paymentMethod: "" | "credit" | "paybox" | "cash" | null; // ★ NEW
+  paymentMethod: "" | "credit" | "paybox" | "cash" | null;
 };
 
 type OrderItemRow = {
@@ -46,10 +46,9 @@ type OrderItemRow = {
 /* -------------------- GET /api/orders/:id -------------------- */
 async function getOrder(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  const orderId = Number(id);
+  const orderId = Number(params.id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
@@ -67,7 +66,7 @@ async function getOrder(
          o.is_ready AS "isReady",
          o.is_test AS "isTest",
          o.is_notified AS "isNotified",
-         o.payment_method AS "paymentMethod",         -- ★ NEW
+         o.payment_method AS "paymentMethod",
          o.pre_group_total      AS "preGroupTotal",
          o.group_discount_total AS "groupDiscountTotal",
          o.delivery_fee         AS "deliveryFee",
@@ -125,14 +124,6 @@ async function getOrder(
 }
 
 /* -------------------- PATCH /api/orders/:id -------------------- */
-/**
- * Supports ONLY:
- *  - { isTest: boolean }
- *  - { name?: string | null, address?: string | null }
- * For payment/status use:
- *  - PATCH /api/orders/:id/payment
- *  - PATCH /api/orders/:id/status
- */
 function normalizeToNullOrString(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
   if (v === null) return null;
@@ -145,10 +136,9 @@ function normalizeToNullOrString(v: unknown): string | null | undefined {
 
 async function updateOrder(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  const orderId = Number(id);
+  const orderId = Number(params.id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
@@ -261,10 +251,9 @@ async function updateOrder(
 /* -------------------- DELETE /api/orders/:id -------------------- */
 async function deleteOrder(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  const orderId = Number(id);
+  const orderId = Number(params.id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }

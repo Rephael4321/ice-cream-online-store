@@ -9,19 +9,29 @@ const DELIVERY_THRESHOLD = Number(
 );
 const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
 
-/* ---------- Helpers: pricing math (server-authoritative) ---------- */
+/* ---------- Helpers: pricing math (SERVER AUTHORITATIVE) ---------- */
+/** Skip per-item sale when the item participates in a sale group. */
 function computePreGroupTotal(
   items: {
     quantity: number;
     productPrice: number;
     sale?: { amount: number; price: number } | null;
+    saleGroup?: {
+      id: number;
+      quantity: number;
+      salePrice: number;
+      unitPrice: number | null;
+    } | null;
     inStock?: boolean;
   }[]
 ) {
   return items
     .filter((i) => i.inStock !== false)
     .map((i) => {
-      if (!i.sale) return i.productPrice * i.quantity;
+      const inGroup = !!i.saleGroup?.id;
+      if (!i.sale || inGroup) {
+        return i.productPrice * i.quantity;
+      }
       const bundles = Math.floor(i.quantity / i.sale.amount);
       const remainder = i.quantity % i.sale.amount;
       return bundles * i.sale.price + remainder * i.productPrice;
@@ -29,6 +39,7 @@ function computePreGroupTotal(
     .reduce((a, b) => a + b, 0);
 }
 
+/** Allocate group discount across members proportionally; reconcile rounding on the last item. */
 function allocateGroupDiscounts(
   items: {
     id: number;
@@ -72,10 +83,10 @@ function allocateGroupDiscounts(
   }
 
   for (const [, grp] of groups) {
-    const totalQty = grp.members.reduce(
-      (a, b) => a + (b.inStock === false ? 0 : b.quantity),
-      0
+    const members = grp.members.filter(
+      (m) => m.inStock !== false && m.quantity > 0
     );
+    const totalQty = members.reduce((a, b) => a + b.quantity, 0);
     const bundles = Math.floor(totalQty / grp.bundleQty);
     if (bundles <= 0) continue;
 
@@ -86,13 +97,17 @@ function allocateGroupDiscounts(
 
     total += discount;
 
-    const sumQ =
-      grp.members.reduce(
-        (a, b) => a + (b.inStock === false ? 0 : b.quantity),
-        0
-      ) || 1;
-    for (const m of grp.members) {
-      const part = ((m.inStock === false ? 0 : m.quantity) / sumQ) * discount;
+    // proportional split; last item gets the remainder after rounding to 2dp
+    const sumQ = totalQty || 1;
+    let allocated = 0;
+    for (let i = 0; i < members.length; i++) {
+      const isLast = i === members.length - 1;
+      const m = members[i];
+      const raw = (m.quantity / sumQ) * discount;
+      const part = isLast
+        ? Math.max(0, discount - allocated)
+        : Math.round(raw * 100) / 100;
+      allocated = Math.round((allocated + part) * 100) / 100;
       perItem.set(m.id, (perItem.get(m.id) || 0) + part);
     }
   }
@@ -228,7 +243,7 @@ async function createOrder(req: NextRequest) {
         };
       });
 
-    // totals
+    // totals (server-authoritative)
     const preGroupTotal = computePreGroupTotal(pricingItems);
     const { perItem, total: groupDiscountTotal } = allocateGroupDiscounts(
       pricingItems.map((p) => ({
@@ -240,7 +255,7 @@ async function createOrder(req: NextRequest) {
       }))
     );
 
-    const subtotal = preGroupTotal - groupDiscountTotal;
+    const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
     const deliveryFee =
       subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
     const total = subtotal + deliveryFee;
@@ -262,7 +277,7 @@ async function createOrder(req: NextRequest) {
     );
     const orderId = orderResult.rows[0].id;
 
-    // insert items
+    // insert items (including per-item group_discount allocation)
     let missingCount = 0;
     for (const raw of items) {
       if (!validIds.has(raw.productId)) {
@@ -322,7 +337,7 @@ async function createOrder(req: NextRequest) {
   }
 }
 
-/* ---------- GET /api/orders: list with snapshot totals (NOW RETURNS paymentMethod) ---------- */
+/* ---------- GET /api/orders: list with snapshot totals ---------- */
 async function listOrders(req: NextRequest) {
   try {
     const from = req.nextUrl.searchParams.get("from");
@@ -346,7 +361,7 @@ async function listOrders(req: NextRequest) {
         o.is_ready AS "isReady",
         o.is_test AS "isTest",
         o.is_notified AS "isNotified",
-        o.payment_method AS "paymentMethod",         -- ★ NEW
+        o.payment_method AS "paymentMethod",
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount",

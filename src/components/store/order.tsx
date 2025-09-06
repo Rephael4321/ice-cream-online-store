@@ -1,3 +1,4 @@
+// app/order/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,7 +15,7 @@ type OrderHeader = {
   isReady: boolean;
   preGroupTotal?: number | null;
   groupDiscountTotal?: number | null;
-  deliveryFee?: number | null; // ⬅️ snapshot from server if present
+  deliveryFee?: number | null;
   total?: number | null;
 };
 
@@ -27,14 +28,12 @@ type OrderItemRow = {
   sale_price: number | null;
   in_stock?: boolean;
 
-  // group snapshot (might be null for legacy or non-group items)
   group_id?: number | null;
   group_bundle_qty?: number | null;
   group_sale_price?: number | null;
   group_unit_price?: number | null;
   group_discount?: number | null;
 
-  // server-computed
   total?: number;
 };
 
@@ -46,11 +45,9 @@ export default function Order() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const url = `/api/orders/client/${id}`;
 
-    fetch(`/api/orders/client/${id}`, {
-      credentials: "include",
-      signal: controller.signal,
-    })
+    fetch(url, { credentials: "include", signal: controller.signal })
       .then((res) => {
         if (res.status === 307 || res.redirected) {
           window.location.href = res.url;
@@ -60,8 +57,9 @@ export default function Order() {
       })
       .then((data) => {
         if (!data) return;
-        if (data.error) setError(data.error);
-        else {
+        if (data.error) {
+          setError(data.error);
+        } else {
           setOrder(data.order);
           setItems(data.items || []);
         }
@@ -85,9 +83,10 @@ export default function Order() {
     return <div className="p-4 text-right rtl">📦 טוען את פרטי ההזמנה...</div>;
   }
 
-  // Build view-model from snapshot
+  // ---------- CALCULATION (no debug prints) ----------
   let totalBeforeDiscount = 0;
-  let finalTotalFromItems = 0;
+  let sumAfterItemSale = 0;
+  let sumGroupDiscount = 0;
 
   const processed = items.map((raw) => {
     const qty = Number(raw.quantity || 0);
@@ -98,22 +97,30 @@ export default function Order() {
     const inGroup = raw.group_id != null;
     const perItemGroupDiscount = Number(raw.group_discount || 0);
 
-    // Base (no discounts)
     const base = qty * unitPrice;
-    totalBeforeDiscount += base;
 
-    // Per-item sale applies ONLY if not in a sale group (matches cart rule)
+    // Per-item sale ONLY if NOT in a sale group
+    let usedItemSale = false;
     let afterItemSale = base;
-    if (!inGroup && saleQty && salePrice != null && qty >= saleQty) {
+    if (
+      !inGroup &&
+      saleQty != null &&
+      saleQty > 0 &&
+      salePrice != null &&
+      salePrice >= 0 &&
+      qty >= saleQty
+    ) {
       const bundles = Math.floor(qty / saleQty);
       const rest = qty % saleQty;
       afterItemSale = bundles * salePrice + rest * unitPrice;
+      usedItemSale = true;
     }
 
-    // Apply recorded per-item group discount snapshot
-    const payable = Math.max(0, afterItemSale - perItemGroupDiscount);
-    finalTotalFromItems += payable;
+    totalBeforeDiscount += base;
+    sumAfterItemSale += afterItemSale;
+    sumGroupDiscount += Math.max(0, perItemGroupDiscount);
 
+    const payable = Math.max(0, afterItemSale - perItemGroupDiscount);
     const saved =
       Math.max(0, base - afterItemSale) + Math.max(0, perItemGroupDiscount);
 
@@ -128,41 +135,61 @@ export default function Order() {
       payable,
       saved,
       inGroup,
+      usedItemSale,
     };
   });
 
-  // Prefer server snapshot totals; fallback to derived totals
-  const preGroupTotal =
-    order.preGroupTotal != null
-      ? Number(order.preGroupTotal)
-      : finalTotalFromItems + 0;
+  // Snapshots vs fallbacks
+  let preGroupTotal: number;
+  let preGroupDecision: string;
+  if (order.preGroupTotal != null) {
+    preGroupTotal = Number(order.preGroupTotal);
+    preGroupDecision = "used order.preGroupTotal snapshot";
+  } else {
+    preGroupTotal = sumAfterItemSale;
+    preGroupDecision = "fallback: sumAfterItemSale";
+  }
 
-  const groupDiscountTotal =
-    order.groupDiscountTotal != null
-      ? Number(order.groupDiscountTotal)
-      : Math.max(
-          0,
-          processed.reduce((s, it) => s + (it.perItemGroupDiscount || 0), 0)
-        );
+  let groupDiscountTotal: number;
+  let groupDiscountDecision: string;
+  if (order.groupDiscountTotal != null) {
+    groupDiscountTotal = Number(order.groupDiscountTotal);
+    groupDiscountDecision = "used order.groupDiscountTotal snapshot";
+  } else {
+    groupDiscountTotal = Math.max(0, sumGroupDiscount);
+    groupDiscountDecision = "fallback: sumGroupDiscount";
+  }
 
-  // Subtotal after discounts (no delivery)
   const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
 
-  // 🔧 Delivery config from env (fallbacks keep UI resilient)
+  // Delivery fee
   const DELIVERY_THRESHOLD = Number(
     process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
   );
   const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
-
-  // Delivery fee: use snapshot if present, else derive by the rule for legacy orders
   const derivedDelivery =
     subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
-  const deliveryFee =
-    order.deliveryFee != null ? Number(order.deliveryFee) : derivedDelivery;
 
-  // Final total (prefer stored; otherwise subtotal + delivery)
-  const finalTotal =
-    order.total != null ? Number(order.total) : subtotal + deliveryFee;
+  let deliveryFee: number;
+  let deliveryDecision: string;
+  if (order.deliveryFee != null) {
+    deliveryFee = Number(order.deliveryFee);
+    deliveryDecision = "used order.deliveryFee snapshot";
+  } else {
+    deliveryFee = derivedDelivery;
+    deliveryDecision = `fallback: by rule (threshold=${DELIVERY_THRESHOLD}, fee=${DELIVERY_FEE})`;
+  }
+
+  // Final total
+  let finalTotal: number;
+  let finalDecision: string;
+  if (order.total != null) {
+    finalTotal = Number(order.total);
+    finalDecision = "used order.total snapshot";
+  } else {
+    finalTotal = subtotal + deliveryFee;
+    finalDecision = "fallback: subtotal + deliveryFee";
+  }
 
   const totalSavings = Math.max(0, totalBeforeDiscount - finalTotal);
 
@@ -205,7 +232,6 @@ export default function Order() {
               <p>כמות: {item.quantity}</p>
               <p>מחיר רגיל: ₪{item.unitPrice.toFixed(2)}</p>
 
-              {/* Per-item sale (only if not a group item) */}
               {!item.inGroup &&
                 item.saleQty &&
                 item.salePrice != null &&
@@ -215,7 +241,6 @@ export default function Order() {
                   </p>
                 )}
 
-              {/* Group discount snapshot (allocated part for this item) */}
               {item.inGroup && item.perItemGroupDiscount > 0 && (
                 <p className="text-green-700">
                   הנחת קבוצה: −₪{item.perItemGroupDiscount.toFixed(2)}
@@ -240,7 +265,6 @@ export default function Order() {
           </p>
         )}
 
-        {/* Breakdown */}
         <p>ביניים: ₪{subtotal.toFixed(2)}</p>
         <p>
           דמי משלוח:{" "}
@@ -252,7 +276,6 @@ export default function Order() {
           💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}
         </p>
 
-        {/* Optional: show snapshot internals if present */}
         {order.preGroupTotal != null && (
           <p className="text-sm text-gray-500">
             (לפני הנחת קבוצה: ₪{Number(order.preGroupTotal).toFixed(2)} · הנחת

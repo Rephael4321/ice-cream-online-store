@@ -148,9 +148,7 @@ export default function OrderItemList({
   return (
     <div className={`border rounded shadow p-4 ${testStyle || completedStyle}`}>
       <h2 className="text-lg font-bold mb-4">פרטי מוצרים</h2>
-
       {content}
-
       <div className="text-right mt-6 space-y-2 border-t pt-4">
         <p>סה״כ לפני הנחה: ₪{before.toFixed(2)}</p>
         <p>סה״כ הנחה: ₪{discount.toFixed(2)}</p>
