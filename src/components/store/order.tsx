@@ -1,4 +1,3 @@
-// app/order/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -83,7 +82,7 @@ export default function Order() {
     return <div className="p-4 text-right rtl">📦 טוען את פרטי ההזמנה...</div>;
   }
 
-  // ---------- CALCULATION (no debug prints) ----------
+  // ---------- CALCULATION ----------
   let totalBeforeDiscount = 0;
   let sumAfterItemSale = 0;
   let sumGroupDiscount = 0;
@@ -99,7 +98,6 @@ export default function Order() {
 
     const base = qty * unitPrice;
 
-    // Per-item sale ONLY if NOT in a sale group
     let usedItemSale = false;
     let afterItemSale = base;
     if (
@@ -139,30 +137,18 @@ export default function Order() {
     };
   });
 
-  // Snapshots vs fallbacks
-  let preGroupTotal: number;
-  let preGroupDecision: string;
-  if (order.preGroupTotal != null) {
-    preGroupTotal = Number(order.preGroupTotal);
-    preGroupDecision = "used order.preGroupTotal snapshot";
-  } else {
-    preGroupTotal = sumAfterItemSale;
-    preGroupDecision = "fallback: sumAfterItemSale";
-  }
+  const preGroupTotal =
+    order.preGroupTotal != null
+      ? Number(order.preGroupTotal)
+      : sumAfterItemSale;
 
-  let groupDiscountTotal: number;
-  let groupDiscountDecision: string;
-  if (order.groupDiscountTotal != null) {
-    groupDiscountTotal = Number(order.groupDiscountTotal);
-    groupDiscountDecision = "used order.groupDiscountTotal snapshot";
-  } else {
-    groupDiscountTotal = Math.max(0, sumGroupDiscount);
-    groupDiscountDecision = "fallback: sumGroupDiscount";
-  }
+  const groupDiscountTotal =
+    order.groupDiscountTotal != null
+      ? Number(order.groupDiscountTotal)
+      : Math.max(0, sumGroupDiscount);
 
   const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
 
-  // Delivery fee
   const DELIVERY_THRESHOLD = Number(
     process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90
   );
@@ -170,28 +156,13 @@ export default function Order() {
   const derivedDelivery =
     subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
 
-  let deliveryFee: number;
-  let deliveryDecision: string;
-  if (order.deliveryFee != null) {
-    deliveryFee = Number(order.deliveryFee);
-    deliveryDecision = "used order.deliveryFee snapshot";
-  } else {
-    deliveryFee = derivedDelivery;
-    deliveryDecision = `fallback: by rule (threshold=${DELIVERY_THRESHOLD}, fee=${DELIVERY_FEE})`;
-  }
+  const deliveryFee =
+    order.deliveryFee != null ? Number(order.deliveryFee) : derivedDelivery;
 
-  // Final total
-  let finalTotal: number;
-  let finalDecision: string;
-  if (order.total != null) {
-    finalTotal = Number(order.total);
-    finalDecision = "used order.total snapshot";
-  } else {
-    finalTotal = subtotal + deliveryFee;
-    finalDecision = "fallback: subtotal + deliveryFee";
-  }
+  const finalTotal =
+    order.total != null ? Number(order.total) : subtotal + deliveryFee;
 
-  const totalSavings = Math.max(0, totalBeforeDiscount - finalTotal);
+  const totalSavings = Math.max(0, totalBeforeDiscount - subtotal);
 
   return (
     <div className="max-w-2xl mx-auto p-6 text-right rtl">
@@ -241,17 +212,12 @@ export default function Order() {
                   </p>
                 )}
 
-              {item.inGroup && item.perItemGroupDiscount > 0 && (
-                <p className="text-green-700">
-                  הנחת קבוצה: −₪{item.perItemGroupDiscount.toFixed(2)}
-                </p>
-              )}
-
               <p>סה״כ למוצר: ₪{item.payable.toFixed(2)}</p>
+
               <p className="text-green-700">
                 {item.saved > 0
-                  ? `✔️ חסכת: ₪${item.saved.toFixed(2)}`
-                  : "✔️ במחיר מלא"}
+                  ? `₪${item.saved.toFixed(2)} חסכת`
+                  : "במחיר מלא"}
               </p>
             </div>
           </li>
@@ -259,30 +225,24 @@ export default function Order() {
       </ul>
 
       <div className="mt-6 text-right rtl space-y-1">
-        {totalSavings > 0 && (
-          <p className="text-green-700 font-medium">
-            🎁 חסכת: ₪{totalSavings.toFixed(2)}
-          </p>
-        )}
-
         <p>ביניים: ₪{subtotal.toFixed(2)}</p>
+
         <p>
           דמי משלוח:{" "}
           {deliveryFee > 0
             ? `₪${deliveryFee.toFixed(2)}`
             : `₪0 (מעל ${DELIVERY_THRESHOLD}₪)`}
         </p>
+
+        {totalSavings > 0 && (
+          <p className="text-green-700 font-medium">
+            🎁 סה״כ חסכת: ₪{totalSavings.toFixed(2)}
+          </p>
+        )}
+
         <p className="text-xl font-bold">
           💵 סה״כ לתשלום: ₪{finalTotal.toFixed(2)}
         </p>
-
-        {order.preGroupTotal != null && (
-          <p className="text-sm text-gray-500">
-            (לפני הנחת קבוצה: ₪{Number(order.preGroupTotal).toFixed(2)} · הנחת
-            קבוצה מצטברת: −₪
-            {Number(order.groupDiscountTotal || 0).toFixed(2)})
-          </p>
-        )}
       </div>
     </div>
   );

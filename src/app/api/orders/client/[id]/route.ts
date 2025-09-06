@@ -21,7 +21,7 @@ async function handler(
       c.phone AS "clientPhone",
       o.pre_group_total AS "preGroupTotal",
       o.group_discount_total AS "groupDiscountTotal",
-      o.delivery_fee AS "deliveryFee",           -- ⬅️ NEW
+      o.delivery_fee AS "deliveryFee",
       o.total AS "total"
     FROM orders o
     JOIN clients c ON o.client_id = c.id
@@ -72,7 +72,7 @@ async function handler(
     const base = unitPrice * quantity;
 
     let afterItemSale = base;
-    // IMPORTANT: do not apply per-item sale if item is part of a sale group
+    // Do NOT apply per-item sale if item is part of a sale group
     if (
       !inGroup &&
       saleQuantity &&
@@ -121,7 +121,7 @@ async function handler(
         order.preGroupTotal != null ? Number(order.preGroupTotal) : null,
       groupDiscountTotal:
         order.groupDiscountTotal != null ? Number(order.groupDiscountTotal) : 0,
-      deliveryFee: order.deliveryFee != null ? Number(order.deliveryFee) : null, // ⬅️ normalize
+      deliveryFee: order.deliveryFee != null ? Number(order.deliveryFee) : null,
       total: finalTotal,
     },
     items,
