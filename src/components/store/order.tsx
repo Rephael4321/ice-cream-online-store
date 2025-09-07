@@ -1,3 +1,4 @@
+// app/order/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -182,17 +183,17 @@ export default function Order() {
             key={i}
             className="border rounded p-4 shadow-sm flex items-center gap-4"
           >
-            <div className="min-w-[64px]">
+            <div className="w-[60px] h-[60px] relative shrink-0">
               {item.product_image ? (
                 <Image
                   src={item.product_image}
                   alt={item.product_name}
-                  width={64}
-                  height={64}
-                  className="rounded object-cover"
+                  fill
+                  className="object-contain rounded border"
+                  unoptimized
                 />
               ) : (
-                <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-sm">
+                <div className="absolute inset-0 grid place-items-center rounded border bg-gray-100 text-gray-500 text-[10px]">
                   אין תמונה
                 </div>
               )}
