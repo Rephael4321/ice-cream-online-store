@@ -48,6 +48,6 @@ async function updateDelivery(
   }
 }
 
-export const PATCH = withMiddleware(updateDelivery);
+export const PATCH = withMiddleware(updateDelivery, { allowed: ["driver"] });
 
 
