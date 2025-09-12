@@ -295,7 +295,32 @@ export default function ViewOrder() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, inStock: just.inStock }),
-      }).catch(() => showToast("❌ שגיאה בעדכון מלאי לפריט", "error"));
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          setOrder((o) =>
+            o
+              ? {
+                  ...o,
+                  preGroupTotal:
+                    data?.preGroupTotal != null
+                      ? Number(data.preGroupTotal)
+                      : (o.preGroupTotal ?? null),
+                  groupDiscountTotal:
+                    data?.groupDiscountTotal != null
+                      ? Number(data.groupDiscountTotal)
+                      : (o.groupDiscountTotal ?? 0),
+                  deliveryFee:
+                    data?.deliveryFee != null
+                      ? Number(data.deliveryFee)
+                      : (o.deliveryFee ?? null),
+                  total:
+                    data?.total != null ? Number(data.total) : (o.total ?? null),
+                }
+              : o
+          );
+        })
+        .catch(() => showToast("❌ שגיאה בעדכון מלאי לפריט", "error"));
       return next;
     });
   };

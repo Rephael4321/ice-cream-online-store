@@ -181,7 +181,9 @@ export default function Order() {
         {processed.map((item, i) => (
           <li
             key={i}
-            className="border rounded p-4 shadow-sm flex items-center gap-4"
+            className={`border rounded p-4 shadow-sm flex items-center gap-4 ${
+              item.in_stock === false ? "bg-red-50 border-red-300" : ""
+            }`}
           >
             <div className="w-[60px] h-[60px] relative shrink-0">
               {item.product_image ? (
@@ -200,7 +202,14 @@ export default function Order() {
             </div>
 
             <div className="flex-1 space-y-1 text-right rtl">
-              <p className="font-semibold">{item.product_name}</p>
+              <p className="font-semibold flex items-center gap-2 justify-end">
+                {item.product_name}
+                {item.in_stock === false && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-red-600 text-white">
+                    לא במלאי
+                  </span>
+                )}
+              </p>
               <p>כמות: {item.quantity}</p>
               <p>מחיר רגיל: ₪{item.unitPrice.toFixed(2)}</p>
 
@@ -213,7 +222,12 @@ export default function Order() {
                   </p>
                 )}
 
-              <p>סה״כ למוצר: ₪{item.payable.toFixed(2)}</p>
+              <p>
+                סה״כ למוצר: ₪{item.payable.toFixed(2)}
+                {item.in_stock === false && (
+                  <span className="ml-2 text-xs text-red-700">לא יחויב</span>
+                )}
+              </p>
 
               <p className="text-green-700">
                 {item.saved > 0

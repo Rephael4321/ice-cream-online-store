@@ -36,30 +36,129 @@ async function updateProductStock(
     inStock: boolean;
   };
 
-  // ✅ Ensure product belongs to this order
-  const { rowCount } = await pool.query(
-    `SELECT 1 FROM order_items WHERE order_id = $1 AND product_id = $2`,
-    [orderId, productId]
-  );
-  if (rowCount === 0)
-    return NextResponse.json(
-      { error: "Product not part of order" },
-      { status: 404 }
+  // ── Compute-and-persist totals within a transaction
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Ensure product belongs to this order
+    const { rowCount } = await client.query(
+      `SELECT 1 FROM order_items WHERE order_id = $1 AND product_id = $2`,
+      [orderId, productId]
+    );
+    if (rowCount === 0) {
+      await client.query('ROLLBACK');
+      return NextResponse.json(
+        { error: "Product not part of order" },
+        { status: 404 }
+      );
+    }
+
+    // Update global product stock (preserve current behavior)
+    await client.query(`UPDATE products SET in_stock = $1 WHERE id = $2`, [
+      inStock,
+      productId,
+    ]);
+
+    // Update only this order's item stock
+    await client.query(
+      `UPDATE order_items SET in_stock = $1 WHERE order_id = $2 AND product_id = $3`,
+      [inStock, orderId, productId]
     );
 
-  // ✅ Update global product stock
-  await pool.query(`UPDATE products SET in_stock = $1 WHERE id = $2`, [
-    inStock,
-    productId,
-  ]);
+    // Load snapshot rows for this order
+    const { rows: items } = await client.query(
+      `SELECT
+         quantity,
+         unit_price     AS "unitPrice",
+         sale_quantity  AS "saleQuantity",
+         sale_price     AS "salePrice",
+         in_stock       AS "inStock",
+         group_id       AS "groupId",
+         group_bundle_qty   AS "groupBundleQty",
+         group_sale_price   AS "groupSalePrice",
+         group_unit_price   AS "groupUnitPrice"
+       FROM order_items
+       WHERE order_id = $1`,
+      [orderId]
+    );
 
-  // ✅ Update only this order's item stock
-  await pool.query(
-    `UPDATE order_items SET in_stock = $1 WHERE order_id = $2 AND product_id = $3`,
-    [inStock, orderId, productId]
-  );
+    // Pricing math from snapshots, considering only in-stock items
+    const inStockItems = items.filter((it: any) => it.inStock !== false);
 
-  return NextResponse.json({ success: true });
+    // pre_group_total (apply per-item sale only when not in a group)
+    let preGroupTotal = 0;
+    for (const it of inStockItems) {
+      const qty = Number(it.quantity || 0);
+      const unitPrice = Number(it.unitPrice || 0);
+      let line = unitPrice * qty;
+      const inGroup = it.groupId != null;
+      const saleQty = it.saleQuantity != null ? Number(it.saleQuantity) : null;
+      const salePrice = it.salePrice != null ? Number(it.salePrice) : null;
+      if (!inGroup && saleQty && salePrice != null && qty >= saleQty) {
+        const bundles = Math.floor(qty / saleQty);
+        const remainder = qty % saleQty;
+        line = bundles * salePrice + remainder * unitPrice;
+      }
+      preGroupTotal += line;
+    }
+
+    // group_discount_total
+    // Group members by groupId
+    const groups = new Map<number, any[]>();
+    for (const it of inStockItems) {
+      if (it.groupId == null) continue;
+      const gid = Number(it.groupId);
+      if (!groups.has(gid)) groups.set(gid, []);
+      groups.get(gid)!.push(it);
+    }
+    let groupDiscountTotal = 0;
+    for (const [gid, members] of groups) {
+      const totalQty = members.reduce((sum, m: any) => sum + Number(m.quantity || 0), 0);
+      const bundleQty = Number(members[0].groupBundleQty || 0);
+      const bundlePrice = Number(members[0].groupSalePrice || 0);
+      const unitPriceForGroup = (m: any) =>
+        m.groupUnitPrice != null ? Number(m.groupUnitPrice) : Number(m.unitPrice || 0);
+      if (!bundleQty || !bundlePrice) continue;
+      const bundles = Math.floor(totalQty / bundleQty);
+      if (bundles <= 0) continue;
+      const regular = bundles * bundleQty * unitPriceForGroup(members[0]);
+      const onSale = bundles * bundlePrice;
+      const discount = Math.max(0, regular - onSale);
+      groupDiscountTotal += discount;
+    }
+
+    const subtotal = Math.max(0, preGroupTotal - groupDiscountTotal);
+    const DELIVERY_THRESHOLD = Number(process.env.NEXT_PUBLIC_DELIVERY_THRESHOLD || 90);
+    const DELIVERY_FEE = Number(process.env.NEXT_PUBLIC_DELIVERY_FEE || 10);
+    const deliveryFee = subtotal > 0 && subtotal < DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
+    const total = subtotal + deliveryFee;
+
+    await client.query(
+      `UPDATE orders
+          SET pre_group_total = $1,
+              group_discount_total = $2,
+              delivery_fee = $3,
+              total = $4,
+              updated_at = now()
+        WHERE id = $5`,
+      [preGroupTotal, groupDiscountTotal, deliveryFee, total, orderId]
+    );
+
+    await client.query('COMMIT');
+    return NextResponse.json({
+      preGroupTotal,
+      groupDiscountTotal,
+      deliveryFee,
+      total,
+    });
+  } catch (err) {
+    try { await pool.query('ROLLBACK'); } catch {}
+    console.error('❌ Stock update failed:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } finally {
+    try { client.release(); } catch {}
+  }
 }
 
 // ✅ Export with middleware (GET remains public, PATCH is protected)
