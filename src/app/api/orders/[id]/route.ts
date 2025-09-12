@@ -12,6 +12,7 @@ type OrderRow = {
   updatedAt: string;
   isPaid: boolean;
   isReady: boolean;
+  isDelivered?: boolean;
   isTest: boolean;
   isNotified: boolean;
   preGroupTotal: number | null;
@@ -67,6 +68,7 @@ async function getOrder(
          o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
          o.is_paid AS "isPaid",
          o.is_ready AS "isReady",
+         o.is_delivered AS "isDelivered",
          o.is_test AS "isTest",
          o.is_notified AS "isNotified",
          o.payment_method AS "paymentMethod",

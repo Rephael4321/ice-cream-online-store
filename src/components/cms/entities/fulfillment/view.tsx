@@ -18,6 +18,7 @@ type Order = {
   createdAt: string;
   isPaid: boolean;
   isReady: boolean;
+  isDelivered?: boolean;
   isTest?: boolean;
   isNotified?: boolean;
   preGroupTotal?: number | null;
@@ -160,6 +161,7 @@ export default function ViewOrder() {
           createdAt: String(o.createdAt),
           isPaid: Boolean(o.isPaid),
           isReady: Boolean(o.isReady),
+          isDelivered: Boolean(o.isDelivered),
           isTest: Boolean(o.isTest),
           isNotified: Boolean(o.isNotified),
           paymentMethod: sanitizePaymentMethod(o?.paymentMethod),
@@ -265,6 +267,24 @@ export default function ViewOrder() {
     }
   };
 
+  const toggleDelivered = async () => {
+    if (!order) return;
+    try {
+      const r = await fetch(`/api/orders/${order.orderId}/delivery`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isDelivered: !order.isDelivered }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrder((o) =>
+        o ? { ...o, isDelivered: data.isDelivered ?? !o.isDelivered } : o
+      );
+    } catch {
+      showToast("❌ שגיאה בעדכון סטטוס משלוח", "error");
+    }
+  };
+
   const toggleStock = async (productId: number) => {
     setItems((prev) => {
       const next = prev.map((it) =>
@@ -354,6 +374,7 @@ export default function ViewOrder() {
           }}
           onPaymentChange={setPaymentMethod}
           onReadyClick={toggleReady}
+          onDeliveredClick={toggleDelivered}
           handleTitleClick={handleTitleClick}
           onNotifyWhatsApp={handleNotifyAndWhatsApp}
         />

@@ -27,6 +27,7 @@ type Props = {
   onEnterSelectMode?: () => void;
   onChangePayment: (m: PaymentMethod | null) => void;
   onToggleReady: () => void;
+  onToggleDelivered?: () => void;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -40,6 +41,7 @@ export default function SingleOrder({
   onEnterSelectMode,
   onChangePayment,
   onToggleReady,
+  onToggleDelivered,
 }: Props) {
   const date = new Date(order.createdAt);
   const formatted = !isNaN(date.getTime())
@@ -184,6 +186,24 @@ export default function SingleOrder({
             >
               {order.isReady ? "מוכן ✅" : "הזמנה חדשה 🆕"}
             </button>
+
+            {/* Delivered toggle */}
+            {onToggleDelivered && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleDelivered();
+                }}
+                className={`px-3 py-1 rounded text-white transition ${
+                  (order as any).isDelivered
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-gray-600 hover:bg-gray-700"
+                }`}
+                title="שנה סטטוס משלוח"
+              >
+                {(order as any).isDelivered ? "נשלח 📦" : "לא נשלח 🚚"}
+              </button>
+            )}
           </div>
         </div>
 

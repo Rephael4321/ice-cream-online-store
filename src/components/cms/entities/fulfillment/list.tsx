@@ -17,6 +17,7 @@ type Order = {
   itemCount: number;
   isPaid: boolean;
   isReady: boolean;
+  isDelivered?: boolean;
   isTest?: boolean;
   isNotified?: boolean;
   clientName: string | null;
@@ -252,6 +253,27 @@ export default function ListOrder() {
     }
   };
 
+  const toggleDelivered = async (orderId: number, current?: boolean) => {
+    try {
+      const r = await fetch(`/api/orders/${orderId}/delivery`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isDelivered: !(current ?? false) }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Failed");
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId
+            ? { ...o, isDelivered: data.isDelivered ?? !(current ?? false) }
+            : o
+        )
+      );
+    } catch {
+      showToast("❌ שגיאה בעדכון סטטוס משלוח", "error");
+    }
+  };
+
   return (
     <main
       dir="rtl"
@@ -332,6 +354,9 @@ export default function ListOrder() {
                 }}
                 onChangePayment={(m) => updatePaymentMethod(order.orderId, m)}
                 onToggleReady={() => toggleReady(order.orderId, order.isReady)}
+                onToggleDelivered={() =>
+                  toggleDelivered(order.orderId, order.isDelivered)
+                }
               />
             ))}
           </ul>

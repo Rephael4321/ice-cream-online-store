@@ -16,6 +16,7 @@ async function handler(
       o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
       o.is_paid AS "isPaid",
       o.is_ready AS "isReady",
+      o.is_delivered AS "isDelivered",
       c.name AS "clientName",
       c.address AS "clientAddress",
       c.phone AS "clientPhone",

@@ -13,6 +13,7 @@ type Props = {
     createdAt: string;
     isPaid: boolean;
     isReady: boolean;
+    isDelivered?: boolean;
     isTest?: boolean;
     isNotified?: boolean;
     paymentMethod?: PaymentMethod | null;
@@ -24,6 +25,7 @@ type Props = {
   onEdit: () => void;
   onPaymentChange: (m: PaymentMethod | null) => void;
   onReadyClick: () => void;
+  onDeliveredClick?: () => void;
   handleTitleClick: () => void;
   onNotifyWhatsApp?: () => Promise<void>;
 };
@@ -36,6 +38,7 @@ export default function ClientControlPanel({
   onEdit,
   onPaymentChange,
   onReadyClick,
+  onDeliveredClick,
   handleTitleClick,
   onNotifyWhatsApp,
 }: Props) {
@@ -170,7 +173,7 @@ export default function ClientControlPanel({
       </p>
 
       {/* Controls row */}
-      <div className="mt-4 flex gap-4 flex-wrap items-center">
+      <div className="mt-4 flex gap-2 flex-wrap items-center">
         {/* Payment method select */}
         <div className="flex items-center gap-2">
           <label
@@ -209,6 +212,19 @@ export default function ClientControlPanel({
         >
           {order.isReady ? "הזמנה מוכנה ✅" : "הזמנה חדשה 🆕"}
         </button>
+
+        {onDeliveredClick && (
+          <button
+            onClick={onDeliveredClick}
+            className={`px-3 py-1 rounded text-white transition ${
+              order.isDelivered
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-gray-600 hover:bg-gray-700"
+            }`}
+          >
+            {order.isDelivered ? "נשלח 📦" : "לא נשלח 🚚"}
+          </button>
+        )}
       </div>
 
       <div className="mt-4 text-lg font-bold">

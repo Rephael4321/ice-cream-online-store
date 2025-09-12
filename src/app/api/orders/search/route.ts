@@ -14,6 +14,7 @@ async function searchOrders(req: NextRequest) {
         o.id AS "orderId",
         o.is_paid AS "isPaid",
         o.is_ready AS "isReady",
+        o.is_delivered AS "isDelivered",
         o.is_test AS "isTest",
         o.is_notified AS "isNotified",
         o.payment_method AS "paymentMethod",         -- ★ NEW
