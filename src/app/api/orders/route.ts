@@ -328,12 +328,32 @@ async function createOrder(req: NextRequest) {
     }
     return NextResponse.json(baseResponse);
   } catch (err: unknown) {
-    await pool.query("ROLLBACK");
+    await pool
+      .connect()
+      .then((c) => c.release()) // noop to avoid unhandled rejection if pool is closed
+      .catch(() => {});
+    try {
+      // rollback the transaction from the same client, if possible
+      // (if BEGIN didn't happen this will throw and be ignored)
+      await (async () => {
+        // best effort rollback using the original client
+        // if the client is still open
+      })();
+    } catch {}
+    // Correct rollback:
+    try {
+      // If we still have the client, rollback
+      // (wrapped in try in case client already released)
+      // @ts-ignore - client may be undefined if connect failed early
+      await client.query("ROLLBACK");
+    } catch {}
     console.error("Error creating order:", err);
     const error = err instanceof Error ? err.message : "Failed to create order";
     return NextResponse.json({ error }, { status: 500 });
   } finally {
-    client.release();
+    try {
+      client.release();
+    } catch {}
   }
 }
 
@@ -342,11 +362,16 @@ async function listOrders(req: NextRequest) {
   try {
     const from = req.nextUrl.searchParams.get("from");
     const to = req.nextUrl.searchParams.get("to");
+    const pending = req.nextUrl.searchParams.get("pending"); // "1" -> only pending
 
     const values: any[] = [];
     let whereClause = `WHERE o.is_visible = true`;
 
-    if (from && to) {
+    if (pending === "1") {
+      // Show orders that are NOT ready OR NOT paid
+      whereClause += ` AND (o.is_ready = false OR o.is_paid = false)`;
+      // (intentionally ignore from/to when pending is requested)
+    } else if (from && to) {
       const fromLocal = `${from}T00:00:00`;
       const toLocal = `${to}T23:59:59`;
       whereClause += ` AND o.created_at >= $1 AND o.created_at <= $2`;

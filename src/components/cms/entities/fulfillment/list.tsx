@@ -26,8 +26,6 @@ type Order = {
 };
 
 const SCROLL_KEY = "lastViewedOrder";
-
-// ✅ reuseable normalizer for lists as well
 const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
   v === "credit" || v === "paybox" || v === "cash" ? v : "";
 
@@ -51,10 +49,22 @@ export default function ListOrder() {
     return { from: format(from), to: format(now) };
   };
 
-  const fetchOrders = async (from?: string, to?: string) => {
+  // 🔁 unified loader:
+  // - if `pending` true -> /api/orders?pending=1
+  // - else optional date range -> /api/orders?from=...&to=...
+  const fetchOrders = async (opts?: {
+    pending?: boolean;
+    from?: string;
+    to?: string;
+  }) => {
     setLoading(true);
     let query = "";
-    if (from && to) query = `?from=${from}&to=${to}`;
+    if (opts?.pending) {
+      query = `?pending=1`;
+    } else if (opts?.from && opts?.to) {
+      query = `?from=${opts.from}&to=${opts.to}`;
+    }
+
     try {
       const res = await fetch(`/api/orders${query}`, { cache: "no-store" });
       const data = await res.json();
@@ -75,17 +85,15 @@ export default function ListOrder() {
 
   const searchOrders = async (query: string) => {
     if (!query) {
-      const { from, to } = getLast7DaysRange();
-      fetchOrders(from, to);
+      // ↩️ When clearing search, show PENDING by default
+      await fetchOrders({ pending: true });
       return;
     }
     setLoading(true);
     try {
       const res = await fetch(
         `/api/orders/search?query=${encodeURIComponent(query)}`,
-        {
-          cache: "no-store",
-        }
+        { cache: "no-store" }
       );
       const data = await res.json();
       const list: Order[] = (data.orders || []).map((o: any) => ({
@@ -103,22 +111,23 @@ export default function ListOrder() {
     }
   };
 
+  // ⏱️ On mount -> pending
   useEffect(() => {
-    const { from, to } = getLast7DaysRange();
-    fetchOrders(from, to);
+    fetchOrders({ pending: true });
   }, []);
 
+  // 📅 If a date is picked -> show that date only, else -> pending
   useEffect(() => {
-    if (search.trim()) return;
+    if (search.trim()) return; // search has priority
     if (selectedDate === null) {
-      const { from, to } = getLast7DaysRange();
-      fetchOrders(from, to);
+      fetchOrders({ pending: true });
     } else {
       const dateStr = selectedDate.toLocaleDateString("sv-SE");
-      fetchOrders(dateStr, dateStr);
+      fetchOrders({ from: dateStr, to: dateStr });
     }
-  }, [selectedDate]);
+  }, [selectedDate, search]);
 
+  // 🔖 Restore scroll-to-last-viewed
   useEffect(() => {
     const raw = localStorage.getItem(SCROLL_KEY);
     if (!raw) return;
@@ -187,7 +196,6 @@ export default function ListOrder() {
     });
   };
 
-  // NEW: update payment method (and isPaid derived)
   const updatePaymentMethod = async (
     orderId: number,
     method: PaymentMethod
@@ -251,7 +259,6 @@ export default function ListOrder() {
     >
       <HeaderHydrator title="הזמנות" />
 
-      {/* 🧭 Floating Toolbar */}
       {selectMode && (
         <div className="fixed top-[72px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-6 p-3 rounded shadow w-full max-w-4xl">
           <span className="text-blue-800 font-semibold">
@@ -299,14 +306,12 @@ export default function ListOrder() {
           />
         </div>
 
-        {/* ⚠️ WhatsApp Notification Warning */}
         {hasUnnotified && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm font-medium">
             ⚠️ ישנן הזמנות שלא נשלחה אליהן הודעת וואטסאפ.
           </div>
         )}
 
-        {/* 📃 Orders List */}
         {loading ? (
           <p>טוען הזמנות...</p>
         ) : orders.length === 0 ? (
