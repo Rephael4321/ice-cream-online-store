@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/cms/ui/input";
 import { Label } from "@/components/cms/ui/label";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
-import Image from "next/image";
+import ImagePickerPanel, {
+  baseName as baseNameFromPicker,
+} from "@/components/cms/shared/image-picker-panel";
 
 type CategoryType = "collection" | "sale";
 
@@ -33,29 +35,7 @@ type UpdateCategoryPayload = {
   salePrice?: number;
 };
 
-type ProductImage = {
-  key?: string;
-  url: string;
-  size?: number;
-  updated_at?: string | null;
-  name?: string;
-};
-
 type Props = { name: string }; // only name
-
-const PAGE_SIZE = 50;
-
-// helpers
-const stripExt = (s: string) => s.replace(/\.[^/.]+$/, "");
-const baseName = (urlOrName: string) => {
-  if (!urlOrName) return "";
-  const file = (urlOrName.split("/").pop() || urlOrName).split("?")[0];
-  let decoded = file;
-  try {
-    decoded = decodeURIComponent(file);
-  } catch {}
-  return stripExt(decoded);
-};
 
 export default function EditCategory({ name: initialName }: Props) {
   const [loading, setLoading] = useState(true);
@@ -65,127 +45,6 @@ export default function EditCategory({ name: initialName }: Props) {
     null
   );
   const originalNameRef = useRef(initialName); // used for PUT/DELETE route
-
-  // ---- camera / device upload
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const deviceInputRef = useRef<HTMLInputElement | null>(null);
-
-  async function uploadSelectedFile(file: File) {
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/images/upload", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Upload failed");
-      }
-      const data = await res.json();
-      const url: string =
-        data.url || data.Location || data.file?.url || data.image?.url;
-      if (!url) throw new Error("Upload succeeded but no URL returned");
-
-      setCategory((prev) =>
-        prev
-          ? { ...prev, image: url, name: prev.name || baseName(file.name) }
-          : prev
-      );
-      showToast("התמונה הועלתה בהצלחה", "success");
-    } catch (e: any) {
-      console.error(e);
-      showToast(`שגיאה בהעלאת תמונה: ${e.message || e}`, "error");
-    }
-  }
-
-  const onCameraPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.currentTarget.value = "";
-    if (file) uploadSelectedFile(file);
-  };
-  const onDevicePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.currentTarget.value = "";
-    if (file) uploadSelectedFile(file);
-  };
-
-  // ---- app gallery modal (unchanged UI logic)
-  const [appGalleryOpen, setAppGalleryOpen] = useState(false);
-  const [images, setImages] = useState<ProductImage[]>([]);
-  const [loadingImgs, setLoadingImgs] = useState(false);
-  const [reloading, setReloading] = useState(false);
-  const [sort, setSort] = useState<"name" | "updated" | "size">("updated");
-  const [order, setOrder] = useState<"asc" | "desc">("desc");
-  const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [filter, setFilter] = useState("");
-  const fetchingRef = useRef(false);
-
-  async function fetchBatch(opts: { reset?: boolean } = {}) {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
-
-    const nextOffset = opts.reset ? 0 : offset;
-    try {
-      const qs = new URLSearchParams({
-        sort,
-        order,
-        offset: String(nextOffset),
-        limit: String(PAGE_SIZE),
-      });
-      const res = await fetch(`/api/products/unused-images?${qs}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
-      const next = (data.images || []) as ProductImage[];
-
-      if (opts.reset) setImages(next);
-      else setImages((prev) => [...prev, ...next]);
-
-      const got = Array.isArray(next) ? next.length : 0;
-      const newOffset = nextOffset + got;
-      setOffset(newOffset);
-      setTotal(Number(data.total || 0));
-      setHasMore(newOffset < Number(data.total || 0));
-    } finally {
-      fetchingRef.current = false;
-      setLoadingImgs(false);
-      setReloading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (appGalleryOpen && images.length === 0 && !loadingImgs) {
-      setLoadingImgs(true);
-      setOffset(0);
-      setHasMore(true);
-      fetchBatch({ reset: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appGalleryOpen]);
-
-  const filteredImages = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return images;
-    return images.filter((i) =>
-      (i.name || baseName(i.url)).toLowerCase().includes(q)
-    );
-  }, [filter, images]);
-
-  const pickFromAppGallery = (it: ProductImage) => {
-    setCategory((prev) =>
-      prev
-        ? {
-            ...prev,
-            image: it.url,
-            name: prev.name || it.name || baseName(it.url),
-          }
-        : prev
-    );
-    setAppGalleryOpen(false);
-  };
 
   // ---- load category + parents (USING NAME ONLY)
   useEffect(() => {
@@ -350,22 +209,12 @@ export default function EditCategory({ name: initialName }: Props) {
   if (!category)
     return <div className="p-4 text-red-600">לא נמצאה קטגוריה</div>;
 
-  const previewSrc = category.image || "";
-
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 text-sm sm:text-base">
       {/* Shared header title (rendered by the section layout) */}
       <HeaderHydrator
         title={`עריכת קטגוריה — ${category.name || initialName}`}
       />
-
-      {/* Optional page-local controls row (kept minimal here) */}
-      {/* If you want quick actions up top, you can uncomment this:
-      <div className="mt-2 mb-4 flex items-center justify-end gap-2">
-        <Button onClick={handleSubmit as any}>שמור</Button>
-        <Button onClick={handleDelete} className="bg-red-600 text-white hover:bg-red-700">מחק</Button>
-      </div>
-      */}
 
       <form
         onSubmit={handleSubmit}
@@ -473,104 +322,27 @@ export default function EditCategory({ name: initialName }: Props) {
           </Button>
         </div>
 
-        {/* RIGHT: preview + buttons */}
+        {/* RIGHT — shared image picker */}
         <aside className="w-full md:w-1/2 space-y-4">
-          <div className="relative w-full h-80 border rounded-md bg-white">
-            {previewSrc ? (
-              <Image
-                src={previewSrc}
-                alt="תצוגה מקדימה"
-                fill
-                className="object-contain rounded-md"
-                sizes="(max-width: 768px) 100vw, 50vw"
-                unoptimized
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-gray-400">
-                אין תמונה נבחרת
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => cameraInputRef.current?.click()}
-              className="w-full"
-              title="צלם והעלה"
-            >
-              📸 צילום
-            </Button>
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={onCameraPick}
-            />
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => deviceInputRef.current?.click()}
-              className="w-full"
-              title="בחר מהגלריה (מהמכשיר)"
-            >
-              🖼️ גלריה
-            </Button>
-            <input
-              ref={deviceInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={onDevicePick}
-            />
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                window.open(
-                  `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
-                    category.name || "ice cream"
-                  )}`,
-                  "_blank",
-                  "noopener,noreferrer"
-                )
-              }
-              className="w-full"
-              title="חפש בגוגל תמונות"
-            >
-              🔎 Google
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAppGalleryOpen(true)}
-              className="w-full"
-              title="פתח ספריית תמונות מהאפליקציה"
-            >
-              📁 ספריית אפליקציה
-            </Button>
-          </div>
+          <ImagePickerPanel
+            value={category.image || ""}
+            googleQuery={category.name || "ice cream"}
+            previewClassName="relative w-full h-80 border rounded-md bg-white"
+            onChange={(url) =>
+              setCategory((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      image: url,
+                      // only auto-fill name if empty
+                      name: prev.name || baseNameFromPicker(url),
+                    }
+                  : prev
+              )
+            }
+          />
         </aside>
       </form>
-
-      {/* ---- APP GALLERY MODAL (unchanged UI) ---- */}
-      {appGalleryOpen && (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setAppGalleryOpen(false)}
-          />
-          <div className="absolute inset-x-0 top-12 mx-auto max-w-5xl bg-white rounded-lg shadow-lg border p-4 sm:p-6">
-            {/* ... keep the modal body exactly as you had it ... */}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

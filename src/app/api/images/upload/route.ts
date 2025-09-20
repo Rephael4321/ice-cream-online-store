@@ -24,6 +24,16 @@ const ALLOWED_TYPES = new Set([
   "image/svg+xml",
 ]);
 
+// Use the real bucket to construct a full S3 URL and pass it to img-proxy as ?url=...
+const BUCKET = process.env.MEDIA_BUCKET!;
+function s3UrlForKey(key: string) {
+  return `https://${BUCKET}.s3.amazonaws.com/${key.replace(/^\/+/, "")}`;
+}
+function publicUrlForKey(key: string) {
+  const s3 = s3UrlForKey(key);
+  return `/api/img-proxy?url=${encodeURIComponent(s3)}`;
+}
+
 function toAwsIdentity(creds: any) {
   const accessKeyId = creds?.accessKeyId ?? creds?.AccessKeyId;
   const secretAccessKey = creds?.secretAccessKey ?? creds?.SecretAccessKey;
@@ -83,6 +93,7 @@ async function handler(req: NextRequest) {
       type: string;
       hash?: string;
       key?: string;
+      url?: string; // public URL via img-proxy?url=...
       status: "uploaded" | "duplicate" | "skipped" | "error";
       message?: string;
     }> = [];
@@ -138,6 +149,7 @@ async function handler(req: NextRequest) {
           ...base,
           hash,
           key: existing.key,
+          url: publicUrlForKey(existing.key), // include url for duplicates
           status: "duplicate",
           message: "Already exists",
         });
@@ -158,7 +170,13 @@ async function handler(req: NextRequest) {
         );
 
         indexUpdates.push({ hash, key, name: f.name, size: f.size });
-        results.push({ ...base, hash, key, status: "uploaded" });
+        results.push({
+          ...base,
+          hash,
+          key,
+          url: publicUrlForKey(key), // include url for uploaded
+          status: "uploaded",
+        });
       } catch (e: any) {
         results.push({
           ...base,
