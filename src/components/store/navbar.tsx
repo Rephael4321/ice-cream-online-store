@@ -1,4 +1,5 @@
 import Cart from "@/components/store/cart/cart";
+import OrderHistoryButton from "@/components/store/cart/order-history-button";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -41,13 +42,16 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
           )}
         </div>
 
-        {/* Cart */}
-        <Cart />
+        {/* Cart and Order History */}
+        <div className="flex items-center gap-2">
+          <OrderHistoryButton />
+          <Cart />
+        </div>
       </div>
 
       {/* Mobile layout */}
       <div className="sm:hidden flex flex-col w-full">
-        {/* Top: Logo + Cart */}
+        {/* Top: Logo + Cart and Order History */}
         <div className="flex justify-between items-center w-full">
           <Link
             href="/"
@@ -62,7 +66,10 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
             />
             המפנק
           </Link>
-          <Cart />
+          <div className="flex items-center gap-2">
+            <OrderHistoryButton />
+            <Cart />
+          </div>
         </div>
 
         {/* Bottom: Buttons centered and size-limited */}

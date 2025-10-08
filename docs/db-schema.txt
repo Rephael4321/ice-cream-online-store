@@ -1,0 +1,306 @@
+📦 Table: public.categories
+  - created_at timestamp with time zone DEFAULT now()
+  - description text
+  - id integer NOT NULL DEFAULT nextval('categories_id_seq'::regclass)
+  - image text
+  - name character varying NOT NULL
+  - parent_id integer
+  - show_in_menu boolean DEFAULT false
+  - sort_order integer DEFAULT 0
+  - type text
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - categories_parent_id_fkey: parent_id → public.categories(id) ON DELETE SET NULL
+
+🔑 Unique Constraints:
+  - categories_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - categories_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41348_1_not_null: id IS NOT NULL
+  - 2200_41348_2_not_null: name IS NOT NULL
+  - categories_type_check: (type = ANY (ARRAY['collection'::text, 'sale'::text]))
+  - type_check: (type = ANY (ARRAY['collection'::text, 'sale'::text]))
+
+📦 Table: public.category_multi_items
+  - category_id integer NOT NULL
+  - color text
+  - created_at timestamp with time zone DEFAULT now()
+  - label text
+  - sort_order integer DEFAULT 0
+  - target_id integer NOT NULL
+  - target_type text NOT NULL
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - category_multi_items_category_id_fkey: category_id → public.categories(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - category_multi_items_pkey: (category_id, target_type, target_id) [PRIMARY KEY]
+
+📊 Indexes:
+  - category_multi_items_pkey: (category_id, target_type, target_id) [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_360464_1_not_null: category_id IS NOT NULL
+  - 2200_360464_2_not_null: target_type IS NOT NULL
+  - 2200_360464_3_not_null: target_id IS NOT NULL
+  - category_multi_items_target_type_check: (target_type = ANY (ARRAY['product'::text, 'category'::text, 'sale_group'::text]))
+
+📦 Table: public.category_sales
+  - category_id integer NOT NULL
+  - created_at timestamp with time zone DEFAULT now()
+  - id integer NOT NULL DEFAULT nextval('category_sales_id_seq'::regclass)
+  - quantity integer NOT NULL
+  - sale_price numeric NOT NULL
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - category_sales_category_id_fkey: category_id → public.categories(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - category_sales_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - category_sales_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41364_1_not_null: id IS NOT NULL
+  - 2200_41364_2_not_null: category_id IS NOT NULL
+  - 2200_41364_3_not_null: quantity IS NOT NULL
+  - 2200_41364_4_not_null: sale_price IS NOT NULL
+
+📦 Table: public.clients
+  - address text
+  - created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+  - id integer NOT NULL DEFAULT nextval('clients_id_seq'::regclass)
+  - name character varying
+  - phone character varying
+  - updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+
+🔑 Unique Constraints:
+  - clients_pkey: id [PRIMARY KEY]
+  - unique_phone: phone [UNIQUE]
+
+📊 Indexes:
+  - clients_pkey: id [btree] [UNIQUE]
+  - unique_phone: phone [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_98305_1_not_null: id IS NOT NULL
+
+📦 Table: public.order_items
+  - created_at timestamp with time zone DEFAULT now()
+  - group_bundle_qty integer
+  - group_discount numeric NOT NULL DEFAULT 0
+  - group_id integer
+  - group_increment_step integer
+  - group_sale_price numeric
+  - group_unit_price numeric
+  - id integer NOT NULL DEFAULT nextval('order_items_id_seq'::regclass)
+  - in_stock boolean DEFAULT true
+  - order_id integer NOT NULL
+  - product_id integer
+  - product_image text
+  - product_name character varying
+  - quantity integer NOT NULL
+  - sale_price numeric
+  - sale_quantity integer
+  - unit_price numeric
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - order_items_order_id_fkey: order_id → public.orders(id) ON DELETE CASCADE
+  - order_items_product_id_fkey: product_id → public.products(id) ON DELETE SET NULL
+
+🔑 Unique Constraints:
+  - order_items_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - idx_order_items_group_id: group_id [btree]
+  - idx_order_items_order_id: order_id [btree]
+  - order_items_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41399_17_not_null: group_discount IS NOT NULL
+  - 2200_41399_1_not_null: id IS NOT NULL
+  - 2200_41399_2_not_null: order_id IS NOT NULL
+  - 2200_41399_5_not_null: quantity IS NOT NULL
+  - order_items_group_increment_step_pos: ((group_increment_step IS NULL) OR (group_increment_step > 0))
+
+📦 Table: public.orders
+  - client_id integer
+  - created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+  - delivery_fee numeric NOT NULL DEFAULT 0
+  - group_discount_total numeric NOT NULL DEFAULT 0
+  - id integer NOT NULL DEFAULT nextval('orders_id_seq'::regclass)
+  - is_delivered boolean NOT NULL DEFAULT false
+  - is_notified boolean DEFAULT false
+  - is_paid boolean DEFAULT false
+  - is_ready boolean DEFAULT false
+  - is_test boolean DEFAULT false
+  - is_visible boolean DEFAULT true
+  - payment_method text
+  - pre_group_total numeric
+  - total numeric
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - orders_client_id_fkey: client_id → public.clients(id) ON DELETE SET NULL
+
+🔑 Unique Constraints:
+  - orders_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - orders_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41391_12_not_null: group_discount_total IS NOT NULL
+  - 2200_41391_14_not_null: delivery_fee IS NOT NULL
+  - 2200_41391_16_not_null: is_delivered IS NOT NULL
+  - 2200_41391_1_not_null: id IS NOT NULL
+  - orders_delivery_fee_nonneg: (delivery_fee >= (0)::numeric)
+
+📦 Table: public.product_categories
+  - category_id integer NOT NULL
+  - created_at timestamp with time zone DEFAULT now()
+  - product_id integer NOT NULL
+  - sort_order integer DEFAULT 0
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - product_categories_category_id_fkey: category_id → public.categories(id) ON DELETE CASCADE
+  - product_categories_product_id_fkey: product_id → public.products(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - product_categories_pkey: (product_id, category_id) [PRIMARY KEY]
+
+📊 Indexes:
+  - product_categories_pkey: (product_id, category_id) [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41375_1_not_null: product_id IS NOT NULL
+  - 2200_41375_2_not_null: category_id IS NOT NULL
+
+📦 Table: public.product_sale_groups
+  - color text
+  - created_at timestamp with time zone DEFAULT now()
+  - label text
+  - product_id integer NOT NULL
+  - sale_group_id integer NOT NULL
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - product_sale_groups_product_id_fkey: product_id → public.products(id) ON DELETE CASCADE
+  - product_sale_groups_sale_group_id_fkey: sale_group_id → public.sale_groups(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - product_sale_groups_pkey: (product_id, sale_group_id) [PRIMARY KEY]
+
+📊 Indexes:
+  - product_sale_groups_pkey: (product_id, sale_group_id) [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_385035_1_not_null: product_id IS NOT NULL
+  - 2200_385035_2_not_null: sale_group_id IS NOT NULL
+
+📦 Table: public.product_storage
+  - product_id integer NOT NULL
+  - storage_area_id integer
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - product_storage_product_id_fkey: product_id → public.products(id) ON DELETE CASCADE
+  - product_storage_storage_area_id_fkey: storage_area_id → public.storage_areas(id) ON DELETE SET NULL
+
+🔑 Unique Constraints:
+  - product_storage_pkey: product_id [PRIMARY KEY]
+
+📊 Indexes:
+  - product_storage_pkey: product_id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_409614_1_not_null: product_id IS NOT NULL
+
+📦 Table: public.products
+  - created_at timestamp with time zone DEFAULT now()
+  - description text
+  - id integer NOT NULL DEFAULT nextval('products_id_seq'::regclass)
+  - image text
+  - in_stock boolean DEFAULT true
+  - name character varying
+  - price numeric
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔑 Unique Constraints:
+  - products_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - products_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41327_1_not_null: id IS NOT NULL
+
+📦 Table: public.sale_groups
+  - created_at timestamp with time zone DEFAULT now()
+  - id integer NOT NULL DEFAULT nextval('sale_groups_id_seq'::regclass)
+  - image text
+  - increment_step integer NOT NULL DEFAULT 1
+  - name character varying
+  - price numeric
+  - quantity integer
+  - sale_price numeric
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔑 Unique Constraints:
+  - sale_groups_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - sale_groups_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_385025_1_not_null: id IS NOT NULL
+  - 2200_385025_9_not_null: increment_step IS NOT NULL
+  - sale_groups_increment_step_pos: (increment_step > 0)
+
+📦 Table: public.sales
+  - created_at timestamp with time zone DEFAULT now()
+  - id integer NOT NULL DEFAULT nextval('sales_id_seq'::regclass)
+  - product_id integer
+  - quantity integer
+  - sale_price numeric
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔗 Foreign Keys:
+  - sales_product_id_fkey: product_id → public.products(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - sales_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - sales_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_41336_1_not_null: id IS NOT NULL
+
+📦 Table: public.storage_areas
+  - created_at timestamp with time zone DEFAULT now()
+  - id integer NOT NULL DEFAULT nextval('storage_areas_id_seq'::regclass)
+  - name text NOT NULL
+  - sort_order integer DEFAULT 0
+  - updated_at timestamp with time zone DEFAULT now()
+
+🔑 Unique Constraints:
+  - storage_areas_name_key: name [UNIQUE]
+  - storage_areas_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - storage_areas_name_key: name [btree] [UNIQUE]
+  - storage_areas_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - 2200_409601_1_not_null: id IS NOT NULL
+  - 2200_409601_2_not_null: name IS NOT NULL
