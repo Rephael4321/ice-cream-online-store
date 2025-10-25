@@ -117,6 +117,29 @@ export default function ListOrder() {
     fetchOrders({ pending: true });
   }, []);
 
+  // 🔄 Refresh when page becomes visible (handles mobile back button)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !loading) {
+        // Only refresh if we're not already loading and page is visible
+        if (search.trim()) {
+          searchOrders(search.trim());
+        } else if (selectedDate === null) {
+          fetchOrders({ pending: true });
+        } else {
+          const dateStr = selectedDate.toLocaleDateString("sv-SE");
+          fetchOrders({ from: dateStr, to: dateStr });
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [search, selectedDate, loading]);
+
   // 📅 If a date is picked -> show that date only, else -> pending
   useEffect(() => {
     if (search.trim()) return; // search has priority
