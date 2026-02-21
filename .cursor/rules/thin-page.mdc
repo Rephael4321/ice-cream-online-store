@@ -1,0 +1,15 @@
+---
+description: App route pages must be thin wrappers that only compose components and pass params; no business logic or heavy JSX in page files.
+globs: src/app/**/page.tsx
+alwaysApply: false
+---
+
+# Thin-page rule
+
+When editing or adding app route pages under `src/app`:
+
+- The page file should **only** import one (or a few) components from `@/components` and pass `params` / `searchParams` as props.
+- **No** business logic, form state, or data fetching in the page file.
+- **No** heavy JSX; keep the page to a single return of a component.
+
+**Template:** See `src/app/(root)/(cms)/orders/[id]/address/page.tsx` and `docs/conventions/PAGE-CONVENTIONS.md`.

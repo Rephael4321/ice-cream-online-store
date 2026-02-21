@@ -12,9 +12,9 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 | 2 – Pages | ✅ Done | 2.1, 2.2, 2.3 |
 | 3 – Component structure | ✅ Done | 3.1, 3.2, 3.3 |
 | 4 – Duplication | ✅ Done | 4.1, 4.2, 4.3 |
-| 5 – Documentation | Pending | — |
+| 5 – Documentation | ✅ Done | 5.1, 5.2, 5.3 |
 
-**Next:** Category 5 (document thin-page rule, component structure, API usage).
+**Next:** All categories complete. Optional follow-ups in Category 6.
 
 ---
 
@@ -40,13 +40,19 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 - **4.2** Product images grid: `image-grid.tsx` → `ProductImageGrid` in `product-image-grid.tsx`; image entity grid → `ImageLibraryGrid` in `image-library-grid.tsx` (with `ImageItem` export). Imports updated in product images list, image view, and image-tile.
 - **4.3** Shared `Dialog` added at `src/components/cms/ui/dialog.tsx` (role="dialog", aria-modal, Escape + backdrop close, initial focus). Exported from CMS UI barrel. Sale-group price-conflict modal refactored to use it; other modals can be migrated over time.
 
+## Completed (Category 5 – Documentation)
+
+- **5.1** Thin-page rule documented in `docs/conventions/PAGE-CONVENTIONS.md`. Cursor rule `.cursor/rules/thin-page.mdc` added for `src/app/**/page.tsx`; template reference: order address page.
+- **5.2** Component structure documented in `docs/conventions/COMPONENT-STRUCTURE.md`: store/ vs cms/, cms/ui primitives and barrel, entities with optional ui/ subfolder, kebab-case file names.
+- **5.3** API usage documented in `docs/conventions/API-USAGE.md`: client (`api`, `apiGet`, `apiPost`, etc.), route protection (withMiddleware, skipAuth), category name-based APIs.
+
 ---
 
 ## Current state (summary)
 
 - **API**: Unused routes removed (1.1, 1.2). Centralized client at `src/lib/api/client.ts`; all client-side API calls use it (1.3 done).
 - **Pages**: Order address is a thin wrapper; logic lives in `src/components/cms/entities/fulfillment/order-address-form.tsx` using shared `Button`. All pages under `src/app` are `.tsx` (categories/new migrated from .jsx).
-- **Components**: Naming clarified: category uses `CategorySaleGroupCard`; product images use `ProductImageGrid`, image entity uses `ImageLibraryGrid`. Shared `Dialog` in `cms/ui/dialog.tsx`; sale-group price-conflict modal migrated. Other modals (fulfillment, cart, image-picker) can adopt `Dialog` over time.
+- **Components**: Naming clarified: category uses `CategorySaleGroupCard`; product images use `ProductImageGrid`, image entity uses `ImageLibraryGrid`. Shared `Dialog` in `cms/ui/dialog.tsx`; sale-group price-conflict modal migrated. Conventions documented in `docs/conventions/` (pages, component structure, API usage); Cursor rule for thin pages in `.cursor/rules/thin-page.mdc`.
 
 ---
 
@@ -104,9 +110,9 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 
 | #   | Status | Action                           | Details                                                                                                                                                                                                                                                |
 | --- | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 5.1 |        | **Document "thin page" rule**    | In `docs/` or `.cursor/rules`, state that app route pages under `src/app` should only compose components from `@/components` and pass route params; no business logic or heavy JSX in page files. Point to the order address refactor as the template. |
-| 5.2 |        | **Document component structure** | Short doc: `store/` for storefront, `cms/` for admin; under `cms/`, `ui/` = primitives, `entities/<name>/` = entity-specific with optional `ui/` subfolder; file names kebab-case.                                                                     |
-| 5.3 |        | **Document API usage**           | List which API routes are public vs protected; note that category APIs are name-based (and id-based removed or deprecated). If you add a small API client (1.3), document its usage.                                                                   |
+| 5.1 | ✅ Done | **Document "thin page" rule**    | In `docs/` or `.cursor/rules`, state that app route pages under `src/app` should only compose components from `@/components` and pass route params; no business logic or heavy JSX in page files. Point to the order address refactor as the template. |
+| 5.2 | ✅ Done | **Document component structure** | Short doc: `store/` for storefront, `cms/` for admin; under `cms/`, `ui/` = primitives, `entities/<name>/` = entity-specific with optional `ui/` subfolder; file names kebab-case.                                                                     |
+| 5.3 | ✅ Done | **Document API usage**           | List which API routes are public vs protected; note that category APIs are name-based (and id-based removed or deprecated). If you add a small API client (1.3), document its usage.                                                                   |
 
 ---
 
@@ -126,7 +132,7 @@ Execute in order within each category; categories can be reordered by priority:
 2. ~~**Category 2** (Pages)~~ ✅ Done – 2.1, 2.2, 2.3.
 3. ~~**Category 3** (Structure)~~ ✅ Done – 3.1, 3.2, 3.3.
 4. ~~**Category 4** (Duplication)~~ ✅ Done – 4.1, 4.2, 4.3.
-5. **Category 5** (Docs) – 5.1, 5.2, 5.3 anytime.
+5. ~~**Category 5** (Docs)~~ ✅ Done – 5.1, 5.2, 5.3.
 
 ---
 

@@ -4,7 +4,7 @@ import { PATCH as updatePayment } from "@/app/api/orders/[id]/payment/route";
 import { PATCH as updateStatus } from "@/app/api/orders/[id]/status/route";
 import { POST as createOrder } from "@/app/api/orders/route";
 import { POST as createProduct } from "@/app/api/products/route";
-import { PATCH as updateCategory } from "@/app/api/categories/route";
+import { PUT as updateCategoryByName } from "@/app/api/categories/name/[name]/route";
 import { createJWT } from "@/lib/jwt";
 import { NextRequest } from "next/server";
 
@@ -123,12 +123,15 @@ describe("Driver cannot mutate products or categories", () => {
     expect(String(json.error).toLowerCase()).toContain("forbidden");
   });
 
-  it("PATCH /api/categories with driver token returns 403", async () => {
-    const res = await updateCategory(
-      createRequest("PATCH", "http://localhost/api/categories", driverToken, {
-        id: 1,
-        name: "Updated",
-      })
+  it("PUT /api/categories/name/[name] with driver token returns 403", async () => {
+    const res = await updateCategoryByName(
+      createRequest(
+        "PUT",
+        "http://localhost/api/categories/name/test-category",
+        driverToken,
+        { name: "Updated", type: "collection" }
+      ),
+      { params: Promise.resolve({ name: "test-category" }) }
     );
     expect(res.status).toBe(403);
     const json = await res.json();
