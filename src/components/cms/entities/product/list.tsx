@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input } from "@/components/cms/ui/input";
-import { Button } from "@/components/cms/ui/button";
+import { Input, Button } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import Link from "next/link";
 import Image from "next/image";

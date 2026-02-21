@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Input } from "@/components/cms/ui/input";
-import { Label } from "@/components/cms/ui/label";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Input, Label, Button, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ImagePickerPanel, {
   baseName as baseNameFromPicker,

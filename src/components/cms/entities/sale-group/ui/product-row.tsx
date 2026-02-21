@@ -2,8 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Button, showToast } from "@/components/cms/ui";
 import Image from "next/image";
 import { apiDelete, apiPost } from "@/lib/api/client";
 

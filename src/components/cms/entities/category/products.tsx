@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ViewProducts from "./ui/view-products";
 import OrganizeProducts from "./ui/organize-products";

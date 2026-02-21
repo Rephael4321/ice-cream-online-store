@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Button } from "@/components/cms/ui/button";
-import { Label } from "@/components/cms/ui/label";
+import { Button, Label } from "@/components/cms/ui";
 
 type Group = {
   id: number;

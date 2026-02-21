@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { showToast } from "@/components/cms/ui/toast";
+import { showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import Link from "next/link";
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";

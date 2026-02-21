@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import { Trash2 } from "lucide-react";
 
 interface SaleGroupItemProps {

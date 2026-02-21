@@ -3,10 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Input } from "@/components/cms/ui/input";
-import { Label } from "@/components/cms/ui/label";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Input, Label, Button, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { apiDelete, apiGet, apiPut } from "@/lib/api/client";
 

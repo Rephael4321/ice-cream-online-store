@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Input } from "@/components/cms/ui/input";
-import { Label } from "@/components/cms/ui/label";
-import { Button } from "@/components/cms/ui/button";
+import { Input, Label, Button } from "@/components/cms/ui";
 import UploadImage from "@/components/cms/entities/image/upload";
 import UploadFolder from "@/components/cms/entities/image/upload-folder";
 import { apiGet } from "@/lib/api/client";

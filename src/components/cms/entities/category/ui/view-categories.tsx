@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import Image from "next/image";
 import { apiGet } from "@/lib/api/client";
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Input } from "@/components/cms/ui/input";
+import { Input } from "@/components/cms/ui";
 
 export default function SearchBar() {
   const router = useRouter();

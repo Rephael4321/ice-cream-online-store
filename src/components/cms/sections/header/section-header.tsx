@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import Link from "next/link";
 import {
   createContext,

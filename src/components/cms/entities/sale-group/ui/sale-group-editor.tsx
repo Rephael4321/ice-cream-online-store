@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/cms/ui/button";
-import { Input } from "@/components/cms/ui/input";
-import { showToast } from "@/components/cms/ui/toast";
-import { Label } from "@/components/cms/ui/label";
+import { Button, Input, showToast, Label } from "@/components/cms/ui";
 import Link from "next/link";
 import CategoryLinker from "@/components/cms/entities/sale-group/ui/category-linker";
 import { apiDelete, apiPatch } from "@/lib/api/client";

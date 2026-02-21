@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import { useRef } from "react";
 import Link from "next/link";
-import { AddressDisplay } from "../AddressDisplay";
+import { AddressDisplay } from "../address-display";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 

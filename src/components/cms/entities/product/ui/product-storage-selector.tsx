@@ -7,8 +7,8 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/cms/ui/select";
-import { showToast } from "@/components/cms/ui/toast";
+  showToast,
+} from "@/components/cms/ui";
 import { apiGet, apiPost } from "@/lib/api/client";
 
 interface StorageArea {

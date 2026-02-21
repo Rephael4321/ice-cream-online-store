@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import ImageSelector, { BaseItem } from "@/components/cms/ui/image-selector";
 import { apiGet, apiPost } from "@/lib/api/client";
 

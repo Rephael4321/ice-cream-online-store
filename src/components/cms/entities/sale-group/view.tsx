@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { showToast } from "@/components/cms/ui/toast";
+import { showToast } from "@/components/cms/ui";
 import { SaleGroupEditor } from "./ui/sale-group-editor";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ImagePickerPanel from "@/components/cms/shared/image-picker-panel";

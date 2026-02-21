@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { showToast } from "@/components/cms/ui/toast";
+import { showToast } from "@/components/cms/ui";
 import { apiDelete, apiGet, apiPost } from "@/lib/api/client";
 
 type SaleGroupSummary = {

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/cms/ui/input";
+import { Input } from "@/components/cms/ui";
 import Image from "next/image";
-import SaleGroupCard from "./ui/sale-group-card";
+import SaleGroupCard from "./sale-group-card";
 import ProductSaleGroupMenu from "@/components/cms/entities/sale-group/ui/product-sale-group-menu";
 import { apiGet } from "@/lib/api/client";
 

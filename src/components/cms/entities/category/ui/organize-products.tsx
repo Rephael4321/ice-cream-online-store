@@ -17,7 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import Image from "next/image";
 import { apiGet, apiPut } from "@/lib/api/client";
 

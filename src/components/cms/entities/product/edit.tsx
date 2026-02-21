@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input } from "@/components/cms/ui/input";
-import { Button } from "@/components/cms/ui/button";
-import { Label } from "@/components/cms/ui/label";
-import { showToast } from "@/components/cms/ui/toast";
+import { Input, Button, Label, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import Category from "@/components/cms/entities/product/ui/category";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";

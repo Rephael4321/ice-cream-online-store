@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Label } from "@/components/cms/ui/label";
 import {
+  Label,
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/cms/ui/select";
-import { Button } from "@/components/cms/ui/button";
+  Button,
+} from "@/components/cms/ui";
 import { apiDelete, apiGet, apiPost } from "@/lib/api/client";
 
 interface Category {

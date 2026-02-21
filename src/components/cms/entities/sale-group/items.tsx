@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { SaleGroupItem } from "./ui/sale-group-item";
-import { showToast } from "@/components/cms/ui/toast";
+import { showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { apiDelete, apiGet } from "@/lib/api/client";
 

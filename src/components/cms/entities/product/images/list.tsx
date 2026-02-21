@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import ImageGrid from "./ui/image-grid";
 import UploadImage from "@/components/cms/entities/image/upload";
 import UploadFolder from "@/components/cms/entities/image/upload-folder";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { apiGet } from "@/lib/api/client";
 

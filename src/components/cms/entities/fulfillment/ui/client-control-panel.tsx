@@ -1,7 +1,7 @@
 "use client";
 
-import { showToast } from "@/components/cms/ui/toast";
-import { AddressDisplay } from "./AddressDisplay";
+import { showToast } from "@/components/cms/ui";
+import { AddressDisplay } from "./address-display";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 

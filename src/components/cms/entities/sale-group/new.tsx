@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/cms/ui/input";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Input, Button, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ImagePickerPanel, {
   baseName as baseNameFromPicker,

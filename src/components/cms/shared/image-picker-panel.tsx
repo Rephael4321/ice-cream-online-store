@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Input } from "@/components/cms/ui/input";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Input, Button, showToast } from "@/components/cms/ui";
 import Image from "next/image";
 import { api, apiGet } from "@/lib/api/client";
 

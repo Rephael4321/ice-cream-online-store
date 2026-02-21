@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Button, showToast, Input } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
-import { Input } from "@/components/cms/ui/input";
 import "react-datepicker/dist/react-datepicker.css";
 import DatePicker from "react-datepicker";
 import SingleOrder from "./ui/list/single-order";

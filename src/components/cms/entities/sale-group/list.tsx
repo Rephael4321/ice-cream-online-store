@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SaleGroupCard } from "./ui/sale-group-card";
-import { showToast } from "@/components/cms/ui/toast";
-import { Button } from "@/components/cms/ui/button";
+import { showToast, Button } from "@/components/cms/ui";
 import Link from "next/link";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { apiGet } from "@/lib/api/client";

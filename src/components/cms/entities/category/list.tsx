@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ViewCategories from "./ui/view-categories";
 import OrganizeCategories from "./ui/organize-categories";

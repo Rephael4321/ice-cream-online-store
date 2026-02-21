@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { showToast } from "@/components/cms/ui/toast";
+import { showToast, Button } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
-import { Button } from "@/components/cms/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { apiGet, apiPatch } from "@/lib/api/client";

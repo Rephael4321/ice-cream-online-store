@@ -19,9 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/components/cms/ui/input";
-import { Button } from "@/components/cms/ui/button";
-import { showToast } from "@/components/cms/ui/toast";
+import { Input, Button, showToast } from "@/components/cms/ui";
 import { Trash2, GripVertical, Check } from "lucide-react";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { apiDelete, apiGet, apiPost } from "@/lib/api/client";

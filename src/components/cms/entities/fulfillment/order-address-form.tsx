@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AddressSearch, type SelectedPlace } from "@/components/AddressSearch";
-import { showToast } from "@/components/cms/ui/toast";
-import { Button } from "@/components/cms/ui/button";
+import { AddressSearch, type SelectedPlace } from "@/components/address-search";
+import { showToast, Button } from "@/components/cms/ui";
 import { apiGet, apiPatch } from "@/lib/api/client";
 
 type Client = {

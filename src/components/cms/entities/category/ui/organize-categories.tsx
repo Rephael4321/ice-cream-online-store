@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button } from "@/components/cms/ui/button";
+import { Button } from "@/components/cms/ui";
 import Image from "next/image";
 import { apiGet, apiPut } from "@/lib/api/client";
 
