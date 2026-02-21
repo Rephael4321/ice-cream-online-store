@@ -38,6 +38,7 @@
     "zod": "^4.0.14"
   },
   "devDependencies": {
+    "pg-dump-restore": "^1.0.15",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.6.3",
