@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { withMiddleware } from "@/lib/api/with-middleware";
 
 type Category = {
   id: number;
@@ -285,6 +286,6 @@ async function updateCategory(req: NextRequest) {
   }
 }
 
-export const GET = getCategories;
-export const POST = createCategory;
-export const PATCH = updateCategory;
+export const GET = withMiddleware(getCategories);
+export const POST = withMiddleware(createCategory);
+export const PATCH = withMiddleware(updateCategory);

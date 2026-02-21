@@ -70,12 +70,10 @@ export default function OrderAddressPage() {
     if (!client || !selectedPlace) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/clients/${client.id}`, {
-        method: "PUT",
+      const res = await fetch(`/api/clients/${client.id}/address`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: client.name,
-          phone: client.phone,
           address: selectedPlace.formattedAddress,
           address_lat: selectedPlace.lat,
           address_lng: selectedPlace.lng,
