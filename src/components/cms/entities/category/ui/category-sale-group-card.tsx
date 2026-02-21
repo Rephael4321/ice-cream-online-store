@@ -10,7 +10,7 @@ type ProductInGroup = {
   color: string;
 };
 
-type SaleGroupCardProps = {
+export type CategorySaleGroupCardProps = {
   group: {
     id: number;
     name: string;
@@ -22,11 +22,9 @@ type SaleGroupCardProps = {
   };
 };
 
-export default function SaleGroupCard({
+export function CategorySaleGroupCard({
   group,
-}: {
-  group: SaleGroupCardProps["group"];
-}) {
+}: CategorySaleGroupCardProps) {
   const { name, image, price, sale_price, quantity, products } = group;
 
   return (

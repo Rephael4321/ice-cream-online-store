@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import ImageGrid from "./ui/image-grid";
+import ProductImageGrid from "./ui/product-image-grid";
 import UploadImage from "@/components/cms/entities/image/upload";
 import UploadFolder from "@/components/cms/entities/image/upload-folder";
 import { Button } from "@/components/cms/ui";
@@ -178,7 +178,7 @@ export default function ProductImagesList() {
       )}
 
       {/* Server sorts; grid groups locally for UI only */}
-      <ImageGrid images={images} groupBy={sort} order={order} />
+      <ProductImageGrid images={images} groupBy={sort} order={order} />
 
       {/* Load more */}
       {hasMore && (

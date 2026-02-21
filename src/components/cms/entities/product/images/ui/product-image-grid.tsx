@@ -4,7 +4,7 @@ import ImageCard from "./image-card";
 
 type GroupBy = "name" | "updated" | "size";
 
-export default function ImageGrid({
+export default function ProductImageGrid({
   images,
   groupBy = "updated",
   order = "desc",

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { Button, Label } from "@/components/cms/ui";
+import { Dialog } from "@/components/cms/ui";
 
 type Group = {
   id: number;
@@ -40,26 +40,9 @@ export default function SaleGroupPriceConflictModal({
   onDetach: () => Promise<void>;
   onPropagate: () => Promise<void>;
 }) {
-  // Close on ESC
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="sale-group-conflict-title"
-      onClick={onClose} // backdrop click closes
-    >
-      <div
-        className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()} // prevent closing when clicking content
-      >
-        <div className="mb-4">
+    <Dialog open titleId="sale-group-conflict-title" onClose={onClose}>
+      <div className="mb-4">
           <h2 id="sale-group-conflict-title" className="text-xl font-semibold">
             המוצר שייך לקבוצת מבצע
           </h2>
@@ -131,7 +114,6 @@ export default function SaleGroupPriceConflictModal({
             השאר בקבוצה ועדכן את כולם + נתוני הקבוצה
           </Button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import type { ImageItem } from "./image-grid";
+import type { ImageItem } from "./image-library-grid";
 import { api, apiPost } from "@/lib/api/client";
 
 export default function ImageTile({

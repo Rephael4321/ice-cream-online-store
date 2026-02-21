@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UploadImage from "./upload";
 import UploadFolder from "./upload-folder";
-import ImageGrid from "./ui/image-grid";
+import ImageLibraryGrid from "./ui/image-library-grid";
 import { api, apiGet } from "@/lib/api/client";
 
 type ImageItem = { url: string; key: string; name: string };
@@ -118,7 +118,7 @@ export default function ViewImages() {
           אין תמונות עדיין. העלה/י תמונה כדי להתחיל.
         </div>
       ) : (
-        <ImageGrid
+        <ImageLibraryGrid
           images={images}
           onFreeze={setFreezeMsg}
           selectMode={selectMode}

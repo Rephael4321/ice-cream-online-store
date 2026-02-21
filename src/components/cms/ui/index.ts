@@ -10,3 +10,4 @@ export {
   SelectItem,
 } from "./select";
 export { showToast, dismissToast, type ToastType } from "./toast";
+export { Dialog } from "./dialog";

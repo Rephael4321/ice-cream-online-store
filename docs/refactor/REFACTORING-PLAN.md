@@ -4,6 +4,20 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 
 ---
 
+## Progress summary
+
+| Category | Status   | Items done |
+| -------- | -------- | ---------- |
+| 1 – API  | ✅ Done  | 1.1, 1.2, 1.3 |
+| 2 – Pages | ✅ Done | 2.1, 2.2, 2.3 |
+| 3 – Component structure | ✅ Done | 3.1, 3.2, 3.3 |
+| 4 – Duplication | ✅ Done | 4.1, 4.2, 4.3 |
+| 5 – Documentation | Pending | — |
+
+**Next:** Category 5 (document thin-page rule, component structure, API usage).
+
+---
+
 ## Completed (Category 1 – API)
 
 - **1.1** Unused API routes removed: `api/categories/[id]`, `api/categories/[id]/products`, `api/categories/[id]/products/order`, `api/images/index`, `api/images/update-index`, `api/products/by-sale`, `api/storage/unplaced-products`. Category API is now **name-based only** (1.2).
@@ -20,13 +34,19 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 - **3.2** Redundant `ui/ui` folder removed: `category/ui/ui/sale-group-card.tsx` moved to `category/ui/sale-group-card.tsx`; inner `ui` folder deleted. `view-products.tsx` import updated to `./sale-group-card`.
 - **3.3** Barrel added: `src/components/cms/ui/index.ts` re-exports `Button`, `Input`, `Label`, `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`, `showToast`, `dismissToast`, `ToastType`. All client imports of these primitives now use `@/components/cms/ui`.
 
+## Completed (Category 4 – Duplication and naming)
+
+- **4.1** Category SaleGroupCard renamed to `CategorySaleGroupCard` in `src/components/cms/entities/category/ui/category-sale-group-card.tsx`; old `sale-group-card.tsx` removed. `view-products.tsx` updated. Sale-group entity keeps `SaleGroupCard` in `sale-group/ui/sale-group-card.tsx`.
+- **4.2** Product images grid: `image-grid.tsx` → `ProductImageGrid` in `product-image-grid.tsx`; image entity grid → `ImageLibraryGrid` in `image-library-grid.tsx` (with `ImageItem` export). Imports updated in product images list, image view, and image-tile.
+- **4.3** Shared `Dialog` added at `src/components/cms/ui/dialog.tsx` (role="dialog", aria-modal, Escape + backdrop close, initial focus). Exported from CMS UI barrel. Sale-group price-conflict modal refactored to use it; other modals can be migrated over time.
+
 ---
 
 ## Current state (summary)
 
 - **API**: Unused routes removed (1.1, 1.2). Centralized client at `src/lib/api/client.ts`; all client-side API calls use it (1.3 done).
 - **Pages**: Order address is a thin wrapper; logic lives in `src/components/cms/entities/fulfillment/order-address-form.tsx` using shared `Button`. All pages under `src/app` are `.tsx` (categories/new migrated from .jsx).
-- **Components**: Component file naming standardized for AddressSearch/AddressDisplay (kebab-case). Category `ui/ui` folder removed; `sale-group-card` lives in `category/ui/`. CMS UI barrel at `src/components/cms/ui/index.ts`; all primitive imports use it. Remaining: two different `SaleGroupCard` implementations, two different `ImageGrid` implementations, and mixed modal patterns (Category 4).
+- **Components**: Naming clarified: category uses `CategorySaleGroupCard`; product images use `ProductImageGrid`, image entity uses `ImageLibraryGrid`. Shared `Dialog` in `cms/ui/dialog.tsx`; sale-group price-conflict modal migrated. Other modals (fulfillment, cart, image-picker) can adopt `Dialog` over time.
 
 ---
 
@@ -72,9 +92,9 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 
 | #   | Status | Action                                                   | Details                                                                                                                                                                                                                                                                                                                                                           |
 | --- | ------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4.1 |        | **Rename category SaleGroupCard to avoid collision**     | The category entity has a different `SaleGroupCard` (group with products, used in view-products) than the sale-group entity's `SaleGroupCard` (link card in list). Rename the category one to e.g. `CategorySaleGroupCard` or `SaleGroupProductCard`, and use that name for the file and export. Update imports in `view-products.tsx` and any other category UI. |
-| 4.2 |        | **Rename one or both ImageGrid components**              | Product images: `cms/entities/product/images/ui/image-grid.tsx`; image entity: `cms/entities/image/ui/image-grid.tsx`. Rename to distinct names (e.g. `ProductImageGrid` and `ImageLibraryGrid`) and update imports so it's clear which grid is used where.                                                                                                       |
-| 4.3 |        | **Introduce a shared Modal/Dialog primitive (optional)** | Today modals are implemented ad hoc in several places (e.g. fulfillment view, cart, image-picker-panel). Optionally add a single reusable component (e.g. `src/components/cms/ui/dialog.tsx` or `modal.tsx`) with accessibility (aria-modal, focus trap) and refactor one or two high-traffic flows first; then migrate others over time.                         |
+| 4.1 | ✅ Done | **Rename category SaleGroupCard to avoid collision**     | The category entity has a different `SaleGroupCard` (group with products, used in view-products) than the sale-group entity's `SaleGroupCard` (link card in list). Rename the category one to e.g. `CategorySaleGroupCard` or `SaleGroupProductCard`, and use that name for the file and export. Update imports in `view-products.tsx` and any other category UI. |
+| 4.2 | ✅ Done | **Rename one or both ImageGrid components**              | Product images: `cms/entities/product/images/ui/image-grid.tsx`; image entity: `cms/entities/image/ui/image-grid.tsx`. Rename to distinct names (e.g. `ProductImageGrid` and `ImageLibraryGrid`) and update imports so it's clear which grid is used where.                                                                                                       |
+| 4.3 | ✅ Done | **Introduce a shared Modal/Dialog primitive (optional)** | Today modals are implemented ad hoc in several places (e.g. fulfillment view, cart, image-picker-panel). Optionally add a single reusable component (e.g. `src/components/cms/ui/dialog.tsx` or `modal.tsx`) with accessibility (aria-modal, focus trap) and refactor one or two high-traffic flows first; then migrate others over time.                         |
 
 ---
 
@@ -102,11 +122,11 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 
 Execute in order within each category; categories can be reordered by priority:
 
-1. **Category 1** (API) – 1.1, then 1.2; 1.3 later if desired.
-2. **Category 2** (Pages) – 2.1 and 2.2 together for the address page; then 2.3.
-3. **Category 3** (Structure) – 3.1, 3.2; 3.3 when convenient.
-4. **Category 4** (Duplication) – 4.1, 4.2; 4.3 when you want a shared modal.
-5. **Category 5** (Docs) – 5.1 after 2.1/2.2; 5.2 and 5.3 anytime.
+1. ~~**Category 1** (API)~~ ✅ Done – 1.1, 1.2, 1.3.
+2. ~~**Category 2** (Pages)~~ ✅ Done – 2.1, 2.2, 2.3.
+3. ~~**Category 3** (Structure)~~ ✅ Done – 3.1, 3.2, 3.3.
+4. ~~**Category 4** (Duplication)~~ ✅ Done – 4.1, 4.2, 4.3.
+5. **Category 5** (Docs) – 5.1, 5.2, 5.3 anytime.
 
 ---
 

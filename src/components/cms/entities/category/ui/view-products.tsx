@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/cms/ui";
 import Image from "next/image";
-import SaleGroupCard from "./sale-group-card";
+import { CategorySaleGroupCard } from "./category-sale-group-card";
 import ProductSaleGroupMenu from "@/components/cms/entities/sale-group/ui/product-sale-group-menu";
 import { apiGet } from "@/lib/api/client";
 
@@ -306,7 +306,7 @@ export default function ViewProducts({ name }: { name: string }) {
                 </div>
               </div>
             ) : (
-              <SaleGroupCard key={`group-${item.id}`} group={item} />
+              <CategorySaleGroupCard key={`group-${item.id}`} group={item} />
             )
           )}
         </div>

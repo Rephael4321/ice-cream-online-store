@@ -14,7 +14,7 @@ type Props = {
   onEnterSelectMode?: () => void;
 };
 
-export default function ImageGrid({
+export default function ImageLibraryGrid({
   images = [],
   onFreeze,
   selectMode = false,
