@@ -27,11 +27,14 @@
 
 ---
 
-## 2. Google Maps
+## 2. Places (address search, key server-only)
+
+The Google API key is never sent to the client. These routes proxy Google Places on the server.
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| GET | `/api/google-maps-key` | **Anyone** | Get `GOOGLE_MAPS_API_KEY` from env (or 500 if unset). No auth. | Yes (AddressSearch) |
+| GET | `/api/places/autocomplete` | **Anyone** (GET) | Place suggestions for address search. Server calls Google with key from env. | Yes (AddressSearch) |
+| GET | `/api/places/details` | **Anyone** (GET) | Formatted address and lat/lng for a `place_id`. Server calls Google with key from env. | Yes (AddressSearch) |
 
 ---
 
@@ -180,7 +183,7 @@
 
 | Role | Allowed actions |
 |------|------------------|
-| **Anyone (no auth)** | All GETs (except where middleware restricts), POST `/api/orders`, POST `/api/auth/verify`, GET `/api/auth/entry`, GET `/api/google-maps-key`, GET `/api/img-proxy`, GET `/api/categories`, GET `/api/orders/by-phone`, PATCH `/api/orders/[id]/notify`, GET `/api/products/stock`, POST `/api/products/sale-groups`. |
+| **Anyone (no auth)** | All GETs (except where middleware restricts), POST `/api/orders`, POST `/api/auth/verify`, GET `/api/auth/entry`, GET `/api/img-proxy`, GET `/api/places/autocomplete`, GET `/api/places/details`, GET `/api/categories`, GET `/api/orders/by-phone`, PATCH `/api/orders/[id]/notify`, GET `/api/products/stock`, POST `/api/products/sale-groups`. |
 | **Client** | GET `/api/orders/client/[id]` only when cookie `phoneNumber` matches the order’s client phone. |
 | **Driver** | Same as admin for: PATCH `/api/orders/[id]/status`, PATCH `/api/orders/[id]/delivery`, PATCH `/api/orders/[id]/payment`, PATCH `/api/clients/[id]/address`. All other non-GET: admin only. |
 | **Admin** | All non-GET endpoints (except those with skipAuth). GETs are public; admin also gets redirect from `/api/orders/client/[id]` to CMS order page. |
