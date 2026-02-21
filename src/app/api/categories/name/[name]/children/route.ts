@@ -4,10 +4,10 @@ import { withMiddleware } from "@/lib/api/with-middleware";
 
 async function getCategoryChildren(
   _req: NextRequest,
-  context: { params: { name: string } }
+  context: { params: Promise<{ name: string }> }
 ) {
   try {
-    const { name } = context.params;
+    const { name } = await context.params;
     const slug = decodeURIComponent(name);
 
     const categoryRes = await pool.query<{ id: number }>(

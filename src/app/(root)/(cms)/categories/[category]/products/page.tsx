@@ -1,10 +1,11 @@
 import ProductsCategory from "@/components/cms/entities/category/products";
 
-export default function CategoryProductsPage({
+export default async function CategoryProductsPage({
   params,
 }: {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 }) {
-  const name = decodeURIComponent(params.category);
+  const { category } = await params;
+  const name = decodeURIComponent(category);
   return <ProductsCategory name={name} />;
 }

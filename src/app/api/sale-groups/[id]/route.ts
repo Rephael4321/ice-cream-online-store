@@ -15,15 +15,11 @@ type SaleGroup = {
   categories?: { id: number; name: string }[];
 };
 
-async function resolveParams<T>(p: T | Promise<T>): Promise<T> {
-  return await Promise.resolve(p);
-}
-
 async function getSaleGroup(
   _req: NextRequest,
-  context: { params: { id: string } } | { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: idStr } = await resolveParams((context as any).params);
+  const { id: idStr } = await params;
   const id = Number(idStr);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -68,9 +64,9 @@ async function getSaleGroup(
 
 async function updateSaleGroup(
   req: NextRequest,
-  context: { params: { id: string } } | { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: idStr } = await resolveParams((context as any).params);
+  const { id: idStr } = await params;
   const id = Number(idStr);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -144,9 +140,9 @@ async function updateSaleGroup(
 
 async function deleteSaleGroup(
   _req: NextRequest,
-  context: { params: { id: string } } | { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: idStr } = await resolveParams((context as any).params);
+  const { id: idStr } = await params;
   const id = Number(idStr);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });

@@ -3,24 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
 
-// Works whether params is sync or a Promise (Next 15 dynamic)
-async function resolveParams<T>(p: T | Promise<T>): Promise<T> {
-  return await Promise.resolve(p);
-}
-
 function eqMoney(a: number, b: number) {
   return Number(Number(a).toFixed(2)) === Number(Number(b).toFixed(2));
 }
 
 async function addProductToSaleGroup(
   _req: NextRequest,
-  context:
-    | { params: { id: string; productId: string } }
-    | { params: Promise<{ id: string; productId: string }> }
+  { params }: { params: Promise<{ id: string; productId: string }> }
 ) {
-  const { id: idStr, productId: productIdStr } = await resolveParams(
-    (context as any).params
-  );
+  const { id: idStr, productId: productIdStr } = await params;
   const groupId = Number(idStr);
   const productId = Number(productIdStr);
 
@@ -114,13 +105,9 @@ async function addProductToSaleGroup(
 
 async function removeProductFromSaleGroup(
   _req: NextRequest,
-  context:
-    | { params: { id: string; productId: string } }
-    | { params: Promise<{ id: string; productId: string }> }
+  { params }: { params: Promise<{ id: string; productId: string }> }
 ) {
-  const { id: idStr, productId: productIdStr } = await resolveParams(
-    (context as any).params
-  );
+  const { id: idStr, productId: productIdStr } = await params;
   const groupId = Number(idStr);
   const productId = Number(productIdStr);
 

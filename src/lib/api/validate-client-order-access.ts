@@ -4,17 +4,18 @@ import { verifyJWT } from "@/lib/jwt";
 
 export async function validateClientOrderAccess(
   req: NextRequest,
-  context: { params: { id: string }; [key: string]: any }
+  context: { params: Promise<{ id: string }>; [key: string]: any }
 ): Promise<NextResponse | void> {
   const cookie = cookies();
   const phone = (await cookie).get("phoneNumber")?.value;
   const token = (await cookie).get("token")?.value;
-  const orderId = Number(context.params.id);
+  const { id } = await context.params;
+  const orderId = Number(id);
 
   console.log("🔐 Validating client order access...");
 
   if (isNaN(orderId)) {
-    console.warn("❌ Invalid order ID:", context.params.id);
+    console.warn("❌ Invalid order ID:", id);
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 

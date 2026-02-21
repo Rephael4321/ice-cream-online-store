@@ -7,9 +7,10 @@ const schema = z.object({ isDelivered: z.boolean() });
 
 async function updateDelivery(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }

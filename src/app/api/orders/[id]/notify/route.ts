@@ -4,9 +4,10 @@ import pool from "@/lib/db";
 
 async function notifyOrder(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(context.params.id);
+  const { id } = await context.params;
+  const orderId = Number(id);
   if (isNaN(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }

@@ -5,9 +5,10 @@ import { withMiddleware } from "@/lib/api/with-middleware";
 /* ─── GET (public): return out-of-stock product IDs for given order ─── */
 async function getOutOfStock(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (isNaN(orderId))
     return NextResponse.json({ outOfStock: [] }, { status: 400 });
 
@@ -25,9 +26,10 @@ async function getOutOfStock(
 /* ─── PATCH (admin only): toggle product stock status ─── */
 async function updateProductStock(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (isNaN(orderId))
     return NextResponse.json({ error: "Bad order id" }, { status: 400 });
 

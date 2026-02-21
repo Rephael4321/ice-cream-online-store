@@ -4,9 +4,10 @@ import pool from "@/lib/db";
 
 async function getCategoryProducts(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const categoryId = Number(params.id);
+  const { id } = await params;
+  const categoryId = Number(id);
   if (isNaN(categoryId)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
   }

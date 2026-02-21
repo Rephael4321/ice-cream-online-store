@@ -3,11 +3,13 @@ import { withMiddleware } from "@/lib/api/with-middleware";
 import pool from "@/lib/db";
 
 async function addToGroup(
-  _req: NextRequest,
-  { params }: { params: { id: string; productId: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const groupId = Number(params.id);
-  const productId = Number(params.productId);
+  const { id: idParam } = await params;
+  const groupId = Number(idParam);
+  const body = await req.json().catch(() => ({}));
+  const productId = Number(body.productId ?? body.product_id);
 
   if (isNaN(groupId) || isNaN(productId)) {
     return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
@@ -95,11 +97,15 @@ async function addToGroup(
 }
 
 async function removeFromGroup(
-  _req: NextRequest,
-  { params }: { params: { id: string; productId: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const groupId = Number(params.id);
-  const productId = Number(params.productId);
+  const { id: idParam } = await params;
+  const groupId = Number(idParam);
+  const productIdParam =
+    req.nextUrl.searchParams.get("productId") ??
+    req.nextUrl.searchParams.get("product_id");
+  const productId = Number(productIdParam);
 
   if (isNaN(groupId) || isNaN(productId)) {
     return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });

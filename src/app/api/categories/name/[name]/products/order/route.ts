@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-type Ctx = { params: { name: string } };
+type Ctx = { params: Promise<{ name: string }> };
 
 function normalizeName(input: string): string {
   return String(input || "")
@@ -23,7 +23,8 @@ async function getCategoryIdByName(nameOrSlug: string) {
 }
 
 async function putOrder(req: NextRequest, context: Ctx) {
-  const categoryId = await getCategoryIdByName(context.params.name);
+  const { name } = await context.params;
+  const categoryId = await getCategoryIdByName(name);
   if (!categoryId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

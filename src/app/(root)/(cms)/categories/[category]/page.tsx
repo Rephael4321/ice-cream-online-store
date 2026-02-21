@@ -1,10 +1,11 @@
 import EditCategory from "@/components/cms/entities/category/edit";
 
-export default function EditCategoryPage({
+export default async function EditCategoryPage({
   params,
 }: {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 }) {
-  const name = decodeURIComponent(params.category);
+  const { category } = await params;
+  const name = decodeURIComponent(category);
   return <EditCategory name={name} />;
 }

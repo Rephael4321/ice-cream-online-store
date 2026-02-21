@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-type Ctx = { params: { name: string } };
+type Ctx = { params: Promise<{ name: string }> };
 
 // normalize: collapse any whitespace to '-', collapse multiple dashes, trim dashes
 function normalizeName(input: string): string {
@@ -29,7 +29,8 @@ async function findCategoryIdByName(
 }
 
 async function getCategoryByName(_req: NextRequest, context: Ctx) {
-  const id = await findCategoryIdByName(context.params.name);
+  const { name } = await context.params;
+  const id = await findCategoryIdByName(name);
   if (!id) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { rows } = await pool.query(
@@ -45,7 +46,8 @@ async function getCategoryByName(_req: NextRequest, context: Ctx) {
 }
 
 async function updateCategoryByName(req: NextRequest, context: Ctx) {
-  const id = await findCategoryIdByName(context.params.name);
+  const { name } = await context.params;
+  const id = await findCategoryIdByName(name);
   if (!id) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
@@ -104,7 +106,8 @@ async function updateCategoryByName(req: NextRequest, context: Ctx) {
 }
 
 async function deleteCategoryByName(_req: NextRequest, context: Ctx) {
-  const id = await findCategoryIdByName(context.params.name);
+  const { name } = await context.params;
+  const id = await findCategoryIdByName(name);
   if (!id) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await pool.query(`DELETE FROM categories WHERE id = $1`, [id]);

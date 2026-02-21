@@ -4,9 +4,14 @@ const BUCKET = process.env.MEDIA_BUCKET || "ice-cream-online-store";
 const REGION = process.env.AWS_REGION || "us-east-1";
 
 const nextConfig: NextConfig = {
-  typescript: { ignoreBuildErrors: true }, // ✅ disables type checking during `next build`
-  eslint: { ignoreDuringBuilds: true }, // ✅ disables ESLint during `next build`
+  typescript: { ignoreBuildErrors: true },
+  // eslint: no longer configurable here in Next.js 16; use eslint.config.js or CLI
   images: {
+    // Next.js 16: allow local images (public folder + img-proxy)
+    localPatterns: [
+      { pathname: "/api/img-proxy" },
+      { pathname: "/**" }, // public folder: /favicon_io/..., /icons/..., /popsicle.png, etc.
+    ],
     remotePatterns: [
       // Non-region host (worked before)
       {

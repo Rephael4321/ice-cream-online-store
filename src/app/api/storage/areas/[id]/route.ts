@@ -4,9 +4,10 @@ import pool from "@/lib/db";
 
 async function deleteStorageArea(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = Number(params.id);
+  const { id: idParam } = await params;
+  const id = Number(idParam);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }

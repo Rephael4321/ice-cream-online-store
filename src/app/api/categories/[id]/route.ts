@@ -28,9 +28,10 @@ type CategorySale = {
 
 async function getCategory(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = Number(params.id);
+  const { id: idParam } = await params;
+  const id = Number(idParam);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
   }
@@ -129,7 +130,7 @@ async function getCategory(
 
 async function updateCategory(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const {
@@ -152,7 +153,8 @@ async function updateCategory(
       salePrice?: number;
     } = await req.json();
 
-    const id = Number(params.id);
+    const { id: idParam } = await params;
+    const id = Number(idParam);
     if (!id || !name || !type || !["collection", "sale"].includes(type)) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
@@ -209,9 +211,10 @@ async function updateCategory(
 
 async function deleteCategory(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = Number(params.id);
+  const { id: idParam } = await params;
+  const id = Number(idParam);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid category ID" }, { status: 400 });
   }

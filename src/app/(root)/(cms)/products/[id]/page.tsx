@@ -1,9 +1,10 @@
 import EditProduct from "@/components/cms/entities/product/edit";
 
 interface ProductPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function ProductPage({ params }: ProductPageProps) {
-  return <EditProduct params={Promise.resolve(params)} />;
+export default async function ProductPage({ params }: ProductPageProps) {
+  const resolved = await params;
+  return <EditProduct params={Promise.resolve(resolved)} />;
 }

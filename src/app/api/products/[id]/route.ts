@@ -44,10 +44,11 @@ function toBool(v: unknown): boolean {
 
 async function getProduct(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = Number(params.id);
+    const { id } = await params;
+    const productId = Number(id);
     if (isNaN(productId)) {
       return NextResponse.json(
         { error: "Invalid product ID" },
@@ -141,11 +142,12 @@ async function getProduct(
 
 async function updateProduct(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = Number(params.id);
-    if (isNaN(id)) {
+    const { id } = await params;
+    const idNum = Number(id);
+    if (isNaN(idNum)) {
       return NextResponse.json(
         { error: "Invalid product ID" },
         { status: 400 }
@@ -163,7 +165,7 @@ async function updateProduct(
 
     await pool.query(
       "UPDATE products SET name = $1, price = $2, image = $3 WHERE id = $4",
-      [name, price, image, id]
+      [name, price, image, idNum]
     );
 
     const quantity = Number(saleQuantity);
@@ -172,24 +174,24 @@ async function updateProduct(
     const isValidSalePrice = !isNaN(sale) && sale >= 0;
 
     if (saleQuantity === null && salePrice === null) {
-      await pool.query("DELETE FROM sales WHERE product_id = $1", [id]);
+      await pool.query("DELETE FROM sales WHERE product_id = $1", [idNum]);
       return NextResponse.json({ message: "Product updated and sale removed" });
     } else if (isValidQuantity && isValidSalePrice) {
       const result = await pool.query(
         "SELECT id FROM sales WHERE product_id = $1",
-        [id]
+        [idNum]
       );
 
       if (result.rows.length > 0) {
         await pool.query(
           "UPDATE sales SET quantity = $1, sale_price = $2 WHERE product_id = $3",
-          [quantity, sale, id]
+          [quantity, sale, idNum]
         );
         return NextResponse.json({ message: "Product and sale updated" });
       } else {
         await pool.query(
           "INSERT INTO sales (product_id, quantity, sale_price) VALUES ($1, $2, $3)",
-          [id, quantity, sale]
+          [idNum, quantity, sale]
         );
         return NextResponse.json({ message: "Product updated and sale added" });
       }
@@ -205,18 +207,19 @@ async function updateProduct(
 
 async function deleteProduct(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = Number(params.id);
-    if (isNaN(id)) {
+    const { id } = await params;
+    const idNum = Number(id);
+    if (isNaN(idNum)) {
       return NextResponse.json(
         { error: "Invalid product ID" },
         { status: 400 }
       );
     }
 
-    const result = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+    const result = await pool.query("DELETE FROM products WHERE id = $1", [idNum]);
 
     if (result.rowCount === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });

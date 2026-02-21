@@ -4,9 +4,10 @@ import pool from "@/lib/db";
 
 async function getClient(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const clientId = Number(params.id);
+  const { id } = await params;
+  const clientId = Number(id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
   }
@@ -43,9 +44,10 @@ async function getClient(
 
 async function updateClient(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const clientId = Number(params.id);
+  const { id } = await params;
+  const clientId = Number(id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
   }
@@ -84,9 +86,10 @@ async function updateClient(
 
 async function deleteClient(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const clientId = Number(params.id);
+  const { id } = await params;
+  const clientId = Number(id);
   if (isNaN(clientId)) {
     return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
   }

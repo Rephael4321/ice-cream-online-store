@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { verifyJWT } from "@/lib/jwt";
+import { getSiteUrl } from "@/lib/site-url";
 import SingleProduct from "@/components/store/single-product";
 import SaleGroupCluster from "@/components/store/sale-group-cluster";
 import Image from "next/image";
@@ -8,7 +9,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 
 export interface Props {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 }
 
 interface Category {
@@ -52,12 +53,14 @@ interface Product {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const name = decodeURIComponent(params.category).replace(/-/g, " ");
+  const { category } = await params;
+  const name = decodeURIComponent(category).replace(/-/g, " ");
   return { title: `מוצרים מתוך ${name}` };
 }
 
 export default async function ProductsByCategory({ params }: Props) {
-  const raw = decodeURIComponent(params.category);
+  const { category } = await params;
+  const raw = decodeURIComponent(category);
 
   // Slug expected by API
   const slug = raw
@@ -73,9 +76,10 @@ export default async function ProductsByCategory({ params }: Props) {
   const token = (await cookieStore).get("token")?.value;
   const isAdmin = !!(token && verifyJWT(token));
 
+  const baseUrl = getSiteUrl();
   // Try child categories first (unchanged)
   const childrenRes = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/children`,
+    `${baseUrl}/api/categories/name/${slug}/children`,
     { cache: "no-store" }
   );
   if (childrenRes.ok) {
@@ -125,7 +129,7 @@ export default async function ProductsByCategory({ params }: Props) {
 
   // Products-only API
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/name/${slug}/products`,
+    `${baseUrl}/api/categories/name/${slug}/products`,
     { cache: "no-store" }
   );
 

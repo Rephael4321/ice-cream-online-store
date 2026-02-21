@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { verifyJWT } from "@/lib/jwt";
+import { getSiteUrl } from "@/lib/site-url";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -48,10 +49,9 @@ export default async function MainMenu() {
   let categories: Category[] = [];
 
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/api/categories/root`,
-      { cache: "no-store" }
-    );
+    const res = await fetch(`${getSiteUrl()}/api/categories/root`, {
+      cache: "no-store",
+    });
 
     const contentType = res.headers.get("content-type") || "";
 

@@ -53,9 +53,10 @@ type OrderItemRow = {
 /* -------------------- GET /api/orders/:id -------------------- */
 async function getOrder(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
@@ -153,9 +154,10 @@ function normalizeToNullOrString(v: unknown): string | null | undefined {
 
 async function updateOrder(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
@@ -268,9 +270,10 @@ async function updateOrder(
 /* -------------------- DELETE /api/orders/:id -------------------- */
 async function deleteOrder(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (!Number.isInteger(orderId)) {
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
