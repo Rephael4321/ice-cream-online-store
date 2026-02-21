@@ -1,0 +1,46 @@
+/**
+ * Google Places Autocomplete dropdown styles.
+ * Uses optional --waze-* variables so the host app can theme; fallbacks work standalone.
+ * Import this in your layout (or before the Waze page) so the dropdown matches your app.
+ */
+
+/* Dropdown container and items */
+.pac-container {
+  margin-top: 4px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--waze-border, #e5e7eb);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  background: var(--waze-bg, #fff);
+  font-family: inherit;
+}
+.pac-item {
+  padding: 0.75rem 1rem;
+  color: var(--waze-text, #111);
+  border-top: 1px solid var(--waze-border, #e5e7eb);
+  cursor: pointer;
+}
+.pac-item:first-child {
+  border-top: none;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background: var(--waze-muted, #f3f4f6);
+}
+.pac-item-query {
+  color: var(--waze-text, #111);
+  font-size: 0.9375rem;
+}
+.pac-icon {
+  margin-right: 0.75rem;
+}
+
+/* "Powered by Google" at bottom – dark mode: invert when html has data-theme="dark" */
+.pac-container.pac-logo::after,
+.pac-container.hdpi::after {
+  opacity: 1;
+}
+html[data-theme="dark"] .pac-container.pac-logo::after,
+html[data-theme="dark"] .pac-container.hdpi::after {
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.95 !important;
+}

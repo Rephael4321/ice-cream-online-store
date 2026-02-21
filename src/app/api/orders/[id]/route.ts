@@ -5,9 +5,12 @@ import pool from "@/lib/db";
 
 type OrderRow = {
   orderId: number;
+  clientId: number | null;
   clientPhone: string | null;
   clientName: string | null;
   clientAddress: string | null;
+  clientAddressLat: number | null;
+  clientAddressLng: number | null;
   createdAt: string;
   updatedAt: string;
   isPaid: boolean;
@@ -61,9 +64,12 @@ async function getOrder(
     const orderResult = await pool.query<OrderRow>(
       `SELECT 
          o.id AS "orderId",
+         c.id AS "clientId",
          c.phone AS "clientPhone",
          c.name AS "clientName",
          c.address AS "clientAddress",
+         c.address_lat AS "clientAddressLat",
+         c.address_lng AS "clientAddressLng",
          o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
          o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
          o.is_paid AS "isPaid",

@@ -1,6 +1,7 @@
 "use client";
 
 import { showToast } from "@/components/cms/ui/toast";
+import { AddressDisplay } from "./AddressDisplay";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
@@ -10,6 +11,8 @@ type Props = {
     clientPhone: string;
     clientName: string | null;
     clientAddress: string | null;
+    clientAddressLat?: number | null;
+    clientAddressLng?: number | null;
     createdAt: string;
     isPaid: boolean;
     isReady: boolean;
@@ -44,7 +47,6 @@ export default function ClientControlPanel({
 }: Props) {
   const phone = order.clientPhone;
   const name = order.clientName;
-  const address = order.clientAddress;
 
   // normalize current payment method for the select
   const currentPM: PaymentMethod = (order.paymentMethod ?? "") as PaymentMethod;
@@ -113,7 +115,15 @@ export default function ClientControlPanel({
       )}
 
       <p>שם: {name ?? "—"}</p>
-      <p>כתובת: {address ?? "—"}</p>
+      <div>
+        כתובת:{" "}
+        <AddressDisplay
+          orderId={order.orderId}
+          address={order.clientAddress}
+          addressLat={order.clientAddressLat ?? null}
+          addressLng={order.clientAddressLng ?? null}
+        />
+      </div>
       <p>
         טלפון:&nbsp;
         <button

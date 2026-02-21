@@ -3,6 +3,7 @@
 import { Button } from "@/components/cms/ui/button";
 import { useRef } from "react";
 import Link from "next/link";
+import { AddressDisplay } from "../AddressDisplay";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
@@ -17,8 +18,10 @@ type Props = {
     isNotified?: boolean;
     clientName: string | null;
     clientAddress: string | null;
+    clientAddressLat?: number | null;
+    clientAddressLng?: number | null;
     clientPhone: string | null;
-    paymentMethod?: PaymentMethod | null; // stays
+    paymentMethod?: PaymentMethod | null;
   };
   onDelete: (id: number) => void;
   selectMode?: boolean;
@@ -138,7 +141,15 @@ export default function SingleOrder({
             )}
           </p>
           <p>לקוח: {order.clientName}</p>
-          <p>כתובת: {order.clientAddress}</p>
+          <div>
+            כתובת:{" "}
+            <AddressDisplay
+              orderId={order.orderId}
+              address={order.clientAddress}
+              addressLat={order.clientAddressLat ?? null}
+              addressLng={order.clientAddressLng ?? null}
+            />
+          </div>
           <p>טלפון: {order.clientPhone || "—"}</p>
           <p>תאריך: {formatted}</p>
           <p>כמות מוצרים: {order.itemCount}</p>

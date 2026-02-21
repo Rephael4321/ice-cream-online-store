@@ -13,6 +13,7 @@ type PaymentMethod = null | "" | "credit" | "paybox" | "cash";
 
 type Order = {
   orderId: number;
+  clientId?: number | null;
   createdAt: string;
   itemCount: number;
   isPaid: boolean;
@@ -22,6 +23,8 @@ type Order = {
   isNotified?: boolean;
   clientName: string | null;
   clientAddress: string | null;
+  clientAddressLat?: number | null;
+  clientAddressLng?: number | null;
   clientPhone: string | null;
   paymentMethod?: PaymentMethod;
 };

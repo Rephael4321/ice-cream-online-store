@@ -4,6 +4,7 @@ import { CartProvider } from "@/context/cart-context";
 import { Toaster } from "sonner";
 import SWRegister from "@/components/pwa/sw-register";
 import GlobalImageRetry from "@/components/global-image-retry";
+import "@/styles/places-autocomplete.css";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });

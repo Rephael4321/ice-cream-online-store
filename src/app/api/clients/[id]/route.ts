@@ -18,6 +18,8 @@ async function getClient(
          name,
          phone,
          address,
+         address_lat AS "addressLat",
+         address_lng AS "addressLng",
          created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
          updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
        FROM clients
@@ -49,15 +51,25 @@ async function updateClient(
   }
 
   try {
-    const { name, phone, address } = await req.json();
+    const body = await req.json();
+    const { name, phone, address, address_lat, address_lng } = body as {
+      name?: string;
+      phone?: string;
+      address?: string;
+      address_lat?: number | null;
+      address_lng?: number | null;
+    };
 
     if (!name || !phone || !address) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
+    const lat = address_lat != null && Number.isFinite(Number(address_lat)) ? Number(address_lat) : null;
+    const lng = address_lng != null && Number.isFinite(Number(address_lng)) ? Number(address_lng) : null;
+
     await pool.query(
-      `UPDATE clients SET name = $1, phone = $2, address = $3 WHERE id = $4`,
-      [name.trim(), phone.trim(), address.trim(), clientId]
+      `UPDATE clients SET name = $1, phone = $2, address = $3, address_lat = $5, address_lng = $6 WHERE id = $4`,
+      [name.trim(), phone.trim(), address.trim(), clientId, lat, lng]
     );
 
     return NextResponse.json({ success: true });

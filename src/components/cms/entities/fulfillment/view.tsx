@@ -15,6 +15,8 @@ type Order = {
   clientPhone: string;
   clientName: string | null;
   clientAddress: string | null;
+  clientAddressLat?: number | null;
+  clientAddressLng?: number | null;
   createdAt: string;
   isPaid: boolean;
   isReady: boolean;
@@ -158,6 +160,8 @@ export default function ViewOrder() {
           clientPhone: String(o.clientPhone ?? ""),
           clientName: o.clientName ?? null,
           clientAddress: o.clientAddress ?? null,
+          clientAddressLat: o?.clientAddressLat != null ? Number(o.clientAddressLat) : null,
+          clientAddressLng: o?.clientAddressLng != null ? Number(o.clientAddressLng) : null,
           createdAt: String(o.createdAt),
           isPaid: Boolean(o.isPaid),
           isReady: Boolean(o.isReady),
