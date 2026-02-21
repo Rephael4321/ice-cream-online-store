@@ -30,6 +30,7 @@ export default function ProductImagesList() {
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
+  const [listError, setListError] = useState<string | null>(null);
 
   const fetchingRef = useRef(false);
 
@@ -49,21 +50,41 @@ export default function ProductImagesList() {
       const res = await apiGet(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      const errMsg =
+        data?.listError?.message ||
+        (data?.listError && typeof data.listError === "string"
+          ? data.listError
+          : null);
+      if (errMsg) {
+        setListError(errMsg);
+      } else {
+        setListError(null);
+      }
 
       if (opts.reset) {
-        setImages(data.images || []);
+        setImages(Array.isArray(data.images) ? data.images : []);
       } else {
-        setImages((prev) => [...prev, ...(data.images || [])]);
+        setImages((prev) => [
+          ...prev,
+          ...(Array.isArray(data.images) ? data.images : []),
+        ]);
       }
 
       const got = Array.isArray(data.images) ? data.images.length : 0;
       const newOffset = nextOffset + got;
 
       setOffset(newOffset);
-      setTotal(Number(data.total || 0));
-      setHasMore(newOffset < Number(data.total || 0));
+      setTotal(Number(data.total ?? 0));
+      setHasMore(newOffset < Number(data.total ?? 0));
       setLastRefreshed(new Date().toLocaleString("he-IL"));
+    } catch (_) {
+      setListError("לא ניתן לטעון תמונות.");
+      if (opts.reset) setImages([]);
+      setOffset(nextOffset);
+      setTotal(0);
+      setHasMore(false);
     } finally {
       fetchingRef.current = false;
       setLoading(false);
@@ -86,7 +107,9 @@ export default function ProductImagesList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort, order]);
 
-  if (loading && images.length === 0) return <div>טוען תמונות…</div>;
+  if (loading && images.length === 0 && !listError) {
+    return <div>טוען תמונות…</div>;
+  }
 
   return (
     <div dir="rtl" className="p-6 space-y-4">
@@ -144,6 +167,15 @@ export default function ProductImagesList() {
         <UploadImage onUpload={() => fetchBatch({ reset: true })} />
         <UploadFolder onUpload={() => fetchBatch({ reset: true })} />
       </div>
+
+      {listError && (
+        <div
+          className="rounded-md border-2 border-amber-400 bg-amber-50 text-amber-900 px-4 py-3 font-medium"
+          role="alert"
+        >
+          {listError}
+        </div>
+      )}
 
       {/* Server sorts; grid groups locally for UI only */}
       <ImageGrid images={images} groupBy={sort} order={order} />

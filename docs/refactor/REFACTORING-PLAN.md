@@ -9,6 +9,11 @@ This plan is a **to-do list** to be executed **one action after another**. Each 
 - **1.1** Unused API routes removed: `api/categories/[id]`, `api/categories/[id]/products`, `api/categories/[id]/products/order`, `api/images/index`, `api/images/update-index`, `api/products/by-sale`, `api/storage/unplaced-products`. Category API is now **name-based only** (1.2).
 - **1.3** Centralized API client added: `src/lib/api/client.ts` with `api`, `apiGet`, `apiPost`, `apiPatch`, `apiPut`, `apiDelete`. All client-side `fetch('/api/...')` call sites have been migrated to use it. Server-side fetch (e.g. in `MainMenu`, `ProductsByCategory`, search page) still use absolute URLs and were left as-is.
 
+## Completed (Category 2 – Pages)
+
+- **2.1, 2.2** Order address page refactored: logic and UI moved to `src/components/cms/entities/fulfillment/order-address-form.tsx`. Page at `src/app/(root)/(cms)/orders/[id]/address/page.tsx` is now a thin wrapper that only passes `orderId` from params. Raw `<button>` replaced with `Button` from `@/components/cms/ui/button`.
+- **2.3** `src/app/(root)/(cms)/categories/new/page.jsx` renamed to `page.tsx` (content unchanged, already valid).
+
 ---
 
 ## Current state (summary)

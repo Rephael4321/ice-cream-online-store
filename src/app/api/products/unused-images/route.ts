@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { appendFileSync } from "fs";
+import { join } from "path";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import { getImageIndex, getS3ObjectsCached } from "@/lib/aws/images-index";
 import { listUsedImageKeys } from "@/lib/aws/image-usage";
@@ -8,6 +10,19 @@ import { STSClient, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// #region agent log
+const LOG_PATH = join(process.cwd(), "debug-0f22ca.log");
+function dl(p: Record<string, unknown>) {
+  try {
+    appendFileSync(
+      LOG_PATH,
+      JSON.stringify({ sessionId: "0f22ca", ...p, timestamp: Date.now() }) +
+        "\n"
+    );
+  } catch (_) {}
+}
+// #endregion
+
 type SortKey = "name" | "updated" | "size";
 type SortOrder = "asc" | "desc";
 
@@ -15,6 +30,13 @@ const DEFAULT_LIMIT = 50;
 
 const BUCKET = process.env.MEDIA_BUCKET || "";
 const REGION = process.env.AWS_REGION || "us-east-1";
+
+/** When access is denied we cache the failure so we don't hit AWS again on every request. TTL 60s. */
+const ACCESS_DENIED_TTL_MS = 60_000;
+let accessDeniedCache: {
+  at: number;
+  listError: { code: string; message: string };
+} | null = null;
 
 // Fallback to a correct public S3 host if S3_PUBLIC_HOST not set
 const EFFECTIVE_HOST =
@@ -29,6 +51,15 @@ function toProxyUrl(key: string) {
 }
 
 async function listUnusedImages(req: NextRequest) {
+  // #region agent log
+  dl({
+    runId: "1",
+    hypothesisId: "H1",
+    location: "unused-images/route.ts:entry",
+    message: "listUnusedImages entered",
+    data: { hasBucket: !!BUCKET },
+  });
+  // #endregion
   try {
     if (!BUCKET) {
       throw new Error("MEDIA_BUCKET env var is missing");
@@ -52,6 +83,23 @@ async function listUnusedImages(req: NextRequest) {
     );
     const prefix = searchParams.get("prefix") || "images/";
 
+    // Return cached access-denied response so we don't hit AWS again
+    if (
+      accessDeniedCache &&
+      Date.now() - accessDeniedCache.at < ACCESS_DENIED_TTL_MS
+    ) {
+      return NextResponse.json(
+        {
+          images: [],
+          total: 0,
+          offset,
+          limit,
+          listError: accessDeniedCache.listError,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
     // Tiny debug
     // console.log("[unused-images] params:", {
     //   prefix,
@@ -71,15 +119,38 @@ async function listUnusedImages(req: NextRequest) {
       const who = await sts.send(new GetCallerIdentityCommand({}));
       // console.log("[unused-images] caller ARN:", who.Arn);
     } catch (e: any) {
-      console.error("[unused-images] assumeRole FAILED:", e?.name, e?.message);
-      console.warn(
-        "[unused-images] proceeding with default AWS creds from env"
+      // #region agent log
+      dl({
+        runId: "1",
+        hypothesisId: "H1",
+        location: "unused-images/route.ts:after-assumeRole-catch",
+        message: "assumeRole failed, using fallback creds",
+        data: { credsUndefined: credentials === undefined, errName: e?.name },
+      });
+      // #endregion
+      console.error(
+        "[unused-images] assumeRole FAILED:",
+        e?.name,
+        "—",
+        e?.message || String(e),
+        "| Current identity is not allowed to assume CLIENT_ROLE_ARN; proceeding with default AWS creds from env."
       );
       credentials = undefined; // fallback (remove if you want to fail fast)
     }
 
     // 1) Load display names from index (fast, cached)
     const index = await getImageIndex(credentials);
+    // #region agent log
+    dl({
+      runId: "1",
+      hypothesisId: "H3",
+      location: "unused-images/route.ts:after-getImageIndex",
+      message: "getImageIndex returned",
+      data: {
+        indexKeysCount: index?.images ? Object.keys(index.images).length : 0,
+      },
+    });
+    // #endregion
     const nameByKey = new Map<string, string>();
     if (index?.images && typeof index.images === "object") {
       for (const hash of Object.keys(index.images)) {
@@ -93,19 +164,47 @@ async function listUnusedImages(req: NextRequest) {
       }
     }
 
-    // 2) S3 objects for size + LastModified (cached w/ TTL) — with tiny error print
-    let s3Objects;
+    // 2) S3 objects for size + LastModified (cached w/ TTL)
+    let s3Objects: { key: string; size: number; updatedMs: number }[];
+    let listError: { code: string; message: string } | undefined;
     try {
       s3Objects = await getS3ObjectsCached(prefix, credentials);
     } catch (e: any) {
       const meta = e?.$metadata || {};
+      const errName = e?.name || "Error";
+      const errCode = (e as any)?.Code || errName;
+      const httpStatus = meta.httpStatusCode ?? "—";
+      const requestId = meta.requestId ?? "—";
+      // #region agent log
+      dl({
+        runId: "post-fix",
+        hypothesisId: "H2",
+        location: "unused-images/route.ts:s3-catch",
+        message: "getS3ObjectsCached threw, returning empty list (graceful)",
+        data: {
+          errName: e?.name,
+          errCode: (e as any)?.Code,
+          httpStatusCode: meta.httpStatusCode,
+        },
+      });
+      // #endregion
       console.error(
-        "[unused-images] S3 ListObjects failed:",
-        e?.name || "Error",
+        "[unused-images] S3 ListObjects FAILED:",
+        errName,
+        `(${httpStatus}) —`,
         e?.message || String(e),
-        { httpStatusCode: meta.httpStatusCode, requestId: meta.requestId }
+        "| Identity has no s3:ListBucket on bucket:",
+        BUCKET,
+        "| requestId:",
+        requestId,
+        "| Returning empty list (graceful)."
       );
-      throw e;
+      listError = {
+        code: errCode,
+        message: "לא ניתן לטעון תמונות.",
+      };
+      s3Objects = [];
+      accessDeniedCache = { at: Date.now(), listError };
     }
     // s3Objects: Array<{ key: string; size: number; updatedMs: number }>
 
@@ -149,11 +248,29 @@ async function listUnusedImages(req: NextRequest) {
     const total = rows.length;
     const page = rows.slice(offset, offset + limit);
 
-    return NextResponse.json(
-      { images: page, total, offset, limit },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    const body: {
+      images: typeof page;
+      total: number;
+      offset: number;
+      limit: number;
+      listError?: { code: string; message: string };
+    } = { images: page, total, offset, limit };
+    if (listError) body.listError = listError;
+    else accessDeniedCache = null; // success: clear so next request tries AWS again
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (err: any) {
+    // #region agent log
+    dl({
+      runId: "1",
+      hypothesisId: "H2",
+      location: "unused-images/route.ts:outer-catch",
+      message: "returning 500",
+      data: { errName: err?.name, status: 500 },
+    });
+    // #endregion
     console.error(
       "[unused-images] error:",
       err?.name || "Error",

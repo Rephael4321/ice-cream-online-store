@@ -24,11 +24,14 @@ export async function assumeRole(): Promise<AwsCredentialIdentity> {
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID!;
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY!;
   const roleArn = process.env.CLIENT_ROLE_ARN!;
+  // Must match the role's Trust Policy Condition sts:ExternalId exactly (e.g. ICE-CREAEM-ONLINE-STORE-UUID).
   const externalId = process.env.ASSUME_ROLE_EXTERNAL_ID!;
   const sessionName = "image-upload-session";
 
   if (!region || !accessKeyId || !secretAccessKey || !roleArn || !externalId) {
-    throw new Error("Missing required AWS env vars for assumeRole()");
+    throw new Error(
+      "Missing required AWS env vars for assumeRole() (AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, CLIENT_ROLE_ARN, ASSUME_ROLE_EXTERNAL_ID)"
+    );
   }
 
   const sts = new STSClient({
@@ -40,7 +43,7 @@ export async function assumeRole(): Promise<AwsCredentialIdentity> {
     new AssumeRoleCommand({
       RoleArn: roleArn,
       RoleSessionName: sessionName,
-      ExternalId: externalId,
+      ExternalId: externalId, // Required when role trust policy has Condition StringEquals sts:ExternalId
       DurationSeconds: 900, // 15 minutes
     })
   );

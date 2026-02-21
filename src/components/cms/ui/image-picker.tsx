@@ -42,6 +42,7 @@ export default function InlineImageGalleryPicker({
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
   const fetchingRef = useRef(false);
@@ -60,21 +61,35 @@ export default function InlineImageGalleryPicker({
         offset: String(nextOffset),
         limit: String(PAGE_SIZE),
       });
-      // NOTE: endpoint returns UNUSED images → duplicates prevented by design
       const res = await apiGet(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
       });
-      const data = await res.json();
-
-      const next = (data.images || []) as ProductImage[];
+      const data = await res.json().catch(() => ({}));
+      const errMsg =
+        data?.listError?.message ||
+        (data?.listError && typeof data.listError === "string"
+          ? data.listError
+          : null);
+      if (errMsg) {
+        setListError(errMsg);
+      } else {
+        setListError(null);
+      }
+      const next = (Array.isArray(data?.images) ? data.images : []) as ProductImage[];
       if (opts.reset) setImages(next);
       else setImages((prev) => [...prev, ...next]);
 
-      const got = Array.isArray(next) ? next.length : 0;
+      const got = next.length;
       const newOffset = nextOffset + got;
       setOffset(newOffset);
-      setTotal(Number(data.total || 0));
-      setHasMore(newOffset < Number(data.total || 0));
+      setTotal(Number(data?.total ?? 0));
+      setHasMore(newOffset < Number(data?.total ?? 0));
+    } catch (_) {
+      setListError("לא ניתן לטעון תמונות.");
+      if (opts.reset) setImages([]);
+      setOffset(nextOffset);
+      setTotal(0);
+      setHasMore(false);
     } finally {
       fetchingRef.current = false;
       setLoading(false);
@@ -119,12 +134,20 @@ export default function InlineImageGalleryPicker({
   const quick = useMemo(() => filtered.slice(0, 10), [filtered]);
 
   // ---------- ui
-  if (loading && images.length === 0) {
+  if (loading && images.length === 0 && !listError) {
     return <div className="rounded-md border p-3">טוען גלריה…</div>;
   }
 
   return (
     <div className="space-y-3">
+      {listError && (
+        <div
+          className="rounded-md border-2 border-amber-400 bg-amber-50 text-amber-900 px-4 py-3 font-medium"
+          role="alert"
+        >
+          {listError}
+        </div>
+      )}
       {/* header + search + sort + uploaders */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">

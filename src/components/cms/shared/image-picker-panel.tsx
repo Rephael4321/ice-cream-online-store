@@ -128,6 +128,7 @@ export default function ImagePickerPanel({
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState("");
+  const [galleryError, setGalleryError] = useState<string | null>(null);
 
   const fetchingRef = useRef(false);
 
@@ -146,17 +147,33 @@ export default function ImagePickerPanel({
       const res = await apiGet(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
       });
-      const data = await res.json();
-      const next = (data.images || []) as ProductImage[];
+      const data = await res.json().catch(() => ({}));
+      const errMsg =
+        data?.listError?.message ||
+        (data?.listError && typeof data.listError === "string"
+          ? data.listError
+          : null);
+      if (errMsg) {
+        setGalleryError(errMsg);
+      } else {
+        setGalleryError(null);
+      }
+      const next = (Array.isArray(data?.images) ? data.images : []) as ProductImage[];
 
       if (opts.reset) setImages(next);
       else setImages((prev) => [...prev, ...next]);
 
-      const got = Array.isArray(next) ? next.length : 0;
+      const got = next.length;
       const newOffset = nextOffset + got;
       setOffset(newOffset);
-      setTotal(Number(data.total || 0));
-      setHasMore(newOffset < Number(data.total || 0));
+      setTotal(Number(data?.total ?? 0));
+      setHasMore(newOffset < Number(data?.total ?? 0));
+    } catch (_) {
+      setGalleryError("לא ניתן לטעון את הספרייה.");
+      if (opts.reset) setImages([]);
+      setOffset(nextOffset);
+      setTotal(0);
+      setHasMore(false);
     } finally {
       fetchingRef.current = false;
       setLoadingImgs(false);
@@ -279,7 +296,10 @@ export default function ImagePickerPanel({
         <Button
           type="button"
           variant="outline"
-          onClick={() => setAppGalleryOpen(true)}
+          onClick={() => {
+            setGalleryError(null);
+            setAppGalleryOpen(true);
+          }}
           disabled={disabled}
           className="w-full"
           title="פתח ספריית תמונות מהאפליקציה"
@@ -349,7 +369,15 @@ export default function ImagePickerPanel({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[65vh] overflow-auto pr-1">
-              {loadingImgs && images.length === 0 && (
+              {galleryError && !loadingImgs && (
+                <div
+                  className="col-span-full rounded-md border-2 border-amber-400 bg-amber-50 text-amber-900 px-4 py-3 text-center font-medium"
+                  role="alert"
+                >
+                  {galleryError}
+                </div>
+              )}
+              {loadingImgs && images.length === 0 && !galleryError && (
                 <div className="col-span-full text-center text-gray-500 py-8">
                   טוען…
                 </div>

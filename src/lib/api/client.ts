@@ -39,9 +39,33 @@ export async function api(path: string, init?: ApiInit): Promise<Response> {
   });
 }
 
+/** In-memory cache for unused-images when response has listError (access denied). TTL 60s so we only hit the server once. */
+const UNUSED_IMAGES_ERROR_TTL_MS = 60_000;
+let unusedImagesErrorCache: { at: number; body: unknown } | null = null;
+
 /** GET request (cache and other options supported). */
-export function apiGet(path: string, init?: RequestInit): Promise<Response> {
-  return api(path, { ...init, method: "GET" });
+export async function apiGet(path: string, init?: RequestInit): Promise<Response> {
+  const isUnusedImages = path.includes("/api/products/unused-images");
+  if (isUnusedImages && unusedImagesErrorCache && Date.now() - unusedImagesErrorCache.at < UNUSED_IMAGES_ERROR_TTL_MS) {
+    return new Response(JSON.stringify(unusedImagesErrorCache.body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const res = await api(path, { ...init, method: "GET" });
+  if (isUnusedImages && res.ok) {
+    try {
+      const body = await res.clone().json();
+      if (body?.listError) {
+        unusedImagesErrorCache = { at: Date.now(), body };
+      } else {
+        unusedImagesErrorCache = null;
+      }
+    } catch {
+      unusedImagesErrorCache = null;
+    }
+  }
+  return res;
 }
 
 /** POST with optional JSON body. */
