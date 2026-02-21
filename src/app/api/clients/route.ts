@@ -2,8 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { withMiddleware } from "@/lib/api/with-middleware";
 
-async function getClients(_req: NextRequest) {
+async function getClients(req: NextRequest) {
   try {
+    const withUnpaid = req.nextUrl.searchParams.get("withUnpaid") === "1";
+
+    if (withUnpaid) {
+      const result = await pool.query(`
+        SELECT
+          c.id,
+          c.name,
+          c.phone,
+          c.address,
+          c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+          c.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+          COALESCE(SUM(CASE WHEN o.is_paid = false AND o.is_visible = true THEN o.total END), 0)::numeric AS "unpaidTotal",
+          COUNT(CASE WHEN o.is_paid = false AND o.is_visible = true THEN 1 END)::int AS "unpaidCount"
+        FROM clients c
+        LEFT JOIN orders o ON o.client_id = c.id
+        GROUP BY c.id, c.name, c.phone, c.address, c.created_at, c.updated_at
+        ORDER BY c.created_at DESC
+      `);
+      return NextResponse.json({ clients: result.rows });
+    }
+
     const result = await pool.query(`
       SELECT 
         id,

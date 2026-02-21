@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, showToast, Input } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { useAuth } from "@/components/auth/auth-context";
 import "react-datepicker/dist/react-datepicker.css";
 import DatePicker from "react-datepicker";
 import SingleOrder from "./ui/list/single-order";
@@ -30,6 +31,7 @@ type Order = {
   clientAddressLng?: number | null;
   clientPhone: string | null;
   paymentMethod?: PaymentMethod;
+  clientOtherUnpaidCount?: number;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -37,13 +39,17 @@ const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
   v === "credit" || v === "paybox" || v === "cash" ? v : "";
 
 export default function ListOrder() {
+  const { role } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [search, setSearch] = useState("");
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
   const [hasUnnotified, setHasUnnotified] = useState(false);
+
+  const canEditPayment = role !== "driver";
 
   const containerRef = useRef<HTMLUListElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -58,19 +64,23 @@ export default function ListOrder() {
 
   // 🔁 unified loader:
   // - if `pending` true -> /api/orders?pending=1
+  // - if `unpaidOnly` true -> add unpaid=1
   // - else optional date range -> /api/orders?from=...&to=...
   const fetchOrders = async (opts?: {
     pending?: boolean;
+    unpaid?: boolean;
     from?: string;
     to?: string;
   }) => {
     setLoading(true);
-    let query = "";
-    if (opts?.pending) {
-      query = `?pending=1`;
-    } else if (opts?.from && opts?.to) {
-      query = `?from=${opts.from}&to=${opts.to}`;
+    const params = new URLSearchParams();
+    if (opts?.pending) params.set("pending", "1");
+    if (opts?.unpaid) params.set("unpaid", "1");
+    if (opts?.from && opts?.to) {
+      params.set("from", opts.from);
+      params.set("to", opts.to);
     }
+    const query = params.toString() ? `?${params.toString()}` : "";
 
     try {
       const res = await apiGet(`/api/orders${query}`, { cache: "no-store" });
@@ -78,6 +88,7 @@ export default function ListOrder() {
       const list: Order[] = (data.orders || []).map((o: any) => ({
         ...o,
         paymentMethod: sanitizePaymentMethod(o.paymentMethod),
+        clientOtherUnpaidCount: o.clientOtherUnpaidCount != null ? Number(o.clientOtherUnpaidCount) : 0,
       }));
       setOrders(list);
       setHasUnnotified(
@@ -92,8 +103,11 @@ export default function ListOrder() {
 
   const searchOrders = async (query: string) => {
     if (!query) {
-      // ↩️ When clearing search, show PENDING by default
-      await fetchOrders({ pending: true });
+      // ↩️ When clearing search, show PENDING by default (respect unpaidOnly)
+      await fetchOrders({
+        pending: true,
+        unpaid: unpaidOnly,
+      });
       return;
     }
     setLoading(true);
@@ -106,6 +120,7 @@ export default function ListOrder() {
       const list: Order[] = (data.orders || []).map((o: any) => ({
         ...o,
         paymentMethod: sanitizePaymentMethod(o.paymentMethod),
+        clientOtherUnpaidCount: o.clientOtherUnpaidCount != null ? Number(o.clientOtherUnpaidCount) : 0,
       }));
       setOrders(list);
       setHasUnnotified(
@@ -118,23 +133,28 @@ export default function ListOrder() {
     }
   };
 
-  // ⏱️ On mount -> pending
+  // 📅 On mount and when date or unpaid filter changes -> refetch
   useEffect(() => {
-    fetchOrders({ pending: true });
-  }, []);
+    if (search.trim()) return;
+    if (selectedDate === null) {
+      fetchOrders({ pending: true, unpaid: unpaidOnly });
+    } else {
+      const dateStr = selectedDate.toLocaleDateString("sv-SE");
+      fetchOrders({ from: dateStr, to: dateStr, unpaid: unpaidOnly });
+    }
+  }, [selectedDate, unpaidOnly, search]);
 
   // 🔄 Refresh when page becomes visible (handles mobile back button)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && !loading) {
-        // Only refresh if we're not already loading and page is visible
         if (search.trim()) {
           searchOrders(search.trim());
         } else if (selectedDate === null) {
-          fetchOrders({ pending: true });
+          fetchOrders({ pending: true, unpaid: unpaidOnly });
         } else {
           const dateStr = selectedDate.toLocaleDateString("sv-SE");
-          fetchOrders({ from: dateStr, to: dateStr });
+          fetchOrders({ from: dateStr, to: dateStr, unpaid: unpaidOnly });
         }
       }
     };
@@ -144,18 +164,7 @@ export default function ListOrder() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [search, selectedDate, loading]);
-
-  // 📅 If a date is picked -> show that date only, else -> pending
-  useEffect(() => {
-    if (search.trim()) return; // search has priority
-    if (selectedDate === null) {
-      fetchOrders({ pending: true });
-    } else {
-      const dateStr = selectedDate.toLocaleDateString("sv-SE");
-      fetchOrders({ from: dateStr, to: dateStr });
-    }
-  }, [selectedDate, search]);
+  }, [search, selectedDate, unpaidOnly, loading]);
 
   // 🔖 Restore scroll-to-last-viewed
   useEffect(() => {
@@ -328,7 +337,7 @@ export default function ListOrder() {
 
       <div className="py-6 space-y-6">
         {/* 🔍 Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <label className="font-semibold">סנן לפי תאריך:</label>
             <DatePicker
@@ -341,6 +350,16 @@ export default function ListOrder() {
               disabled={search.trim().length > 0}
             />
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={unpaidOnly}
+              onChange={(e) => setUnpaidOnly(e.target.checked)}
+              className="rounded"
+            />
+            <span className="font-medium">רק לא שולמו</span>
+          </label>
 
           <Input
             type="text"
@@ -380,6 +399,7 @@ export default function ListOrder() {
                 onToggleDelivered={() =>
                   toggleDelivered(order.orderId, order.isDelivered)
                 }
+                canEditPayment={canEditPayment}
               />
             ))}
           </ul>

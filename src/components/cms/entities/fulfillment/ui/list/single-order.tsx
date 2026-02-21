@@ -22,6 +22,8 @@ type Props = {
     clientAddressLng?: number | null;
     clientPhone: string | null;
     paymentMethod?: PaymentMethod | null;
+    clientId?: number | null;
+    clientOtherUnpaidCount?: number;
   };
   onDelete: (id: number) => void;
   selectMode?: boolean;
@@ -31,6 +33,8 @@ type Props = {
   onChangePayment: (m: PaymentMethod | null) => void;
   onToggleReady: () => void;
   onToggleDelivered?: () => void;
+  /** When false (e.g. driver on list), payment is read-only. Default true. */
+  canEditPayment?: boolean;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -45,6 +49,7 @@ export default function SingleOrder({
   onChangePayment,
   onToggleReady,
   onToggleDelivered,
+  canEditPayment = true,
 }: Props) {
   const date = new Date(order.createdAt);
   const formatted = !isNaN(date.getTime())
@@ -156,31 +161,40 @@ export default function SingleOrder({
 
           {/* Status controls */}
           <div className="mt-2 flex gap-2 flex-wrap items-center">
-            {/* Payment method select */}
-            <label
-              className="text-sm font-medium"
-              htmlFor={`pm-${order.orderId}`}
-            >
-              תשלום:
-            </label>
-            <select
-              id={`pm-${order.orderId}`}
-              dir="rtl"
-              className="border px-2 py-1 rounded"
-              value={currentPM}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                const v = e.target.value as PaymentMethod;
-                onChangePayment(v === "" ? null : v);
-              }}
-              title="בחר אמצעי תשלום"
-              aria-label="בחר אמצעי תשלום"
-            >
-              <option value="">לא שולם</option>
-              <option value="credit">אשראי</option>
-              <option value="paybox">פייבוקס</option>
-              <option value="cash">מזומן</option>
-            </select>
+            {/* Payment: editable for admin, read-only for driver on list */}
+            <span className="text-sm font-medium">תשלום:</span>
+            {canEditPayment ? (
+              <select
+                id={`pm-${order.orderId}`}
+                dir="rtl"
+                className="border px-2 py-1 rounded"
+                value={currentPM}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const v = e.target.value as PaymentMethod;
+                  onChangePayment(v === "" ? null : v);
+                }}
+                title="בחר אמצעי תשלום"
+                aria-label="בחר אמצעי תשלום"
+              >
+                <option value="">לא שולם</option>
+                <option value="credit">אשראי</option>
+                <option value="paybox">פייבוקס</option>
+                <option value="cash">מזומן</option>
+              </select>
+            ) : (
+              <span className="text-sm">
+                {effectivePaid
+                  ? currentPM === "credit"
+                    ? "אשראי"
+                    : currentPM === "paybox"
+                      ? "פייבוקס"
+                      : currentPM === "cash"
+                        ? "מזומן"
+                        : "שולם"
+                  : "לא שולם"}
+              </span>
+            )}
 
             {/* Ready toggle */}
             <button
@@ -216,6 +230,23 @@ export default function SingleOrder({
               </button>
             )}
           </div>
+
+          {/* Debt row: other unpaid orders for this client */}
+          {!effectivePaid &&
+            order.clientId != null &&
+            (order.clientOtherUnpaidCount ?? 0) > 0 && (
+              <p className="mt-2 text-sm">
+                <Link
+                  href={`/orders/client/${order.clientId}/unpaid`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-amber-700 underline hover:text-amber-800"
+                >
+                  {order.clientOtherUnpaidCount === 1
+                    ? "יש ללקוח הזמנה נוספת שלא שולמה"
+                    : `יש ללקוח עוד ${order.clientOtherUnpaidCount} הזמנות שלא שולמו`}
+                </Link>
+              </p>
+            )}
         </div>
 
         {/* 🔘 Action Buttons */}

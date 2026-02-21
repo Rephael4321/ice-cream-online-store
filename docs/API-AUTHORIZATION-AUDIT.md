@@ -120,7 +120,7 @@ The Google API key is never sent to the client. These routes proxy Google Places
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| GET | `/api/orders` | **Admin** | List orders (CMS). | Yes (fulfillment list) |
+| GET | `/api/orders` | **Admin** | List orders (CMS). Query: `from`, `to`, `pending=1`, `unpaid=1`. | Yes (fulfillment list) |
 | POST | `/api/orders` | **Anyone** | **skipAuth** – create order (checkout). Body: phone, items, address, etc. | Yes (cart checkout) |
 | GET | `/api/orders/search` | **Admin** | Search orders. | Yes (fulfillment list) |
 | GET | `/api/orders/by-phone?phone=...` | **Anyone** (GET) | List orders for a phone number. **No proof of identity** – anyone who knows the phone can list orders. | Yes (order-history-modal) |
@@ -132,7 +132,7 @@ The Google API key is never sent to the client. These routes proxy Google Places
 | PATCH | `/api/orders/[id]/stock` | **Admin** | Update product stock from order. | Yes (fulfillment view) |
 | PATCH | `/api/orders/[id]/status` | **Admin**, **Driver** | Update order status. | Yes (fulfillment view, list) |
 | PATCH | `/api/orders/[id]/delivery` | **Admin**, **Driver** | Update delivery info. | Yes (fulfillment view, list) |
-| PATCH | `/api/orders/[id]/payment` | **Admin**, **Driver** | Update payment status. | Yes (fulfillment view, list) |
+| PATCH | `/api/orders/[id]/payment` | **Admin**, **Driver** | Update payment status. Sets `paid_at`, `recorded_by` (from JWT). Driver may set payment only from order detail page (UI restriction; list hides control for driver). | Yes (fulfillment view, list) |
 | PATCH | `/api/orders/[id]/notify` | **Anyone** | **skipAuth** – set `is_notified = true` for order. No auth; order ID in path. | Yes (cart, fulfillment view) |
 
 ---
@@ -141,8 +141,8 @@ The Google API key is never sent to the client. These routes proxy Google Places
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| GET | `/api/clients` | **Admin** | List clients. | Yes (clients list) |
-| GET | `/api/clients/[id]` | **Admin** | Get client. | Yes (client-details, address page) |
+| GET | `/api/clients` | **Admin** | List clients. Query: `withUnpaid=1` adds `unpaidTotal`, `unpaidCount` per client. | Yes (clients list) |
+| GET | `/api/clients/[id]` | **Admin** | Get client. Response includes `unpaidTotal`, `unpaidCount`. | Yes (client-details, address page) |
 | PUT | `/api/clients/[id]` | **Admin** | Full client update (name, phone, address, address_lat, address_lng). | Yes (client-details) |
 | PATCH | `/api/clients/[id]/address` | **Admin**, **Driver** | Update only address, address_lat, address_lng. At least one field required. | Yes (order address page) |
 | DELETE | `/api/clients/[id]` | **Admin** | Delete client. | Yes (clients list, client-details) |

@@ -3,7 +3,7 @@ import { verifyJWT } from "@/lib/jwt";
 
 export type Role = "admin" | "driver" | "client";
 
-function extractRole(payload: any): Role | undefined {
+export function extractRole(payload: any): Role | undefined {
   // Prefer explicit role
   if (
     payload?.role === "admin" ||

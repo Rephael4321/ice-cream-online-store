@@ -145,8 +145,10 @@
   - is_ready boolean DEFAULT false
   - is_test boolean DEFAULT false
   - is_visible boolean DEFAULT true
+  - paid_at timestamp with time zone
   - payment_method text
   - pre_group_total numeric
+  - recorded_by text
   - total numeric
   - updated_at timestamp with time zone DEFAULT now()
 

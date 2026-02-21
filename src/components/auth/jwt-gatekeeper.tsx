@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Cookies from "js-cookie";
 import { apiPost } from "@/lib/api/client";
+import { AuthContext } from "./auth-context";
 
 type ExtraJwt = {
   role?: string;
@@ -54,9 +55,9 @@ function isAdmin(p?: ExtraJwt) {
   return hasRole(p, "admin");
 }
 
-// CMS paths a driver may visit:
+// CMS paths a driver may visit: /orders, /orders/[id], /orders/client/[clientId]/unpaid
 function isDriverAllowedCmsPath(pathname: string) {
-  return /^\/orders(\/[^/]+)?$/.test(pathname); // /orders or /orders/[id]
+  return /^\/orders(\/(client\/[^/]+\/unpaid|\d+))?$/.test(pathname);
 }
 
 export default function JwtGatekeeper({
@@ -68,6 +69,7 @@ export default function JwtGatekeeper({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function verifyAndAuthorize() {
@@ -115,18 +117,20 @@ export default function JwtGatekeeper({
       }
 
       // 3) Role-based CMS gating
+      const roleValue = payload?.role ?? null;
       if (isDriver(payload)) {
         // Driver may ONLY access /orders and /orders/[id]
         if (!isDriverAllowedCmsPath(pathname)) {
           router.replace("/orders");
           return;
         }
+        setRole(roleValue);
         setAuthorized(true);
         return;
       }
 
       // Admin (or any non-driver) → full CMS access
-      // If you want to restrict unknown roles, replace this with a redirect.
+      setRole(roleValue);
       setAuthorized(true);
     }
 
@@ -134,5 +138,9 @@ export default function JwtGatekeeper({
   }, [searchParams, pathname, router]);
 
   if (!authorized) return null;
-  return <>{children}</>;
+  return (
+    <AuthContext.Provider value={{ role }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

@@ -363,18 +363,31 @@ async function listOrders(req: NextRequest) {
     const from = req.nextUrl.searchParams.get("from");
     const to = req.nextUrl.searchParams.get("to");
     const pending = req.nextUrl.searchParams.get("pending"); // "1" -> only pending
+    const unpaid = req.nextUrl.searchParams.get("unpaid"); // "1" -> only unpaid
+    const clientIdParam = req.nextUrl.searchParams.get("clientId");
 
     const values: any[] = [];
+    let paramIndex = 0;
     let whereClause = `WHERE o.is_visible = true`;
 
+    const clientId = clientIdParam != null && clientIdParam !== "" ? Number(clientIdParam) : NaN;
+    if (Number.isInteger(clientId)) {
+      paramIndex++;
+      whereClause += ` AND o.client_id = $${paramIndex}`;
+      values.push(clientId);
+    }
+
+    if (unpaid === "1") {
+      whereClause += ` AND o.is_paid = false`;
+    }
+
     if (pending === "1") {
-      // Show orders that are NOT ready OR NOT paid
       whereClause += ` AND (o.is_ready = false OR o.is_paid = false)`;
-      // (intentionally ignore from/to when pending is requested)
     } else if (from && to) {
       const fromLocal = `${from}T00:00:00`;
       const toLocal = `${to}T23:59:59`;
-      whereClause += ` AND o.created_at >= $1 AND o.created_at <= $2`;
+      paramIndex += 2;
+      whereClause += ` AND o.created_at >= $${paramIndex - 1} AND o.created_at <= $${paramIndex}`;
       values.push(fromLocal, toLocal);
     }
 
@@ -399,7 +412,8 @@ async function listOrders(req: NextRequest) {
         c.phone AS "clientPhone",
         o.pre_group_total      AS "preGroupTotal",
         o.group_discount_total AS "groupDiscountTotal",
-        o.total                AS "total"
+        o.total                AS "total",
+        (SELECT COUNT(*)::int FROM orders o2 WHERE o2.client_id = c.id AND o2.is_paid = false AND o2.is_visible = true AND o2.id <> o.id) AS "clientOtherUnpaidCount"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN clients c ON c.id = o.client_id

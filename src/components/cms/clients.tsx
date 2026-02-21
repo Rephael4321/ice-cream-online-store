@@ -13,6 +13,8 @@ type Client = {
   phone: string;
   address: string;
   createdAt: string;
+  unpaidTotal?: number;
+  unpaidCount?: number;
 };
 
 export default function Clients() {
@@ -22,7 +24,7 @@ export default function Clients() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const res = await apiGet("/api/clients", { cache: "no-store" });
+      const res = await apiGet("/api/clients?withUnpaid=1", { cache: "no-store" });
       const data = await res.json();
 
       const normalized: Client[] = (data.clients || data).map((c: any) => {
@@ -35,6 +37,8 @@ export default function Clients() {
           createdAt: !isNaN(date.getTime())
             ? date.toLocaleString("he-IL")
             : c.createdAt || c.created_at,
+          unpaidTotal: c.unpaidTotal != null ? Number(c.unpaidTotal) : 0,
+          unpaidCount: c.unpaidCount != null ? Number(c.unpaidCount) : 0,
         };
       });
 
@@ -106,6 +110,12 @@ export default function Clients() {
                     </span>
                   </p>
                   <p className="text-sm text-gray-500">{client.createdAt}</p>
+                  <p className={client.unpaidTotal != null && client.unpaidTotal > 0 ? "text-amber-700 font-medium" : "text-gray-600"}>
+                    חוב: {client.unpaidTotal != null ? `₪${Number(client.unpaidTotal).toFixed(2)}` : "—"}
+                    {client.unpaidCount != null && client.unpaidCount > 0 && (
+                      <span className="text-sm"> ({client.unpaidCount} הזמנות)</span>
+                    )}
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2 items-end">

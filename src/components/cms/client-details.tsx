@@ -13,6 +13,8 @@ type Client = {
   phone: string;
   address: string;
   createdAt: string;
+  unpaidTotal?: number;
+  unpaidCount?: number;
 };
 
 export default function ClientDetails() {
@@ -43,6 +45,8 @@ export default function ClientDetails() {
           address = "",
           created_at,
           createdAt,
+          unpaidTotal,
+          unpaidCount,
         } = data || {};
 
         const created =
@@ -51,13 +55,15 @@ export default function ClientDetails() {
         if (alive) {
           setClient({
             id: clientId,
-            name,
-            phone,
-            address,
+            name: name ?? "",
+            phone: phone ?? "",
+            address: address ?? "",
             createdAt:
               created && !isNaN(created.getTime())
                 ? created.toLocaleString("he-IL")
                 : "-",
+            unpaidTotal: unpaidTotal != null ? Number(unpaidTotal) : 0,
+            unpaidCount: unpaidCount != null ? Number(unpaidCount) : 0,
           });
         }
       } catch {
@@ -140,7 +146,7 @@ export default function ClientDetails() {
               <Input
                 id="name"
                 name="name"
-                value={client.name}
+                value={client.name ?? ""}
                 onChange={handleChange}
                 dir="auto"
               />
@@ -151,7 +157,7 @@ export default function ClientDetails() {
               <Input
                 id="phone"
                 name="phone"
-                value={client.phone}
+                value={client.phone ?? ""}
                 onChange={handleChange}
                 inputMode="tel"
                 dir="ltr"
@@ -163,7 +169,7 @@ export default function ClientDetails() {
               <Input
                 id="address"
                 name="address"
-                value={client.address}
+                value={client.address ?? ""}
                 onChange={handleChange}
                 dir="auto"
               />
@@ -172,6 +178,19 @@ export default function ClientDetails() {
             <p className="text-sm text-gray-500">
               נוצר בתאריך: {client.createdAt}
             </p>
+
+            {(client.unpaidTotal != null && client.unpaidTotal > 0) && (
+              <div className="border rounded p-3 bg-amber-50 border-amber-200">
+                <p className="font-semibold text-amber-800">
+                  סה״כ חוב: ₪{Number(client.unpaidTotal).toFixed(2)}
+                </p>
+                {client.unpaidCount != null && client.unpaidCount > 0 && (
+                  <p className="text-sm text-amber-700">
+                    מספר הזמנות לא שולמו: {client.unpaidCount}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button onClick={handleSave} disabled={saving}>

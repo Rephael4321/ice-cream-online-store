@@ -15,16 +15,18 @@ async function getClient(
   try {
     const result = await pool.query(
       `SELECT 
-         id,
-         name,
-         phone,
-         address,
-         address_lat AS "addressLat",
-         address_lng AS "addressLng",
-         created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-         updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at
-       FROM clients
-       WHERE id = $1`,
+         c.id,
+         c.name,
+         c.phone,
+         c.address,
+         c.address_lat AS "addressLat",
+         c.address_lng AS "addressLng",
+         c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
+         c.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+         (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.client_id = c.id AND o.is_paid = false AND o.is_visible = true)::numeric AS "unpaidTotal",
+         (SELECT COUNT(*)::int FROM orders o WHERE o.client_id = c.id AND o.is_paid = false AND o.is_visible = true) AS "unpaidCount"
+       FROM clients c
+       WHERE c.id = $1`,
       [clientId]
     );
 
