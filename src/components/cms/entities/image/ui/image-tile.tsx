@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Image from "next/image";
 import type { ImageItem } from "./image-grid";
+import { api, apiPost } from "@/lib/api/client";
 
 export default function ImageTile({
   item,
@@ -56,10 +57,9 @@ export default function ImageTile({
     if (!nextName || nextName.trim() === displayBase) return;
     try {
       onFreeze("מבצע שינוי שם…");
-      const res = await fetch("/api/images/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: url, newBaseName: nextName }),
+      const res = await apiPost("/api/images/rename", {
+        imageUrl: url,
+        newBaseName: nextName,
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -77,10 +77,9 @@ export default function ImageTile({
   const handleDelete = async () => {
     if (!confirm("למחוק את התמונה הזו?")) return;
     try {
-      const res = await fetch("/api/images/delete", {
+      const res = await api("/api/images/delete", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: url }),
+        body: { imageUrl: url },
       });
       if (!res.ok) {
         alert("מחיקה נכשלה");

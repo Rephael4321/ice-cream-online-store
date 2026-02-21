@@ -8,6 +8,11 @@ import { Input } from "@/components/cms/ui/input";
 import "react-datepicker/dist/react-datepicker.css";
 import DatePicker from "react-datepicker";
 import SingleOrder from "./ui/list/single-order";
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+} from "@/lib/api/client";
 
 type PaymentMethod = null | "" | "credit" | "paybox" | "cash";
 
@@ -70,7 +75,7 @@ export default function ListOrder() {
     }
 
     try {
-      const res = await fetch(`/api/orders${query}`, { cache: "no-store" });
+      const res = await apiGet(`/api/orders${query}`, { cache: "no-store" });
       const data = await res.json();
       const list: Order[] = (data.orders || []).map((o: any) => ({
         ...o,
@@ -95,7 +100,7 @@ export default function ListOrder() {
     }
     setLoading(true);
     try {
-      const res = await fetch(
+      const res = await apiGet(
         `/api/orders/search?query=${encodeURIComponent(query)}`,
         { cache: "no-store" }
       );
@@ -179,7 +184,7 @@ export default function ListOrder() {
   const handleDelete = async (orderId: number) => {
     if (!confirm("האם למחוק את ההזמנה?")) return;
     try {
-      const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+      const res = await apiDelete(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error();
       showToast("🗑️ ההזמנה נמחקה", "success");
       setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
@@ -198,7 +203,7 @@ export default function ListOrder() {
     const ids = Array.from(selectedOrders);
     const deleted: number[] = [];
     for (const id of ids) {
-      const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+      const res = await apiDelete(`/api/orders/${id}`);
       if (res.ok) deleted.push(id);
     }
     showToast(`🗑️ נמחקו ${deleted.length} הזמנות`, "success");
@@ -228,10 +233,8 @@ export default function ListOrder() {
     method: PaymentMethod
   ) => {
     try {
-      const r = await fetch(`/api/orders/${orderId}/payment`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: method }),
+      const r = await apiPatch(`/api/orders/${orderId}/payment`, {
+        paymentMethod: method,
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
@@ -260,10 +263,8 @@ export default function ListOrder() {
 
   const toggleReady = async (orderId: number, current: boolean) => {
     try {
-      const r = await fetch(`/api/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isReady: !current }),
+      const r = await apiPatch(`/api/orders/${orderId}/status`, {
+        isReady: !current,
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
@@ -281,10 +282,8 @@ export default function ListOrder() {
 
   const toggleDelivered = async (orderId: number, current?: boolean) => {
     try {
-      const r = await fetch(`/api/orders/${orderId}/delivery`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDelivered: !(current ?? false) }),
+      const r = await apiPatch(`/api/orders/${orderId}/delivery`, {
+        isDelivered: !(current ?? false),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");

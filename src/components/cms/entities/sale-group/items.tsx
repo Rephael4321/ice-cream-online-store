@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { SaleGroupItem } from "./ui/sale-group-item";
 import { showToast } from "@/components/cms/ui/toast";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { apiDelete, apiGet } from "@/lib/api/client";
 
 type Product = {
   id: number;
@@ -25,7 +26,7 @@ export default function SaleGroupItemManager() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`/api/sale-groups/${groupId}/items`);
+      const res = await apiGet(`/api/sale-groups/${groupId}/items`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setProducts(data);
@@ -38,9 +39,8 @@ export default function SaleGroupItemManager() {
 
   const removeProduct = async (productId: number) => {
     try {
-      const res = await fetch(
-        `/api/sale-groups/${groupId}/items/${productId}`,
-        { method: "DELETE" }
+      const res = await apiDelete(
+        `/api/sale-groups/${groupId}/items/${productId}`
       );
       if (!res.ok) throw new Error();
 

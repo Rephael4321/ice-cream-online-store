@@ -18,6 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/cms/ui/button";
 import Image from "next/image";
+import { apiGet, apiPut } from "@/lib/api/client";
 
 // Raw shape from API
 interface RawCategory {
@@ -53,7 +54,7 @@ export default function OrganizeCategories() {
   );
 
   useEffect(() => {
-    fetch("/api/categories?full=true")
+    apiGet("/api/categories?full=true")
       .then((res) => res.json())
       .then((data) => {
         const parsed: Category[] = data.categories
@@ -89,11 +90,7 @@ export default function OrganizeCategories() {
     setSaving(true);
     try {
       const categoryOrder = categories.map((c) => c.id);
-      const res = await fetch("/api/categories/order", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryOrder }),
-      });
+      const res = await apiPut("/api/categories/order", { categoryOrder });
 
       if (!res.ok) throw new Error("Failed to save order");
       alert("✅ סדר הקטגוריות נשמר בהצלחה!");

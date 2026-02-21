@@ -7,6 +7,7 @@ import {
   ReactNode,
   useEffect,
 } from "react";
+import { apiPost } from "@/lib/api/client";
 
 type SaleInfo = {
   amount: number;
@@ -137,11 +138,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!ids.length) return {};
     dlog("📡 Fetch sale-groups for product IDs:", ids);
     try {
-      const res = await fetch("/api/products/sale-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
+      const res = await apiPost("/api/products/sale-groups", { ids });
       if (!res.ok) {
         dwarn("sale-groups fetch not ok:", res.status, res.statusText);
         return {};
@@ -287,11 +284,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (ids.length === 0) return;
     dlog("🔁 refreshStockStatus for IDs:", ids);
     try {
-      const res = await fetch("/api/products/stock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
+      const res = await apiPost("/api/products/stock", { ids });
       if (!res.ok) {
         dwarn("stock fetch not ok:", res.status, res.statusText);
         return;

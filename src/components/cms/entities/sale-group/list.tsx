@@ -6,6 +6,7 @@ import { showToast } from "@/components/cms/ui/toast";
 import { Button } from "@/components/cms/ui/button";
 import Link from "next/link";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { apiGet } from "@/lib/api/client";
 
 type SaleGroup = {
   id: number;
@@ -25,7 +26,7 @@ export default function SaleGroupList() {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const res = await fetch("/api/sale-groups", { cache: "no-store" });
+        const res = await apiGet("/api/sale-groups", { cache: "no-store" });
         if (!res.ok) throw new Error();
         const data = await res.json();
         setGroups(Array.isArray(data.saleGroups) ? data.saleGroups : []);

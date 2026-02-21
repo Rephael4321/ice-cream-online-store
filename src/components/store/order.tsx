@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import { apiGet } from "@/lib/api/client";
 
 type OrderHeader = {
   orderId: number;
@@ -47,7 +48,7 @@ export default function Order() {
     const controller = new AbortController();
     const url = `/api/orders/client/${id}`;
 
-    fetch(url, { credentials: "include", signal: controller.signal })
+    apiGet(url, { signal: controller.signal })
       .then((res) => {
         if (res.status === 307 || res.redirected) {
           window.location.href = res.url;

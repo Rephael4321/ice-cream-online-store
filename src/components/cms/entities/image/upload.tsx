@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { validateImageFile, MAX_FILE_SIZE } from "./utils/upload-utils";
+import { api } from "@/lib/api/client";
 
 type Result = {
   name: string;
@@ -47,10 +48,7 @@ export default function UploadImage({ onUpload }: { onUpload: () => void }) {
     try {
       const fd = new FormData();
       for (const f of files) fd.append("files", f);
-      const res = await fetch("/api/images/upload", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await api("/api/images/upload", { method: "POST", body: fd });
       const data = await res.json();
       setResults(Array.isArray(data?.results) ? data.results : []);
       if (

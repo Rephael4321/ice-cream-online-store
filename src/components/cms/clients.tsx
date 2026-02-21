@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { apiDelete, apiGet } from "@/lib/api/client";
 
 type Client = {
   id: number;
@@ -22,7 +23,7 @@ export default function Clients() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/clients", { cache: "no-store" });
+      const res = await apiGet("/api/clients", { cache: "no-store" });
       const data = await res.json();
 
       const normalized: Client[] = (data.clients || data).map((c: any) => {
@@ -63,7 +64,7 @@ export default function Clients() {
     if (!confirm("האם למחוק את הלקוח וכל ההזמנות?")) return;
 
     try {
-      const res = await fetch(`/api/clients/${id}`, { method: "DELETE" });
+      const res = await apiDelete(`/api/clients/${id}`);
       if (!res.ok) throw new Error();
       setClients((prev) => prev.filter((c) => c.id !== id));
       showToast("🗑️ לקוח נמחק", "success");

@@ -12,6 +12,7 @@ import ImagePickerPanel, {
 } from "@/components/cms/shared/image-picker-panel";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 import CategorySelector from "@/components/cms/entities/product/ui/category";
+import { apiPost } from "@/lib/api/client";
 
 type ProductForm = {
   name: string;
@@ -113,11 +114,7 @@ export default function NewProduct() {
     if (!isNaN(sale) && product.salePrice !== "") payload.salePrice = sale;
 
     try {
-      const response = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await apiPost("/api/products", payload);
 
       if (!response.ok) {
         const errorRes = await response.json().catch(() => ({}));
@@ -132,13 +129,9 @@ export default function NewProduct() {
       const linking: Promise<any>[] = [];
       if (product.storageAreaId) {
         linking.push(
-          fetch("/api/storage/assign", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              product_id: productId,
-              storage_area_id: product.storageAreaId,
-            }),
+          apiPost("/api/storage/assign", {
+            product_id: productId,
+            storage_area_id: product.storageAreaId,
           })
         );
       }
@@ -146,14 +139,10 @@ export default function NewProduct() {
         linking.push(
           Promise.all(
             product.categories.map((categoryId) =>
-              fetch("/api/product-category", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  targetId: productId,
-                  categoryId,
-                  type: "product",
-                }),
+              apiPost("/api/product-category", {
+                targetId: productId,
+                categoryId,
+                type: "product",
               })
             )
           )

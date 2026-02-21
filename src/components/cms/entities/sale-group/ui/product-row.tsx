@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import Image from "next/image";
+import { apiDelete, apiPost } from "@/lib/api/client";
 
 type Product = {
   id: number;
@@ -84,9 +85,8 @@ export default function ProductRow({
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/sale-groups/${saleGroupId}/items/${product.id}`,
-        { method: "POST" }
+      const res = await apiPost(
+        `/api/sale-groups/${saleGroupId}/items/${product.id}`
       );
 
       const data = await res.json();
@@ -105,9 +105,8 @@ export default function ProductRow({
   async function removeProduct() {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/sale-groups/${saleGroupId}/items/${product.id}`,
-        { method: "DELETE" }
+      const res = await apiDelete(
+        `/api/sale-groups/${saleGroupId}/items/${product.id}`
       );
 
       const data = await res.json();

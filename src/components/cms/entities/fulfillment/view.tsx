@@ -7,6 +7,11 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import Link from "next/link";
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
 import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+} from "@/lib/api/client";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
@@ -96,11 +101,7 @@ export default function ViewOrder() {
   const markAsTest = async (flag: boolean) => {
     if (!order) return;
     try {
-      const r = await fetch(`/api/orders/${order.orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isTest: flag }),
-      });
+      const r = await apiPatch(`/api/orders/${order.orderId}`, { isTest: flag });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
       setOrder((o) => (o ? { ...o, ...data } : o));
@@ -127,7 +128,7 @@ export default function ViewOrder() {
     if (!id) return;
     (async () => {
       try {
-        const res = await fetch(`/api/orders/${id}`, { cache: "no-store" });
+        const res = await apiGet(`/api/orders/${id}`, { cache: "no-store" });
         const payload = await res.json();
         const o = payload.order as any;
         const rawItems = (payload.items as any[]) ?? [];
@@ -197,9 +198,7 @@ export default function ViewOrder() {
     }
 
     try {
-      const r = await fetch(`/api/orders/${order.orderId}/notify`, {
-        method: "PATCH",
-      });
+      const r = await apiPatch(`/api/orders/${order.orderId}/notify`);
       if (!r.ok) throw new Error();
 
       setOrder((prev) => (prev ? { ...prev, isNotified: true } : prev));
@@ -226,10 +225,8 @@ export default function ViewOrder() {
   const setPaymentMethod = async (method: PaymentMethod | null) => {
     if (!order) return;
     try {
-      const r = await fetch(`/api/orders/${order.orderId}/payment`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: method }),
+      const r = await apiPatch(`/api/orders/${order.orderId}/payment`, {
+        paymentMethod: method,
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
@@ -258,10 +255,8 @@ export default function ViewOrder() {
   const toggleReady = async () => {
     if (!order) return;
     try {
-      const r = await fetch(`/api/orders/${order.orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isReady: !order.isReady }),
+      const r = await apiPatch(`/api/orders/${order.orderId}/status`, {
+        isReady: !order.isReady,
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
@@ -274,10 +269,8 @@ export default function ViewOrder() {
   const toggleDelivered = async () => {
     if (!order) return;
     try {
-      const r = await fetch(`/api/orders/${order.orderId}/delivery`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDelivered: !order.isDelivered }),
+      const r = await apiPatch(`/api/orders/${order.orderId}/delivery`, {
+        isDelivered: !order.isDelivered,
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Failed");
@@ -295,10 +288,9 @@ export default function ViewOrder() {
         it.productId === productId ? { ...it, inStock: !it.inStock } : it
       );
       const just = next.find((it) => it.productId === productId)!;
-      fetch(`/api/orders/${order?.orderId}/stock`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, inStock: just.inStock }),
+      apiPatch(`/api/orders/${order?.orderId}/stock`, {
+        productId,
+        inStock: just.inStock,
       })
         .then((r) => r.json())
         .then((data) => {
@@ -385,9 +377,7 @@ export default function ViewOrder() {
             if (!order) return;
             if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;
             try {
-              const r = await fetch(`/api/orders/${order.orderId}`, {
-                method: "DELETE",
-              });
+              const r = await apiDelete(`/api/orders/${order.orderId}`);
               if (!r.ok) throw new Error();
               showToast("🗑️ הזמנה נמחקה", "success");
               window.location.href = "/orders";
@@ -486,11 +476,10 @@ export default function ViewOrder() {
                     address: newAddr.trim(),
                   };
                   try {
-                    const r = await fetch(`/api/orders/${order.orderId}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    });
+                    const r = await apiPatch(
+                      `/api/orders/${order.orderId}`,
+                      payload
+                    );
                     const data = await r.json().catch(() => ({}));
                     if (!r.ok) throw new Error(data?.error || "Failed");
 

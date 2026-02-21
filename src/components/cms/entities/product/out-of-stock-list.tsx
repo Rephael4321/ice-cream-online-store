@@ -6,6 +6,7 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import { Button } from "@/components/cms/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { apiGet, apiPatch } from "@/lib/api/client";
 
 type Product = {
   id: number;
@@ -19,7 +20,7 @@ export default function OutOfStockList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/products/out-of-stock")
+    apiGet("/api/products/out-of-stock")
       .then((res) => res.json())
       .then(setProducts)
       .catch(() => showToast("שגיאה בטעינת מוצרים", "error"))
@@ -28,10 +29,9 @@ export default function OutOfStockList() {
 
   const putBackInStock = async (id: number) => {
     try {
-      const res = await fetch("/api/products/out-of-stock", {
-        method: "PATCH",
-        body: JSON.stringify({ productId: id, inStock: true }),
-        headers: { "Content-Type": "application/json" },
+      const res = await apiPatch("/api/products/out-of-stock", {
+        productId: id,
+        inStock: true,
       });
       if (!res.ok) throw new Error();
       setProducts((prev) => prev.filter((p) => p.id !== id));

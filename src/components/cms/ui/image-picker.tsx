@@ -7,6 +7,7 @@ import { Label } from "@/components/cms/ui/label";
 import { Button } from "@/components/cms/ui/button";
 import UploadImage from "@/components/cms/entities/image/upload";
 import UploadFolder from "@/components/cms/entities/image/upload-folder";
+import { apiGet } from "@/lib/api/client";
 
 type ProductImage = {
   key: string;
@@ -60,7 +61,7 @@ export default function InlineImageGalleryPicker({
         limit: String(PAGE_SIZE),
       });
       // NOTE: endpoint returns UNUSED images → duplicates prevented by design
-      const res = await fetch(`/api/products/unused-images?${qs}`, {
+      const res = await apiGet(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
       });
       const data = await res.json();

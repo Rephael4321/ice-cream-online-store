@@ -16,6 +16,7 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import ImagePickerPanel, {
   baseName as baseNameFromPicker,
 } from "@/components/cms/shared/image-picker-panel";
+import { apiPost } from "@/lib/api/client";
 
 type CategoryForm = {
   name: string;
@@ -100,11 +101,7 @@ export default function NewCategory() {
     }
 
     try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiPost("/api/categories", payload);
 
       if (!res.ok) {
         const error = await res.json().catch(() => ({}));

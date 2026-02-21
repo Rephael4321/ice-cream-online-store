@@ -9,6 +9,11 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import ImagePickerPanel, {
   baseName as baseNameFromPicker,
 } from "@/components/cms/shared/image-picker-panel";
+import {
+  apiDelete,
+  apiGet,
+  apiPut,
+} from "@/lib/api/client";
 
 type CategoryType = "collection" | "sale";
 
@@ -54,10 +59,10 @@ export default function EditCategory({ name: initialName }: Props) {
 
         // Try dedicated by-name endpoint first
         const [detailRes, listRes] = await Promise.all([
-          fetch(`/api/categories/name/${enc}`, { cache: "no-store" }).catch(
+          apiGet(`/api/categories/name/${enc}`, { cache: "no-store" }).catch(
             () => null
           ),
-          fetch(`/api/categories?full=true`, { cache: "no-store" }),
+          apiGet(`/api/categories?full=true`, { cache: "no-store" }),
         ]);
 
         const all: { categories: Category[] } = await listRes!.json();
@@ -165,11 +170,10 @@ export default function EditCategory({ name: initialName }: Props) {
 
     try {
       const encOriginal = encodeURIComponent(originalNameRef.current);
-      const res = await fetch(`/api/categories/name/${encOriginal}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiPut(
+        `/api/categories/name/${encOriginal}`,
+        payload
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "שגיאה בעדכון הקטגוריה");
@@ -194,9 +198,7 @@ export default function EditCategory({ name: initialName }: Props) {
 
     try {
       const encOriginal = encodeURIComponent(originalNameRef.current);
-      const res = await fetch(`/api/categories/name/${encOriginal}`, {
-        method: "DELETE",
-      });
+      const res = await apiDelete(`/api/categories/name/${encOriginal}`);
       if (!res.ok) throw new Error();
       showToast("הקטגוריה נמחקה בהצלחה", "success");
       window.location.href = "/categories";

@@ -6,6 +6,7 @@ import { Input } from "@/components/cms/ui/input";
 import Image from "next/image";
 import SaleGroupCard from "./ui/sale-group-card";
 import ProductSaleGroupMenu from "@/components/cms/entities/sale-group/ui/product-sale-group-menu";
+import { apiGet } from "@/lib/api/client";
 
 type ProductItem = {
   type: "product";
@@ -55,7 +56,7 @@ export default function ViewProducts({ name }: { name: string }) {
 
   useEffect(() => {
     const enc = encodeURIComponent(name);
-    fetch(`/api/categories/name/${enc}/items`, { cache: "no-store" })
+    apiGet(`/api/categories/name/${enc}/items`, { cache: "no-store" })
       .then((res) => res.json() as Promise<ApiCategoryItems>)
       .then((data) => setItems(Array.isArray(data.items) ? data.items : []))
       .finally(() => setLoading(false));

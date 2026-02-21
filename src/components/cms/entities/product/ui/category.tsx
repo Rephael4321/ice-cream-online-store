@@ -10,6 +10,7 @@ import {
   SelectItem,
 } from "@/components/cms/ui/select";
 import { Button } from "@/components/cms/ui/button";
+import { apiDelete, apiGet, apiPost } from "@/lib/api/client";
 
 interface Category {
   id: number;
@@ -37,7 +38,7 @@ export default function CategorySelector({
 
   useEffect(() => {
     async function fetchAvailable() {
-      const res = await fetch("/api/categories/root");
+      const res = await apiGet("/api/categories/root");
       const data = await res.json();
       const filtered = (data.categories || []).filter(
         (cat: Category) => !linked.some((l) => l.id === cat.id)
@@ -59,9 +60,8 @@ export default function CategorySelector({
     }
 
     // edit mode → API call
-    await fetch(
-      `/api/product-category?targetId=${productId}&categoryId=${categoryId}&type=product`,
-      { method: "DELETE" }
+    await apiDelete(
+      `/api/product-category?targetId=${productId}&categoryId=${categoryId}&type=product`
     );
     const updated = linked.filter((c) => c.id !== categoryId);
     setLinked(updated);
@@ -83,14 +83,10 @@ export default function CategorySelector({
     }
 
     // edit mode → API call
-    await fetch("/api/product-category", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        targetId: Number(productId),
-        categoryId: selectedId,
-        type: "product",
-      }),
+    await apiPost("/api/product-category", {
+      targetId: Number(productId),
+      categoryId: selectedId,
+      type: "product",
     });
 
     const updated = [...linked, newCat];

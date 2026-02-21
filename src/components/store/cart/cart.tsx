@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Cookies from "js-cookie";
 import CartSingleItem from "./ui/cart-single-item";
 import ConfirmOrderModal from "./ui/confirm-order-modal";
+import { apiPatch, apiPost } from "@/lib/api/client";
 
 /* ---------- utils ---------- */
 const normalizePhoneForDB = (input: string) => {
@@ -180,11 +181,7 @@ export default function Cart() {
     async function run(ids: number[]) {
       if (!ids.length) return;
       // stock
-      const res = await fetch("/api/products/stock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
+      const res = await apiPost("/api/products/stock", { ids });
       if (res.ok) {
         const stockMap: Record<number, boolean> = await res.json();
         Object.entries(stockMap).forEach(([id, inStock]) =>
@@ -288,10 +285,9 @@ export default function Cart() {
     setHasOutOfStockAtSubmit(outOfStock);
 
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        body: JSON.stringify({ phone, items: getOrderItems() }),
-        headers: { "Content-Type": "application/json" },
+      const res = await apiPost("/api/orders", {
+        phone,
+        items: getOrderItems(),
       });
 
       if (!res.ok) {
@@ -328,7 +324,7 @@ export default function Cart() {
   const confirmAndRedirectToWhatsapp = async () => {
     if (!pendingOrderId) return;
     try {
-      await fetch(`/api/orders/${pendingOrderId}/notify`, { method: "PATCH" });
+      await apiPatch(`/api/orders/${pendingOrderId}/notify`);
     } catch (err) {
       console.error("Failed to mark order as notified:", err);
     }

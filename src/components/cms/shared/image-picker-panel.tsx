@@ -5,6 +5,7 @@ import { Input } from "@/components/cms/ui/input";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import Image from "next/image";
+import { api, apiGet } from "@/lib/api/client";
 
 type ProductImage = {
   key?: string;
@@ -54,10 +55,7 @@ export default function ImagePickerPanel({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/images/upload", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await api("/api/images/upload", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error || "Upload failed");
@@ -145,7 +143,7 @@ export default function ImagePickerPanel({
         offset: String(nextOffset),
         limit: String(PAGE_SIZE),
       });
-      const res = await fetch(`/api/products/unused-images?${qs}`, {
+      const res = await apiGet(`/api/products/unused-images?${qs}`, {
         cache: "no-store",
       });
       const data = await res.json();

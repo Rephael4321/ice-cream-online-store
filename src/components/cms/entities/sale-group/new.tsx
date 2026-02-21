@@ -9,6 +9,7 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import ImagePickerPanel, {
   baseName as baseNameFromPicker,
 } from "@/components/cms/shared/image-picker-panel";
+import { apiGet, apiPost } from "@/lib/api/client";
 
 export default function NewSaleGroupForm() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function NewSaleGroupForm() {
     // load used images from existing sale groups
     (async () => {
       try {
-        const groupsRes = await fetch("/api/sale-groups", {
+        const groupsRes = await apiGet("/api/sale-groups", {
           cache: "no-store",
         });
         if (!groupsRes.ok) throw new Error("Failed loading groups");
@@ -60,14 +61,10 @@ export default function NewSaleGroupForm() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/sale-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim() || null,
-          image,
-          increment_step: incrementStep,
-        }),
+      const res = await apiPost("/api/sale-groups", {
+        name: name.trim() || null,
+        image,
+        increment_step: incrementStep,
       });
       if (!res.ok) throw new Error();
       const data = await res.json();

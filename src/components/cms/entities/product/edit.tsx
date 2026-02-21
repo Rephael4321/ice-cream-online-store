@@ -10,6 +10,13 @@ import Category from "@/components/cms/entities/product/ui/category";
 import ProductStorageSelector from "@/components/cms/entities/product/ui/product-storage-selector";
 import SaleGroupPriceConflictModal from "@/components/cms/entities/sale-group/ui/sale-group-price-conflict-modal";
 import ImagePickerPanel from "@/components/cms/shared/image-picker-panel";
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPut,
+} from "@/lib/api/client";
 
 interface ProductDetail {
   id: string;
@@ -72,7 +79,7 @@ export default function EditProduct({ params }: ParamsProps) {
         const { id } = await params;
 
         // product
-        const res = await fetch(`/api/products/${id}`, { cache: "no-store" });
+        const res = await apiGet(`/api/products/${id}`, { cache: "no-store" });
         if (!res.ok) throw new Error("ארעה תקלה בטעינת מוצר");
         const data = await res.json();
         const loaded = data.product ?? data;
@@ -89,7 +96,7 @@ export default function EditProduct({ params }: ParamsProps) {
         });
 
         // categories
-        const catRes = await fetch(`/api/products/${loaded.id}/categories`, {
+        const catRes = await apiGet(`/api/products/${loaded.id}/categories`, {
           cache: "no-store",
         });
         const catData = await catRes.json();
@@ -110,13 +117,9 @@ export default function EditProduct({ params }: ParamsProps) {
     const newStock = !product.inStock;
     setSaving(true);
     try {
-      const res = await fetch("/api/products/stock", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: Number(product.id),
-          inStock: newStock,
-        }),
+      const res = await apiPatch("/api/products/stock", {
+        productId: Number(product.id),
+        inStock: newStock,
       });
       if (!res.ok) throw new Error("שגיאה בעדכון מלאי");
       setProduct({ ...product, inStock: newStock });
@@ -200,11 +203,7 @@ export default function EditProduct({ params }: ParamsProps) {
     productId: string,
     payload: ProductUpdatePayload
   ) {
-    const res = await fetch(`/api/products/${productId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await apiPut(`/api/products/${productId}`, payload);
     if (!res.ok) throw new Error("ארעה תקלה בשמירת מוצר");
   }
 
@@ -222,14 +221,10 @@ export default function EditProduct({ params }: ParamsProps) {
 
     setSaving(true);
     try {
-      const vRes = await fetch(`/api/products/${id}/price-change/validate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price: nextPrice,
-          saleQuantity: nextSaleQty,
-          salePrice: nextSalePrice,
-        }),
+      const vRes = await apiPost(`/api/products/${id}/price-change/validate`, {
+        price: nextPrice,
+        saleQuantity: nextSaleQty,
+        salePrice: nextSalePrice,
       });
 
       if (!vRes.ok) throw new Error("תקלה בבדיקת קונפליקט קבוצה");
@@ -261,15 +256,11 @@ export default function EditProduct({ params }: ParamsProps) {
     if (!product || !conflict) return;
     setModalBusy(true);
     try {
-      await fetch(`/api/products/${product.id}/price-change`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "detach",
-          price: conflict.nextPrice,
-          saleQuantity: conflict.nextSaleQty,
-          salePrice: conflict.nextSalePrice,
-        }),
+      await apiPut(`/api/products/${product.id}/price-change`, {
+        mode: "detach",
+        price: conflict.nextPrice,
+        saleQuantity: conflict.nextSaleQty,
+        salePrice: conflict.nextSalePrice,
       });
       setConflict(null);
       showToast("הוסר מהקבוצה ועודכן בהצלחה", "success");
@@ -285,15 +276,11 @@ export default function EditProduct({ params }: ParamsProps) {
     if (!product || !conflict) return;
     setModalBusy(true);
     try {
-      await fetch(`/api/products/${product.id}/price-change`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "propagate",
-          price: conflict.nextPrice,
-          saleQuantity: conflict.nextSaleQty,
-          salePrice: conflict.nextSalePrice,
-        }),
+      await apiPut(`/api/products/${product.id}/price-change`, {
+        mode: "propagate",
+        price: conflict.nextPrice,
+        saleQuantity: conflict.nextSaleQty,
+        salePrice: conflict.nextSalePrice,
       });
       setConflict(null);
       showToast("עודכן לכלל מוצרי הקבוצה + נתוני הקבוצה", "success");
@@ -438,9 +425,7 @@ export default function EditProduct({ params }: ParamsProps) {
               if (!confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) return;
               setSaving(true);
               try {
-                const res = await fetch(`/api/products/${product.id}`, {
-                  method: "DELETE",
-                });
+                const res = await apiDelete(`/api/products/${product.id}`);
                 if (!res.ok) throw new Error("ארעה תקלה במחיקת המוצר");
                 showToast("מוצר נמחק!", "success");
                 window.location.href = "/products";

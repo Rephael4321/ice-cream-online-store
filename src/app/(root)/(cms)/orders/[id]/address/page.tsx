@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AddressSearch, type SelectedPlace } from "@/components/AddressSearch";
 import { showToast } from "@/components/cms/ui/toast";
+import { apiGet, apiPatch } from "@/lib/api/client";
 
 type Client = {
   id: number;
@@ -27,7 +28,7 @@ export default function OrderAddressPage() {
     let cancelled = false;
     (async () => {
       try {
-        const orderRes = await fetch(`/api/orders/${orderId}`, { cache: "no-store" });
+        const orderRes = await apiGet(`/api/orders/${orderId}`, { cache: "no-store" });
         const orderData = await orderRes.json();
         if (!orderRes.ok || !orderData.order) {
           showToast("הזמנה לא נמצאה", "error");
@@ -40,7 +41,7 @@ export default function OrderAddressPage() {
           router.push(`/orders/${orderId}`);
           return;
         }
-        const clientRes = await fetch(`/api/clients/${clientId}`, { cache: "no-store" });
+        const clientRes = await apiGet(`/api/clients/${clientId}`, { cache: "no-store" });
         const clientData = await clientRes.json();
         if (!clientRes.ok || !clientData.id) {
           showToast("שגיאה בטעינת פרטי לקוח", "error");
@@ -70,14 +71,10 @@ export default function OrderAddressPage() {
     if (!client || !selectedPlace) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/clients/${client.id}/address`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: selectedPlace.formattedAddress,
-          address_lat: selectedPlace.lat,
-          address_lng: selectedPlace.lng,
-        }),
+      const res = await apiPatch(`/api/clients/${client.id}/address`, {
+        address: selectedPlace.formattedAddress,
+        address_lat: selectedPlace.lat,
+        address_lng: selectedPlace.lng,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

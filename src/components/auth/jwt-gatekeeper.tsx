@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Cookies from "js-cookie";
+import { apiPost } from "@/lib/api/client";
 
 type ExtraJwt = {
   role?: string;
@@ -17,13 +18,7 @@ type ExtraJwt = {
 // Server-side JWT verification via API
 async function verifyJWTClient(token: string): Promise<ExtraJwt | null> {
   try {
-    const response = await fetch("/api/auth/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
-    });
+    const response = await apiPost("/api/auth/verify", { token });
 
     if (!response.ok) {
       return null;

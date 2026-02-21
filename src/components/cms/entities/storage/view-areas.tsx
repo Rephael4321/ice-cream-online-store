@@ -24,6 +24,7 @@ import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { Trash2, GripVertical, Check } from "lucide-react";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { apiDelete, apiGet, apiPost } from "@/lib/api/client";
 
 type StorageArea = {
   id: number;
@@ -49,7 +50,7 @@ export default function ViewStorageAreas() {
 
   async function fetchAreas() {
     try {
-      const res = await fetch("/api/storage/areas", { cache: "no-store" });
+      const res = await apiGet("/api/storage/areas", { cache: "no-store" });
       const data = await res.json();
       setAreas(data.areas || []);
     } catch {
@@ -61,11 +62,7 @@ export default function ViewStorageAreas() {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/storage/areas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
-      });
+      const res = await apiPost("/api/storage/areas", { name: name.trim() });
 
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({}));
@@ -86,7 +83,7 @@ export default function ViewStorageAreas() {
     if (!confirm("האם אתה בטוח שברצונך למחוק את האזור?")) return;
 
     try {
-      const res = await fetch(`/api/storage/areas/${id}`, { method: "DELETE" });
+      const res = await apiDelete(`/api/storage/areas/${id}`);
       if (!res.ok) throw new Error("Delete failed");
       setAreas((prev) => prev.filter((a) => a.id !== id));
       showToast("🗑️ האזור נמחק", "success");
@@ -101,11 +98,7 @@ export default function ViewStorageAreas() {
         id: a.id,
         sort_order: idx, // server can also compute; send explicit for clarity
       }));
-      const res = await fetch("/api/storage/areas/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ areas: payload }),
-      });
+      const res = await apiPost("/api/storage/areas/order", { areas: payload });
       if (!res.ok) throw new Error("Order update failed");
       showToast("✅ סדר עודכן", "success");
     } catch {
@@ -132,11 +125,8 @@ export default function ViewStorageAreas() {
 
   async function saveNameChange(id: number, newName: string) {
     try {
-      const res = await fetch("/api/storage/areas/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Same endpoint supports partial updates (name) on server
-        body: JSON.stringify({ areas: [{ id, name: newName.trim() }] }),
+      const res = await apiPost("/api/storage/areas/order", {
+        areas: [{ id, name: newName.trim() }],
       });
       if (!res.ok) throw new Error("Rename failed");
       showToast("✅ השם עודכן", "success");

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/cms/ui/button";
 import Image from "next/image";
+import { apiGet } from "@/lib/api/client";
 
 type Category = {
   id: number;
@@ -23,7 +24,7 @@ export default function ViewCategories() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/categories?full=true")
+    apiGet("/api/categories?full=true")
       .then((res) => res.json())
       .then((data) => setCategories(data.categories || []))
       .catch((err) =>

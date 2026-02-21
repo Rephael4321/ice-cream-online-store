@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiGet } from "@/lib/api/client";
 
 export interface SelectedPlace {
   lat: number;
@@ -42,7 +43,7 @@ export function AddressSearch({ onPlaceSelect, showWazeButton = true }: AddressS
     setIsLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(q)}`);
+      const res = await apiGet(`/api/places/autocomplete?input=${encodeURIComponent(q)}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to load suggestions");
@@ -83,7 +84,7 @@ export function AddressSearch({ onPlaceSelect, showWazeButton = true }: AddressS
       setIsLoading(true);
       setLoadError(null);
       try {
-        const res = await fetch(`/api/places/details?place_id=${encodeURIComponent(placeId)}`);
+        const res = await apiGet(`/api/places/details?place_id=${encodeURIComponent(placeId)}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(data.error ?? "Failed to load place details");

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/cms/ui/button";
 import ImageSelector, { BaseItem } from "@/components/cms/ui/image-selector";
+import { apiGet, apiPost } from "@/lib/api/client";
 
 interface Product {
   id: number;
@@ -31,8 +32,8 @@ export default function LinkProduct() {
   useEffect(() => {
     async function fetchData() {
       const [productsRes, categoriesRes] = await Promise.all([
-        fetch("/api/products"),
-        fetch("/api/categories?full=true"),
+        apiGet("/api/products"),
+        apiGet("/api/categories?full=true"),
       ]);
 
       if (!productsRes.ok || !categoriesRes.ok) {
@@ -97,13 +98,9 @@ export default function LinkProduct() {
     }
 
     try {
-      const response = await fetch("/api/product-category", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: extractId(selectedItem.id),
-          categoryId: category.id,
-        }),
+      const response = await apiPost("/api/product-category", {
+        productId: extractId(selectedItem.id),
+        categoryId: category.id,
       });
 
       if (!response.ok) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import UploadImage from "./upload";
 import UploadFolder from "./upload-folder";
 import ImageGrid from "./ui/image-grid";
+import { api, apiGet } from "@/lib/api/client";
 
 type ImageItem = { url: string; key: string; name: string };
 
@@ -30,7 +31,7 @@ export default function ViewImages() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/images", { cache: "no-store" });
+        const res = await apiGet("/api/images", { cache: "no-store" });
         if (!res.ok) throw new Error("bad status");
         const data = await res.json();
         // API returns [{ url, key, name }]
@@ -58,10 +59,9 @@ export default function ViewImages() {
     const deleted: string[] = [];
 
     for (const url of selectedImages) {
-      const res = await fetch("/api/images/delete", {
+      const res = await api("/api/images/delete", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: url }),
+        body: { imageUrl: url },
       });
       if (res.ok) deleted.push(url);
     }

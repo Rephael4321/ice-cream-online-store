@@ -9,6 +9,7 @@ import {
   SelectItem,
 } from "@/components/cms/ui/select";
 import { showToast } from "@/components/cms/ui/toast";
+import { apiGet, apiPost } from "@/lib/api/client";
 
 interface StorageArea {
   id: number;
@@ -38,7 +39,7 @@ export default function ProductStorageSelector({
 
   useEffect(() => {
     const fetchAreas = async () => {
-      const res = await fetch("/api/storage/areas");
+      const res = await apiGet("/api/storage/areas");
       const data = await res.json();
       setAreas(data.areas || []);
     };
@@ -56,12 +57,9 @@ export default function ProductStorageSelector({
     }
 
     // edit mode → API
-    const res = await fetch("/api/storage/assign", {
-      method: "POST",
-      body: JSON.stringify({
-        product_id: productId,
-        storage_area_id,
-      }),
+    const res = await apiPost("/api/storage/assign", {
+      product_id: productId,
+      storage_area_id,
     });
 
     if (res.ok) {

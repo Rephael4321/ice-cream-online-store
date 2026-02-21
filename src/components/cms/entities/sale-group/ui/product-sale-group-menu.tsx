@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { showToast } from "@/components/cms/ui/toast";
+import { apiDelete, apiGet, apiPost } from "@/lib/api/client";
 
 type SaleGroupSummary = {
   id: number;
@@ -58,7 +59,7 @@ export default function ProductSaleGroupMenu({
   async function ensureSaleGroups() {
     if (saleGroups.length) return;
     try {
-      const res = await fetch("/api/sale-groups", { cache: "no-store" });
+      const res = await apiGet("/api/sale-groups", { cache: "no-store" });
       const data = (await res.json()) as ApiSaleGroupList;
       // If your /api/sale-groups can return name/price/sale_price/quantity — great.
       // If not, we still at least get id/name for the menu.
@@ -74,9 +75,8 @@ export default function ProductSaleGroupMenu({
     try {
       if (prev === groupId) {
         // remove
-        const res = await fetch(
-          `/api/sale-groups/${groupId}/items/${productId}`,
-          { method: "DELETE" }
+        const res = await apiDelete(
+          `/api/sale-groups/${groupId}/items/${productId}`
         );
         if (!res.ok) throw new Error();
         setSelectedGroupId(null);
@@ -84,9 +84,8 @@ export default function ProductSaleGroupMenu({
         showToast("🗑️ הוסר מקבוצת המבצע", "success");
       } else {
         // add (optionally the server may reject if not compatible)
-        const res = await fetch(
-          `/api/sale-groups/${groupId}/items/${productId}`,
-          { method: "POST" }
+        const res = await apiPost(
+          `/api/sale-groups/${groupId}/items/${productId}`
         );
         if (!res.ok) {
           const err = await safeJson<{ error?: string }>(res);

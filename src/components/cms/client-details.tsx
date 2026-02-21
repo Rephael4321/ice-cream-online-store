@@ -8,6 +8,7 @@ import { Label } from "@/components/cms/ui/label";
 import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { apiDelete, apiGet, apiPut } from "@/lib/api/client";
 
 type Client = {
   id: number;
@@ -34,7 +35,7 @@ export default function ClientDetails() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/clients/${id}`, { cache: "no-store" });
+        const res = await apiGet(`/api/clients/${id}`, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch client");
         const data = await res.json();
 
@@ -91,10 +92,10 @@ export default function ClientDetails() {
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/clients/${client.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, address }),
+      const res = await apiPut(`/api/clients/${client.id}`, {
+        name,
+        phone,
+        address,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed");
@@ -113,9 +114,7 @@ export default function ClientDetails() {
     if (!confirm("האם למחוק את הלקוח וכל ההזמנות?")) return;
 
     try {
-      const res = await fetch(`/api/clients/${client.id}`, {
-        method: "DELETE",
-      });
+      const res = await apiDelete(`/api/clients/${client.id}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Delete failed");
       showToast("🗑️ נמחק בהצלחה", "success");

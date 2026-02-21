@@ -6,6 +6,7 @@ import { showToast } from "@/components/cms/ui/toast";
 import { SaleGroupEditor } from "./ui/sale-group-editor";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import ImagePickerPanel from "@/components/cms/shared/image-picker-panel";
+import { apiGet, apiPatch } from "@/lib/api/client";
 
 type SaleGroup = {
   id: number;
@@ -37,8 +38,8 @@ export default function ViewSaleGroup() {
     (async () => {
       try {
         const [res, groupsRes] = await Promise.all([
-          fetch(`/api/sale-groups/${id}`, { cache: "no-store" }),
-          fetch(`/api/sale-groups`, { cache: "no-store" }),
+          apiGet(`/api/sale-groups/${id}`, { cache: "no-store" }),
+          apiGet("/api/sale-groups", { cache: "no-store" }),
         ]);
         if (!res.ok) throw new Error();
         const data = await res.json();
@@ -65,11 +66,7 @@ export default function ViewSaleGroup() {
     if (!group) return;
     setSavingImage(true);
     try {
-      const res = await fetch(`/api/sale-groups/${group.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: url }),
-      });
+      const res = await apiPatch(`/api/sale-groups/${group.id}`, { image: url });
       if (!res.ok) throw new Error();
       setGroup((prev) => (prev ? { ...prev, image: url } : prev));
       showToast("התמונה עודכנה בהצלחה", "success");

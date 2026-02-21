@@ -6,6 +6,7 @@ import { Button } from "@/components/cms/ui/button";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import Link from "next/link";
 import Image from "next/image";
+import { apiGet } from "@/lib/api/client";
 
 interface Product {
   id: number;
@@ -78,7 +79,7 @@ export default function ListProduct() {
     }
 
     try {
-      const res = await fetch(`/api/products?${qs.toString()}`, {
+      const res = await apiGet(`/api/products?${qs.toString()}`, {
         cache: "no-store",
       });
       if (!res.ok) {

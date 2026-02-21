@@ -8,6 +8,7 @@ import { Button } from "@/components/cms/ui/button";
 import { showToast } from "@/components/cms/ui/toast";
 import ProductRow from "./ui/product-row";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
+import { apiDelete, apiGet, apiPost } from "@/lib/api/client";
 
 type Product = {
   id: number;
@@ -114,8 +115,8 @@ export default function ManageSaleGroupItems() {
     setLoading(true);
     try {
       const [productsRes, groupRes] = await Promise.all([
-        fetch(`/api/sale-groups/${saleGroupId}/items/eligible-products`),
-        fetch(`/api/sale-groups/${saleGroupId}`),
+        apiGet(`/api/sale-groups/${saleGroupId}/items/eligible-products`),
+        apiGet(`/api/sale-groups/${saleGroupId}`),
       ]);
 
       if (!productsRes.ok || !groupRes.ok) {
@@ -276,9 +277,8 @@ export default function ManageSaleGroupItems() {
       let fail = 0;
       for (const p of toAdd) {
         try {
-          const res = await fetch(
-            `/api/sale-groups/${saleGroupId}/items/${p.id}`,
-            { method: "POST" }
+          const res = await apiPost(
+            `/api/sale-groups/${saleGroupId}/items/${p.id}`
           );
           if (res.ok) ok++;
           else fail++;
@@ -310,9 +310,8 @@ export default function ManageSaleGroupItems() {
       let fail = 0;
       for (const p of linked) {
         try {
-          const res = await fetch(
-            `/api/sale-groups/${saleGroupId}/items/${p.id}`,
-            { method: "DELETE" }
+          const res = await apiDelete(
+            `/api/sale-groups/${saleGroupId}/items/${p.id}`
           );
           if (res.ok) ok++;
           else fail++;
@@ -343,9 +342,8 @@ export default function ManageSaleGroupItems() {
       let fail = 0;
       for (const p of allLinked) {
         try {
-          const res = await fetch(
-            `/api/sale-groups/${saleGroupId}/items/${p.id}`,
-            { method: "DELETE" }
+          const res = await apiDelete(
+            `/api/sale-groups/${saleGroupId}/items/${p.id}`
           );
           if (res.ok) ok++;
           else fail++;

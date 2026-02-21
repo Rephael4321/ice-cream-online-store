@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/cms/ui/button";
 import Image from "next/image";
+import { apiGet, apiPut } from "@/lib/api/client";
 
 type ProductItem = {
   type: "product";
@@ -58,7 +59,7 @@ export default function OrganizeProducts({ name }: { name: string }) {
 
   useEffect(() => {
     const enc = encodeURIComponent(name);
-    fetch(`/api/categories/name/${enc}/items`, { cache: "no-store" })
+    apiGet(`/api/categories/name/${enc}/items`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         const sorted = data.items.sort(
@@ -90,12 +91,10 @@ export default function OrganizeProducts({ name }: { name: string }) {
     try {
       const enc = encodeURIComponent(name);
       const order = items.map((item) => ({ id: item.id, type: item.type }));
-      const res = await fetch(`/api/categories/name/${enc}/products/order`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ order }),
-      });
+      const res = await apiPut(
+        `/api/categories/name/${enc}/products/order`,
+        { order }
+      );
       if (!res.ok) throw new Error("Failed to save order");
       alert("הסדר נשמר בהצלחה!");
     } catch (err) {

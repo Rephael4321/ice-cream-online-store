@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
+import { apiGet } from "@/lib/api/client";
 
 interface Order {
   orderId: number;
@@ -107,7 +108,7 @@ export default function OrderHistoryModal({ isOpen, onClose }: Props) {
   const fetchOrders = async (phone: string) => {
     setLoading(true);
     try {
-      const response = await fetch(
+      const response = await apiGet(
         `/api/orders/by-phone?phone=${encodeURIComponent(phone)}`
       );
       if (!response.ok) {

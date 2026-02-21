@@ -8,6 +8,7 @@ import { showToast } from "@/components/cms/ui/toast";
 import { Label } from "@/components/cms/ui/label";
 import Link from "next/link";
 import CategoryLinker from "@/components/cms/entities/sale-group/ui/category-linker";
+import { apiDelete, apiPatch } from "@/lib/api/client";
 
 interface SaleGroupEditorProps {
   id: number;
@@ -52,11 +53,7 @@ export function SaleGroupEditor({
         return;
       }
 
-      const res = await fetch(`/api/sale-groups/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiPatch(`/api/sale-groups/${id}`, payload);
 
       if (!res.ok) throw new Error();
       showToast("קבוצת מבצע עודכנה בהצלחה", "success");
@@ -71,7 +68,7 @@ export function SaleGroupEditor({
     if (!confirm("האם אתה בטוח שברצונך למחוק את קבוצת המבצע?")) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/sale-groups/${id}`, { method: "DELETE" });
+      const res = await apiDelete(`/api/sale-groups/${id}`);
       if (!res.ok) throw new Error();
       showToast("קבוצת המבצע נמחקה", "success");
       window.location.href = "/sale-groups";

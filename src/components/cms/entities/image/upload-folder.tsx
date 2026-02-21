@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { validateImageFile } from "./utils/upload-utils";
+import { api } from "@/lib/api/client";
 
 type Result = {
   name: string;
@@ -54,7 +55,7 @@ export default function UploadFolder({ onUpload }: { onUpload: () => void }) {
       const fd = new FormData();
       for (const f of files) fd.append("files", f);
 
-      const res = await fetch("/api/images/upload", {
+      const res = await api("/api/images/upload", {
         method: "POST",
         body: fd,
         signal: abortRef.current.signal,
