@@ -82,7 +82,8 @@ async function getOrder(
          o.pre_group_total      AS "preGroupTotal",
          o.group_discount_total AS "groupDiscountTotal",
          o.delivery_fee         AS "deliveryFee",
-         o.total                AS "total"
+         o.total                AS "total",
+         (SELECT (COALESCE(SUM(o2.total), 0) + COALESCE(c.manual_debt_adjustment, 0))::numeric FROM orders o2 WHERE o2.client_id = c.id AND o2.is_paid = false AND o2.is_visible = true) AS "clientUnpaidTotal"
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
        WHERE o.id = $1`,

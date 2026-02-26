@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Input, Label, Button, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
-import { apiDelete, apiGet, apiPut } from "@/lib/api/client";
+import { useAuth } from "@/components/auth/auth-context";
+import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api/client";
 
 type Client = {
   id: number;
@@ -15,17 +16,22 @@ type Client = {
   createdAt: string;
   unpaidTotal?: number;
   unpaidCount?: number;
+  manualDebtAdjustment?: number | null;
 };
 
 export default function ClientDetails() {
   const params = useParams();
   const router = useRouter();
+  const { role } = useAuth();
   const id = String(params.id ?? "");
 
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingDebt, setEditingDebt] = useState(false);
+  const [debtInput, setDebtInput] = useState("");
+  const [savingDebt, setSavingDebt] = useState(false);
 
   // Load client
   useEffect(() => {
@@ -47,6 +53,7 @@ export default function ClientDetails() {
           createdAt,
           unpaidTotal,
           unpaidCount,
+          manualDebtAdjustment,
         } = data || {};
 
         const created =
@@ -64,6 +71,8 @@ export default function ClientDetails() {
                 : "-",
             unpaidTotal: unpaidTotal != null ? Number(unpaidTotal) : 0,
             unpaidCount: unpaidCount != null ? Number(unpaidCount) : 0,
+            manualDebtAdjustment:
+              manualDebtAdjustment != null ? Number(manualDebtAdjustment) : null,
           });
         }
       } catch {
@@ -127,6 +136,67 @@ export default function ClientDetails() {
     }
   };
 
+  const showDebtBlock =
+    client?.unpaidTotal != null &&
+    (client.unpaidTotal > 0 || (client.manualDebtAdjustment ?? 0) !== 0);
+
+  const handleStartEditDebt = () => {
+    if (!client) return;
+    setDebtInput(String(client.unpaidTotal ?? 0));
+    setEditingDebt(true);
+  };
+
+  const handleCancelEditDebt = () => {
+    setEditingDebt(false);
+    setDebtInput("");
+  };
+
+  const handleSaveDebt = async () => {
+    if (!client) return;
+    const target = Number(debtInput);
+    if (!Number.isFinite(target) || target < 0) {
+      showToast("נא להזין סכום תקין (מספר אי-שלילי)", "warning");
+      return;
+    }
+    setSavingDebt(true);
+    try {
+      const res = await apiPatch(`/api/clients/${client.id}/debt-adjustment`, {
+        targetTotalDebt: target,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed");
+      showToast("✅ סה״כ חוב עודכן", "success");
+      setEditingDebt(false);
+      setDebtInput("");
+      const refetch = await apiGet(`/api/clients/${client.id}`, {
+        cache: "no-store",
+      });
+      if (refetch.ok) {
+        const refetchData = await refetch.json();
+        setClient((prev) =>
+          prev
+            ? {
+                ...prev,
+                unpaidTotal:
+                  refetchData.unpaidTotal != null
+                    ? Number(refetchData.unpaidTotal)
+                    : prev.unpaidTotal,
+                manualDebtAdjustment:
+                  refetchData.manualDebtAdjustment != null
+                    ? Number(refetchData.manualDebtAdjustment)
+                    : refetchData.manualDebtAdjustment ?? null,
+              }
+            : prev
+        );
+      }
+      router.refresh();
+    } catch {
+      showToast("❌ שגיאה בעדכון סה״כ חוב", "error");
+    } finally {
+      setSavingDebt(false);
+    }
+  };
+
   return (
     <main
       dir="rtl"
@@ -179,15 +249,60 @@ export default function ClientDetails() {
               נוצר בתאריך: {client.createdAt}
             </p>
 
-            {(client.unpaidTotal != null && client.unpaidTotal > 0) && (
+            {showDebtBlock && (
               <div className="border rounded p-3 bg-amber-50 border-amber-200">
-                <p className="font-semibold text-amber-800">
-                  סה״כ חוב: ₪{Number(client.unpaidTotal).toFixed(2)}
-                </p>
-                {client.unpaidCount != null && client.unpaidCount > 0 && (
-                  <p className="text-sm text-amber-700">
-                    מספר הזמנות לא שולמו: {client.unpaidCount}
-                  </p>
+                {!editingDebt ? (
+                  <>
+                    <p className="font-semibold text-amber-800 flex items-center gap-2 flex-wrap">
+                      סה״כ חוב: ₪{Number(client.unpaidTotal).toFixed(2)}
+                      {role === "admin" && (
+                        <button
+                          type="button"
+                          onClick={handleStartEditDebt}
+                          className="text-sm px-2 py-1 rounded border border-amber-400 text-amber-800 hover:bg-amber-100"
+                          title="ערוך סה״כ חוב"
+                        >
+                          ערוך
+                        </button>
+                      )}
+                    </p>
+                    {client.unpaidCount != null && client.unpaidCount > 0 && (
+                      <p className="text-sm text-amber-700">
+                        מספר הזמנות לא שולמו: {client.unpaidCount}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="debt-total">סה״כ חוב חדש (₪)</Label>
+                    <Input
+                      id="debt-total"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={debtInput}
+                      onChange={(e) => setDebtInput(e.target.value)}
+                      dir="ltr"
+                      className="max-w-[140px]"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveDebt}
+                        disabled={savingDebt}
+                      >
+                        {savingDebt ? "שומר..." : "שמור"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCancelEditDebt}
+                        disabled={savingDebt}
+                      >
+                        ביטול
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

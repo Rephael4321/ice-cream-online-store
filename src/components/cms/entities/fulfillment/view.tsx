@@ -7,6 +7,7 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import Link from "next/link";
 import ClientControlPanel from "@/components/cms/entities/fulfillment/ui/client-control-panel";
 import OrderItemList from "@/components/cms/entities/fulfillment/ui/order-item-list";
+import { useAuth } from "@/components/auth/auth-context";
 import {
   apiDelete,
   apiGet,
@@ -17,6 +18,7 @@ type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
 type Order = {
   orderId: number;
+  clientId?: number | null;
   clientPhone: string;
   clientName: string | null;
   clientAddress: string | null;
@@ -33,6 +35,7 @@ type Order = {
   deliveryFee?: number | null;
   total?: number | null;
   paymentMethod?: PaymentMethod | null;
+  clientUnpaidTotal?: number | null;
 };
 
 type Item = {
@@ -86,6 +89,7 @@ function calcPreGroupFromItems(items: ExtendedItem[]) {
 
 export default function ViewOrder() {
   const { id } = useParams<{ id: string }>();
+  const { role } = useAuth();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<ExtendedItem[]>([]);
@@ -158,6 +162,7 @@ export default function ViewOrder() {
 
         setOrder({
           orderId: Number(o.orderId),
+          clientId: o.clientId != null ? Number(o.clientId) : null,
           clientPhone: String(o.clientPhone ?? ""),
           clientName: o.clientName ?? null,
           clientAddress: o.clientAddress ?? null,
@@ -176,6 +181,8 @@ export default function ViewOrder() {
             o?.groupDiscountTotal != null ? Number(o.groupDiscountTotal) : 0,
           deliveryFee: o?.deliveryFee != null ? Number(o.deliveryFee) : null,
           total: o?.total != null ? Number(o.total) : null,
+          clientUnpaidTotal:
+            o?.clientUnpaidTotal != null ? Number(o.clientUnpaidTotal) : null,
         });
 
         setItems(enriched);
@@ -373,6 +380,25 @@ export default function ViewOrder() {
         <ClientControlPanel
           order={order}
           finalTotal={grandTotal}
+          clientId={order.clientId ?? undefined}
+          clientUnpaidTotal={
+            order.clientUnpaidTotal != null ? Number(order.clientUnpaidTotal) : undefined
+          }
+          canEditDebt={role === "admin"}
+          onDebtSave={async (targetTotalDebt) => {
+            if (order.clientId == null) return;
+            const r = await apiPatch(
+              `/api/clients/${order.clientId}/debt-adjustment`,
+              { targetTotalDebt }
+            );
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(data?.error || "Failed");
+            setOrder((prev) =>
+              prev
+                ? { ...prev, clientUnpaidTotal: targetTotalDebt }
+                : prev
+            );
+          }}
           onDelete={async () => {
             if (!order) return;
             if (!confirm("האם אתה בטוח שברצונך למחוק?")) return;

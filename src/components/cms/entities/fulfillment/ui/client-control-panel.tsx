@@ -1,6 +1,8 @@
 "use client";
 
-import { showToast } from "@/components/cms/ui";
+import { useState } from "react";
+import Link from "next/link";
+import { Button, Input, Label, showToast } from "@/components/cms/ui";
 import { AddressDisplay } from "./address-display";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
@@ -23,6 +25,10 @@ type Props = {
   };
 
   finalTotal: number;
+  clientId?: number;
+  clientUnpaidTotal?: number;
+  canEditDebt?: boolean;
+  onDebtSave?: (targetTotalDebt: number) => Promise<void>;
   onDelete: () => void;
   onMarkTest: (flag: boolean) => void;
   onEdit: () => void;
@@ -36,6 +42,10 @@ type Props = {
 export default function ClientControlPanel({
   order,
   finalTotal,
+  clientId,
+  clientUnpaidTotal,
+  canEditDebt = false,
+  onDebtSave,
   onDelete,
   onMarkTest,
   onEdit,
@@ -45,6 +55,10 @@ export default function ClientControlPanel({
   handleTitleClick,
   onNotifyWhatsApp,
 }: Props) {
+  const [editingDebt, setEditingDebt] = useState(false);
+  const [debtInput, setDebtInput] = useState("");
+  const [savingDebt, setSavingDebt] = useState(false);
+
   const phone = order.clientPhone;
   const name = order.clientName;
 
@@ -174,6 +188,83 @@ export default function ClientControlPanel({
           ✏️ ערוך פרטי לקוח
         </button>
       </div>
+
+      {/* Client total debt (driver + admin see; admin can edit; clickable to payment page) */}
+      {clientId != null && clientUnpaidTotal != null && (
+        <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded">
+          <p className="font-medium text-amber-800">
+            <Link
+              href={`/clients/${clientId}/payment?orderId=${order.orderId}`}
+              className="underline hover:text-amber-900"
+            >
+              סה״כ חוב ללקוח: ₪{Number(clientUnpaidTotal).toFixed(2)}
+            </Link>
+            {canEditDebt && onDebtSave && !editingDebt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDebtInput(String(clientUnpaidTotal));
+                  setEditingDebt(true);
+                }}
+                className="mr-2 text-sm px-2 py-0.5 rounded border border-amber-500 text-amber-800 hover:bg-amber-100"
+              >
+                ערוך חוב
+              </button>
+            )}
+          </p>
+          {canEditDebt && onDebtSave && editingDebt && (
+            <div className="mt-2">
+              <Label htmlFor="debt-total-order">סה״כ חוב חדש (₪)</Label>
+              <Input
+                id="debt-total-order"
+                type="number"
+                min={0}
+                step={0.01}
+                value={debtInput}
+                onChange={(e) => setDebtInput(e.target.value)}
+                dir="ltr"
+                className="max-w-[140px] mt-1"
+              />
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  disabled={savingDebt}
+                  onClick={async () => {
+                    const target = Number(debtInput);
+                    if (!Number.isFinite(target) || target < 0) {
+                      showToast("נא להזין סכום תקין", "warning");
+                      return;
+                    }
+                    setSavingDebt(true);
+                    try {
+                      await onDebtSave(target);
+                      showToast("✅ סה״כ חוב עודכן", "success");
+                      setEditingDebt(false);
+                    } catch {
+                      showToast("❌ שגיאה בעדכון חוב", "error");
+                    } finally {
+                      setSavingDebt(false);
+                    }
+                  }}
+                >
+                  {savingDebt ? "שומר..." : "שמור"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingDebt}
+                  onClick={() => {
+                    setEditingDebt(false);
+                    setDebtInput("");
+                  }}
+                >
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="mt-2">
         תאריך:&nbsp;

@@ -73,12 +73,39 @@
   - 2200_65560_3_not_null: quantity IS NOT NULL
   - 2200_65560_4_not_null: sale_price IS NOT NULL
 
+📦 Table: public.client_payments
+  - amount numeric NOT NULL
+  - client_id integer NOT NULL
+  - created_at timestamp with time zone DEFAULT now()
+  - id integer NOT NULL DEFAULT nextval('client_payments_id_seq'::regclass)
+  - payment_method text NOT NULL
+  - recorded_by text
+
+🔗 Foreign Keys:
+  - client_payments_client_id_fkey: client_id → public.clients(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - client_payments_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - client_payments_pkey: id [btree] [UNIQUE]
+  - idx_client_payments_client_id: client_id [btree]
+
+✅ Check Constraints:
+  - 2200_83126_1_not_null: id IS NOT NULL
+  - 2200_83126_2_not_null: client_id IS NOT NULL
+  - 2200_83126_3_not_null: amount IS NOT NULL
+  - 2200_83126_4_not_null: payment_method IS NOT NULL
+  - client_payments_amount_check: (amount >= (0)::numeric)
+  - client_payments_payment_method_check: (payment_method = ANY (ARRAY['credit'::text, 'paybox'::text, 'cash'::text]))
+
 📦 Table: public.clients
   - address text
   - address_lat double precision
   - address_lng double precision
   - created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
   - id integer NOT NULL DEFAULT nextval('clients_id_seq'::regclass)
+  - manual_debt_adjustment numeric DEFAULT 0
   - name character varying
   - phone character varying
   - updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP

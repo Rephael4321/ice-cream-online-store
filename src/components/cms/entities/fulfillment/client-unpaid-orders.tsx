@@ -11,8 +11,15 @@ type OrderRow = {
   total: number;
 };
 
+type ClientDebt = {
+  unpaidTotal: number;
+  manualDebtAdjustment: number | null;
+  name?: string | null;
+};
+
 export default function ClientUnpaidOrders({ clientId }: { clientId: number }) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [clientDebt, setClientDebt] = useState<ClientDebt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,17 +29,37 @@ export default function ClientUnpaidOrders({ clientId }: { clientId: number }) {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiGet(
-          `/api/orders?clientId=${clientId}&unpaid=1`,
-          { cache: "no-store" }
-        );
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
+        const [ordersRes, clientRes] = await Promise.all([
+          apiGet(`/api/orders?clientId=${clientId}&unpaid=1`, {
+            cache: "no-store",
+          }),
+          apiGet(`/api/clients/${clientId}`, { cache: "no-store" }),
+        ]);
+
+        if (!ordersRes.ok) {
+          const data = await ordersRes.json().catch(() => ({}));
           throw new Error(data?.error ?? "שגיאה בטעינה");
         }
-        const data = await res.json();
+        const ordersData = await ordersRes.json();
         if (!cancelled) {
-          setOrders(data.orders ?? []);
+          setOrders(ordersData.orders ?? []);
+        }
+
+        if (!cancelled && clientRes.ok) {
+          const clientData = await clientRes.json();
+          setClientDebt({
+            unpaidTotal:
+              clientData.unpaidTotal != null
+                ? Number(clientData.unpaidTotal)
+                : 0,
+            manualDebtAdjustment:
+              clientData.manualDebtAdjustment != null
+                ? Number(clientData.manualDebtAdjustment)
+                : null,
+            name: clientData.name ?? null,
+          });
+        } else if (!cancelled) {
+          setClientDebt(null);
         }
       } catch (e) {
         if (!cancelled) {
@@ -49,7 +76,11 @@ export default function ClientUnpaidOrders({ clientId }: { clientId: number }) {
     };
   }, [clientId]);
 
-  const clientName = orders[0]?.clientName ?? null;
+  const clientName = orders[0]?.clientName ?? clientDebt?.name ?? null;
+  const hasUnpaidOrders = orders.length > 0;
+  const adjustment = clientDebt?.manualDebtAdjustment ?? null;
+  const hasAdjustment = adjustment != null && adjustment !== 0;
+  const showTotalDebt = clientDebt != null && (hasUnpaidOrders || hasAdjustment);
 
   if (loading) {
     return (
@@ -70,7 +101,7 @@ export default function ClientUnpaidOrders({ clientId }: { clientId: number }) {
     );
   }
 
-  if (orders.length === 0) {
+  if (!hasUnpaidOrders && !hasAdjustment) {
     return (
       <div className="p-4" dir="rtl">
         <h1 className="text-xl font-bold mb-2">הזמנות לא שולמו</h1>
@@ -110,6 +141,16 @@ export default function ClientUnpaidOrders({ clientId }: { clientId: number }) {
           );
         })}
       </ul>
+      {hasAdjustment && (
+        <p className="mt-2 text-amber-700 font-medium">
+          התאמה ידנית: ₪{Number(adjustment).toFixed(2)}
+        </p>
+      )}
+      {showTotalDebt && (
+        <p className="mt-1 font-semibold text-amber-800">
+          סה״כ חוב: ₪{Number(clientDebt.unpaidTotal).toFixed(2)}
+        </p>
+      )}
       <Link href="/orders" className="text-blue-600 underline mt-4 inline-block">
         חזרה להזמנות
       </Link>

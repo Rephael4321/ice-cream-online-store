@@ -1,9 +1,11 @@
 "use client";
 
-import { Button } from "@/components/cms/ui";
+import { useState } from "react";
+import { Button, Input, Label, showToast } from "@/components/cms/ui";
 import { useRef } from "react";
 import Link from "next/link";
 import { AddressDisplay } from "../address-display";
+import { apiPatch } from "@/lib/api/client";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
@@ -24,6 +26,7 @@ type Props = {
     paymentMethod?: PaymentMethod | null;
     clientId?: number | null;
     clientOtherUnpaidCount?: number;
+    clientUnpaidTotal?: number | null;
   };
   onDelete: (id: number) => void;
   selectMode?: boolean;
@@ -35,6 +38,10 @@ type Props = {
   onToggleDelivered?: () => void;
   /** When false (e.g. driver on list), payment is read-only. Default true. */
   canEditPayment?: boolean;
+  /** When true (admin), show edit-debt control. */
+  canEditDebt?: boolean;
+  /** Called after debt adjustment so parent can refetch. */
+  onDebtUpdated?: () => void;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -50,7 +57,13 @@ export default function SingleOrder({
   onToggleReady,
   onToggleDelivered,
   canEditPayment = true,
+  canEditDebt = false,
+  onDebtUpdated,
 }: Props) {
+  const [editingDebt, setEditingDebt] = useState(false);
+  const [debtInput, setDebtInput] = useState("");
+  const [savingDebt, setSavingDebt] = useState(false);
+
   const date = new Date(order.createdAt);
   const formatted = !isNaN(date.getTime())
     ? date.toLocaleString("he-IL")
@@ -230,6 +243,91 @@ export default function SingleOrder({
               </button>
             )}
           </div>
+
+          {/* Client total debt (driver + admin) – clickable to payment page */}
+          {order.clientId != null && order.clientUnpaidTotal != null && (
+            <p className="mt-2 text-sm font-medium text-amber-800">
+              <Link
+                href={`/clients/${order.clientId}/payment`}
+                onClick={(e) => e.stopPropagation()}
+                className="underline hover:text-amber-900"
+              >
+                סה״כ חוב ללקוח: ₪{Number(order.clientUnpaidTotal).toFixed(2)}
+              </Link>
+              {canEditDebt && !editingDebt && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDebtInput(String(order.clientUnpaidTotal ?? 0));
+                    setEditingDebt(true);
+                  }}
+                  className="mr-2 text-xs px-2 py-0.5 rounded border border-amber-500 text-amber-800 hover:bg-amber-100"
+                >
+                  ערוך חוב
+                </button>
+              )}
+            </p>
+          )}
+          {canEditDebt && editingDebt && order.clientId != null && (
+            <div
+              className="mt-2 p-2 bg-amber-50 rounded border border-amber-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Label htmlFor={`debt-${order.orderId}`}>סה״כ חוב חדש (₪)</Label>
+              <Input
+                id={`debt-${order.orderId}`}
+                type="number"
+                min={0}
+                step={0.01}
+                value={debtInput}
+                onChange={(e) => setDebtInput(e.target.value)}
+                dir="ltr"
+                className="max-w-[120px] mt-1"
+              />
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  disabled={savingDebt}
+                  onClick={async () => {
+                    const target = Number(debtInput);
+                    if (!Number.isFinite(target) || target < 0) {
+                      showToast("נא להזין סכום תקין", "warning");
+                      return;
+                    }
+                    setSavingDebt(true);
+                    try {
+                      const r = await apiPatch(
+                        `/api/clients/${order.clientId}/debt-adjustment`,
+                        { targetTotalDebt: target }
+                      );
+                      if (!r.ok) throw new Error();
+                      showToast("✅ סה״כ חוב עודכן", "success");
+                      setEditingDebt(false);
+                      onDebtUpdated?.();
+                    } catch {
+                      showToast("❌ שגיאה בעדכון חוב", "error");
+                    } finally {
+                      setSavingDebt(false);
+                    }
+                  }}
+                >
+                  {savingDebt ? "שומר..." : "שמור"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingDebt}
+                  onClick={() => {
+                    setEditingDebt(false);
+                    setDebtInput("");
+                  }}
+                >
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Debt row: other unpaid orders for this client */}
           {!effectivePaid &&

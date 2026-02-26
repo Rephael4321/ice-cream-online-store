@@ -32,6 +32,7 @@ type Order = {
   clientPhone: string | null;
   paymentMethod?: PaymentMethod;
   clientOtherUnpaidCount?: number;
+  clientUnpaidTotal?: number | null;
 };
 
 const SCROLL_KEY = "lastViewedOrder";
@@ -89,6 +90,7 @@ export default function ListOrder() {
         ...o,
         paymentMethod: sanitizePaymentMethod(o.paymentMethod),
         clientOtherUnpaidCount: o.clientOtherUnpaidCount != null ? Number(o.clientOtherUnpaidCount) : 0,
+        clientUnpaidTotal: o.clientUnpaidTotal != null ? Number(o.clientUnpaidTotal) : null,
       }));
       setOrders(list);
       setHasUnnotified(
@@ -121,6 +123,7 @@ export default function ListOrder() {
         ...o,
         paymentMethod: sanitizePaymentMethod(o.paymentMethod),
         clientOtherUnpaidCount: o.clientOtherUnpaidCount != null ? Number(o.clientOtherUnpaidCount) : 0,
+        clientUnpaidTotal: o.clientUnpaidTotal != null ? Number(o.clientUnpaidTotal) : null,
       }));
       setOrders(list);
       setHasUnnotified(
@@ -400,6 +403,17 @@ export default function ListOrder() {
                   toggleDelivered(order.orderId, order.isDelivered)
                 }
                 canEditPayment={canEditPayment}
+                canEditDebt={role === "admin"}
+                onDebtUpdated={() => {
+                  if (search.trim()) searchOrders(search.trim());
+                  else if (selectedDate)
+                    fetchOrders({
+                      from: selectedDate.toLocaleDateString("sv-SE"),
+                      to: selectedDate.toLocaleDateString("sv-SE"),
+                      unpaid: unpaidOnly,
+                    });
+                  else fetchOrders({ pending: true, unpaid: unpaidOnly });
+                }}
               />
             ))}
           </ul>

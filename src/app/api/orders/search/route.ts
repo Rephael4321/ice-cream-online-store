@@ -17,13 +17,15 @@ async function searchOrders(req: NextRequest) {
         o.is_delivered AS "isDelivered",
         o.is_test AS "isTest",
         o.is_notified AS "isNotified",
-        o.payment_method AS "paymentMethod",         -- ★ NEW
+        o.payment_method AS "paymentMethod",
         o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "createdAt",
         o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS "updatedAt",
         COUNT(oi.id) AS "itemCount",
+        c.id AS "clientId",
         c.name AS "clientName",
         c.address AS "clientAddress",
-        c.phone AS "clientPhone"
+        c.phone AS "clientPhone",
+        (SELECT (COALESCE(SUM(o2.total), 0) + COALESCE(c.manual_debt_adjustment, 0))::numeric FROM orders o2 WHERE o2.client_id = c.id AND o2.is_paid = false AND o2.is_visible = true) AS "clientUnpaidTotal"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN clients c ON c.id = o.client_id

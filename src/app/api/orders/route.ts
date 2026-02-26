@@ -391,6 +391,9 @@ async function listOrders(req: NextRequest) {
       values.push(fromLocal, toLocal);
     }
 
+    const clientUnpaidTotal =
+      `(SELECT (COALESCE(SUM(o2.total), 0) + COALESCE(c.manual_debt_adjustment, 0))::numeric FROM orders o2 WHERE o2.client_id = c.id AND o2.is_paid = false AND o2.is_visible = true) AS "clientUnpaidTotal"`;
+
     const result = await pool.query(
       `
       SELECT
@@ -413,7 +416,8 @@ async function listOrders(req: NextRequest) {
         o.pre_group_total      AS "preGroupTotal",
         o.group_discount_total AS "groupDiscountTotal",
         o.total                AS "total",
-        (SELECT COUNT(*)::int FROM orders o2 WHERE o2.client_id = c.id AND o2.is_paid = false AND o2.is_visible = true AND o2.id <> o.id) AS "clientOtherUnpaidCount"
+        (SELECT COUNT(*)::int FROM orders o2 WHERE o2.client_id = c.id AND o2.is_paid = false AND o2.is_visible = true AND o2.id <> o.id) AS "clientOtherUnpaidCount",
+        ${clientUnpaidTotal}
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN clients c ON c.id = o.client_id

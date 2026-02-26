@@ -55,9 +55,12 @@ function isAdmin(p?: ExtraJwt) {
   return hasRole(p, "admin");
 }
 
-// CMS paths a driver may visit: /orders, /orders/[id], /orders/client/[clientId]/unpaid
+// CMS paths a driver may visit: /orders, /orders/[id], /orders/client/[clientId]/unpaid, /clients/[id]/payment
 function isDriverAllowedCmsPath(pathname: string) {
-  return /^\/orders(\/(client\/[^/]+\/unpaid|\d+))?$/.test(pathname);
+  return (
+    /^\/orders(\/(client\/[^/]+\/unpaid|\d+))?$/.test(pathname) ||
+    /^\/clients\/\d+\/payment$/.test(pathname)
+  );
 }
 
 export default function JwtGatekeeper({
