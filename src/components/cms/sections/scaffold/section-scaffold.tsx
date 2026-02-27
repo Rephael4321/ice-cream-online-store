@@ -34,14 +34,28 @@ export default function SectionScaffold({
 
   return (
     <SectionHeaderProvider initialTitle={cfg.label} initialActions={actions}>
-      {/* Header container: centered + a bit of top padding */}
-      <div className="mx-auto max-w-6xl px-4 pt-4">
+      {/* Header container: centered; match content width for clients */}
+      <div
+        className={
+          section === "clients"
+            ? "mx-auto w-full px-4 sm:px-6 pt-4 max-w-6xl lg:max-w-7xl xl:max-w-[85rem] 2xl:max-w-[100rem]"
+            : "mx-auto max-w-6xl px-4 pt-4"
+        }
+      >
         <HeaderHydrator actions={actions} />
         <SectionHeader />
       </div>
 
-      {/* Content container: centered to match header */}
-      <div className="mx-auto max-w-6xl px-4 pb-6">{children}</div>
+      {/* Content container: centered; clients section uses wider max on desktop */}
+      <div
+        className={
+          section === "clients"
+            ? "mx-auto w-full px-4 sm:px-6 pb-6 max-w-6xl lg:max-w-7xl xl:max-w-[85rem] 2xl:max-w-[100rem]"
+            : "mx-auto max-w-6xl px-4 pb-6"
+        }
+      >
+        {children}
+      </div>
     </SectionHeaderProvider>
   );
 }

@@ -22,8 +22,8 @@ async function getClient(
          c.address_lat AS "addressLat",
          c.address_lng AS "addressLng",
          c.manual_debt_adjustment AS "manualDebtAdjustment",
-         c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS created_at,
-         c.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem' AS updated_at,
+         c.created_at AS created_at,
+         c.updated_at AS updated_at,
          ((SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE o.client_id = c.id AND o.is_paid = false AND o.is_visible = true) + COALESCE(c.manual_debt_adjustment, 0))::numeric AS "unpaidTotal",
          (SELECT COUNT(*)::int FROM orders o WHERE o.client_id = c.id AND o.is_paid = false AND o.is_visible = true) AS "unpaidCount"
        FROM clients c

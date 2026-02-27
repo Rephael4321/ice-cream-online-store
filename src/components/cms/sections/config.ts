@@ -45,7 +45,10 @@ export const CMS_SECTIONS = {
   clients: {
     label: "לקוחות",
     base: "/clients",
-    nav: [{ key: "list", label: "רשימת לקוחות", href: "/clients" }],
+    nav: [
+      { key: "list", label: "רשימת לקוחות", href: "/clients" },
+      { key: "new", label: "לקוח חדש", href: "/clients/new" },
+    ],
   } as const satisfies CMSSection,
 
   storage: {

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Input, Label, Button, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { useAuth } from "@/components/auth/auth-context";
+import { AddressSearch, type SelectedPlace } from "@/components/address-search";
 import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api/client";
 
 type Client = {
@@ -13,6 +14,8 @@ type Client = {
   name: string;
   phone: string;
   address: string;
+  addressLat?: number | null;
+  addressLng?: number | null;
   createdAt: string;
   unpaidTotal?: number;
   unpaidCount?: number;
@@ -49,6 +52,8 @@ export default function ClientDetails() {
           name = "",
           phone = "",
           address = "",
+          addressLat,
+          addressLng,
           created_at,
           createdAt,
           unpaidTotal,
@@ -65,9 +70,11 @@ export default function ClientDetails() {
             name: name ?? "",
             phone: phone ?? "",
             address: address ?? "",
+            addressLat: addressLat != null && Number.isFinite(Number(addressLat)) ? Number(addressLat) : null,
+            addressLng: addressLng != null && Number.isFinite(Number(addressLng)) ? Number(addressLng) : null,
             createdAt:
               created && !isNaN(created.getTime())
-                ? created.toLocaleString("he-IL")
+                ? created.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })
                 : "-",
             unpaidTotal: unpaidTotal != null ? Number(unpaidTotal) : 0,
             unpaidCount: unpaidCount != null ? Number(unpaidCount) : 0,
@@ -108,6 +115,8 @@ export default function ClientDetails() {
         name,
         phone,
         address,
+        address_lat: client.addressLat ?? null,
+        address_lng: client.addressLng ?? null,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed");
@@ -137,8 +146,10 @@ export default function ClientDetails() {
   };
 
   const showDebtBlock =
-    client?.unpaidTotal != null &&
-    (client.unpaidTotal > 0 || (client.manualDebtAdjustment ?? 0) !== 0);
+    !!client &&
+    (role === "admin" ||
+      (client.unpaidTotal != null &&
+        (client.unpaidTotal > 0 || (client.manualDebtAdjustment ?? 0) !== 0)));
 
   const handleStartEditDebt = () => {
     if (!client) return;
@@ -149,6 +160,20 @@ export default function ClientDetails() {
   const handleCancelEditDebt = () => {
     setEditingDebt(false);
     setDebtInput("");
+  };
+
+  const handlePlaceSelect = (place: SelectedPlace) => {
+    if (!client) return;
+    setClient((prev) =>
+      prev
+        ? {
+            ...prev,
+            address: place.formattedAddress,
+            addressLat: place.lat,
+            addressLng: place.lng,
+          }
+        : prev
+    );
   };
 
   const handleSaveDebt = async () => {
@@ -235,13 +260,21 @@ export default function ClientDetails() {
             </div>
 
             <div>
-              <Label htmlFor="address">כתובת</Label>
+              <Label htmlFor="address">כתובת (טקסט)</Label>
               <Input
                 id="address"
                 name="address"
                 value={client.address ?? ""}
                 onChange={handleChange}
                 dir="auto"
+              />
+            </div>
+
+            <div>
+              <Label className="block mb-1">או חפש ב-Google Maps</Label>
+              <AddressSearch
+                showWazeButton={false}
+                onPlaceSelect={handlePlaceSelect}
               />
             </div>
 
