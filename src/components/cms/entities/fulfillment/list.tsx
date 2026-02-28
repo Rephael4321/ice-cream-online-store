@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import { List } from "react-window";
 import { Button, showToast, Input } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
@@ -17,10 +17,15 @@ import {
 const DEBOUNCE_MS = 350;
 const SEARCHING_MESSAGE_DELAY_MS = 2000;
 // Card height: smaller than 340 so rows aren’t over-spaced; gap like client list (172+16=188)
-const ROW_HEIGHT = 260;
+// Row height is responsive: ROW_HEIGHT_MOBILE below MOBILE_BREAKPOINT_PX so card is not clipped.
 const ROW_GAP = 8;
-const ITEM_SIZE = ROW_HEIGHT + ROW_GAP;
 const OVERSCAN_COUNT = 3;
+const ROW_HEIGHT_DESKTOP = 260;
+// Tablet: tighter row (card height + ROW_GAP only), like client list, so gap between cards is small
+const ROW_HEIGHT_TABLET = 220;
+const ROW_HEIGHT_MOBILE = 500;
+const TABLET_BREAKPOINT_PX = 768;
+const MOBILE_BREAKPOINT_PX = 1024;
 
 type PaymentMethod = null | "" | "credit" | "paybox" | "cash";
 
@@ -48,8 +53,10 @@ type OrderRowProps = {
   index: number;
   style: React.CSSProperties;
   ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: string };
+  rowHeight: number;
+  rowGap: number;
   orders: Order[];
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => void | Promise<void>;
   selectMode: boolean;
   selectedOrders: Set<number>;
   onSelectToggle: (id: number) => void;
@@ -66,6 +73,8 @@ const OrderRow = memo(function OrderRow({
   index,
   style,
   ariaAttributes,
+  rowHeight,
+  rowGap,
   orders,
   onDelete,
   selectMode,
@@ -78,16 +87,16 @@ const OrderRow = memo(function OrderRow({
   canEditPayment,
   canEditDebt,
   onDebtUpdated,
-}: OrderRowProps) {
+}: OrderRowProps): React.ReactElement | null {
   const order = orders[index];
   if (!order) return null;
   return (
     <div style={style} className="pr-0" {...ariaAttributes}>
       <div
         style={{
-          height: ROW_HEIGHT,
-          minHeight: ROW_HEIGHT,
-          marginBottom: ROW_GAP,
+          height: rowHeight,
+          minHeight: rowHeight,
+          marginBottom: rowGap,
         }}
         className="overflow-hidden [&>li]:m-0 [&>li]:block [&>li]:list-none"
       >
@@ -129,11 +138,31 @@ export default function ListOrder() {
   const [hasUnnotified, setHasUnnotified] = useState(false);
   const [showSearchingMessage, setShowSearchingMessage] = useState(false);
   const [listHeight, setListHeight] = useState(500);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [rowHeight, setRowHeight] = useState(ROW_HEIGHT_DESKTOP);
 
   const canEditPayment = role !== "driver";
 
   const listContainerRef = useRef<HTMLDivElement>(null);
   const searchingDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Responsive row height: desktop | tablet (≤1024) | mobile (≤768)
+  useEffect(() => {
+    const mqMobile = window.matchMedia(`(max-width: ${TABLET_BREAKPOINT_PX}px)`);
+    const mqTablet = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
+    const update = () => {
+      if (mqMobile.matches) setRowHeight(ROW_HEIGHT_MOBILE);
+      else if (mqTablet.matches) setRowHeight(ROW_HEIGHT_TABLET);
+      else setRowHeight(ROW_HEIGHT_DESKTOP);
+    };
+    update();
+    mqMobile.addEventListener("change", update);
+    mqTablet.addEventListener("change", update);
+    return () => {
+      mqMobile.removeEventListener("change", update);
+      mqTablet.removeEventListener("change", update);
+    };
+  }, []);
 
   const getLast7DaysRange = () => {
     const now = new Date();
@@ -456,48 +485,80 @@ export default function ListOrder() {
       )}
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden py-4 space-y-4">
-        {/* 🔍 Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <label className="font-semibold">סנן לפי תאריך:</label>
-            <DatePicker
-              selected={selectedDate}
-              onChange={(date) => setSelectedDate(date)}
-              placeholderText="בחר תאריך"
-              dateFormat="dd/MM/yyyy"
-              className="border px-3 py-2 rounded"
-              isClearable
-              disabled={searchQuery.trim().length > 0}
-            />
+        {/* 🔍 Filters: collapsible on mobile, inline on sm+ */}
+        <div className="flex flex-col flex-shrink-0 gap-2">
+          {/* Mobile: single toggle row */}
+          <div className="flex lg:hidden items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFiltersOpen((o) => !o)}
+              className="shrink-0"
+              aria-expanded={filtersOpen}
+            >
+              {hasUnnotified && "⚠️ "}
+              {filtersOpen ? "סגור סננים ▲" : "סננים ▼"}
+            </Button>
+            {!filtersOpen && (searchQuery.trim() || selectedDate || unpaidOnly) && (
+              <span className="text-sm text-gray-500 truncate">
+                {[searchQuery.trim() && "חיפוש", selectedDate && "תאריך", unpaidOnly && "לא שולמו"]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            )}
+          </div>
+          {/* Filter content: on mobile when open, one scrollable panel so list keeps most of viewport */}
+          <div
+            className={
+              filtersOpen
+                ? "flex flex-col gap-4 flex-wrap max-h-[42vh] overflow-y-auto overflow-x-hidden lg:max-h-none lg:overflow-visible"
+                : "hidden lg:flex flex-col lg:flex-row lg:items-center gap-4 flex-wrap"
+            }
+          >
+            <div className="flex items-center gap-2">
+              <DatePicker
+                selected={selectedDate}
+                onChange={(date) => setSelectedDate(date)}
+                placeholderText="סנן לפי תאריך"
+                dateFormat="dd/MM/yyyy"
+                className="border px-3 py-2 rounded"
+                isClearable
+                disabled={searchQuery.trim().length > 0}
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <Input
+                type="text"
+                placeholder="חיפוש לפי שם, כתובת, טלפון או מספר הזמנה"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:max-w-xs"
+              />
+              {showSearchingMessage && (
+                <span className="text-sm text-gray-500 self-end pb-2">מחפש...</span>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={unpaidOnly}
+                onChange={(e) => setUnpaidOnly(e.target.checked)}
+                className="rounded"
+              />
+              <span className="font-medium">רק לא שולמו</span>
+            </label>
+
+            {hasUnnotified && (
+              <div className="hidden lg:block bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm font-medium">
+                ⚠️ ישנן הזמנות שלא נשלחה אליהן הודעת וואטסאפ.
+              </div>
+            )}
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={unpaidOnly}
-              onChange={(e) => setUnpaidOnly(e.target.checked)}
-              className="rounded"
-            />
-            <span className="font-medium">רק לא שולמו</span>
-          </label>
-
-          <Input
-            type="text"
-            placeholder="חיפוש לפי שם, כתובת, טלפון או מספר הזמנה"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full sm:max-w-xs"
-          />
-          {showSearchingMessage && (
-            <span className="text-sm text-gray-500 self-end pb-2">מחפש...</span>
-          )}
+          {/* Full message only on desktop; on mobile/tablet we only show ⚠️ on the filter button */}
         </div>
-
-        {hasUnnotified && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm font-medium flex-shrink-0">
-            ⚠️ ישנן הזמנות שלא נשלחה אליהן הודעת וואטסאפ.
-          </div>
-        )}
 
         {loading ? (
           <p className="flex-shrink-0">טוען הזמנות...</p>
@@ -510,10 +571,13 @@ export default function ListOrder() {
             className="flex-1 min-h-0"
           >
             <List
-              rowComponent={OrderRow}
+              rowComponent={(props: OrderRowProps) => <OrderRow {...props} />}
               rowCount={orders.length}
-              rowHeight={ITEM_SIZE}
+              rowHeight={rowHeight + ROW_GAP}
+              // List injects index, style, ariaAttributes per row; rowProps supplies the rest
               rowProps={{
+                rowHeight,
+                rowGap: ROW_GAP,
                 orders,
                 onDelete: handleDelete,
                 selectMode,
@@ -526,7 +590,7 @@ export default function ListOrder() {
                 canEditPayment,
                 canEditDebt: role === "admin",
                 onDebtUpdated: handleDebtUpdated,
-              }}
+              } as any}
               overscanCount={OVERSCAN_COUNT}
               defaultHeight={500}
               style={{ height: listHeight, width: "100%" }}

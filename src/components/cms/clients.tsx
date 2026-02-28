@@ -109,6 +109,7 @@ export default function Clients() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [listHeight, setListHeight] = useState(500);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     const el = listContainerRef.current;
@@ -212,22 +213,44 @@ export default function Clients() {
       <HeaderHydrator title="לקוחות" />
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden py-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div>
-            <Label htmlFor="client-search">חיפוש</Label>
-            <Input
-              id="client-search"
-              type="search"
-              placeholder="חפש לפי שם, טלפון או כתובת"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              dir="auto"
-              className="max-w-md"
-            />
+        {/* Filters: collapsible on mobile, inline on sm+ */}
+        <div className="flex flex-col flex-shrink-0 gap-2">
+          <div className="flex sm:hidden items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+            >
+              {filtersOpen ? "סגור חיפוש ▲" : "חיפוש ▼"}
+            </Button>
+            {!filtersOpen && searchQuery.trim() && (
+              <span className="text-sm text-gray-500 truncate">חיפוש פעיל</span>
+            )}
           </div>
-          {showSearchingMessage && (
-            <span className="text-sm text-gray-500 self-end pb-2">מחפש...</span>
-          )}
+          <div
+            className={
+              filtersOpen
+                ? "flex flex-wrap items-center gap-2"
+                : "hidden sm:flex flex-wrap items-center gap-2"
+            }
+          >
+            <div>
+              <Label htmlFor="client-search">חיפוש</Label>
+              <Input
+                id="client-search"
+                type="search"
+                placeholder="חפש לפי שם, טלפון או כתובת"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                dir="auto"
+                className="max-w-md"
+              />
+            </div>
+            {showSearchingMessage && (
+              <span className="text-sm text-gray-500 self-end pb-2">מחפש...</span>
+            )}
+          </div>
         </div>
 
         {loading ? (

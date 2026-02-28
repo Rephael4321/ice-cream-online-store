@@ -5,8 +5,8 @@ import Image from "next/image";
 export default function CmsNavbar() {
   return (
     <div className="sticky top-0 z-50 w-full bg-white px-4 py-3 sm:px-6 md:px-8 shadow-md border-b border-gray-200">
-      {/* Desktop: All in one row */}
-      <div className="hidden sm:flex items-center justify-between w-full">
+      {/* Desktop only (lg+): full menu row; tablet and mobile use stacked layout */}
+      <div className="hidden lg:flex items-center justify-between w-full">
         {/* Logo */}
         <Link
           href="/"
@@ -48,8 +48,8 @@ export default function CmsNavbar() {
         <Cart />
       </div>
 
-      {/* Mobile: Two stacked rows */}
-      <div className="sm:hidden flex flex-col w-full">
+      {/* Mobile + tablet: two stacked rows */}
+      <div className="lg:hidden flex flex-col w-full">
         {/* Top: Logo + Cart */}
         <div className="flex justify-between items-center w-full">
           <Link
