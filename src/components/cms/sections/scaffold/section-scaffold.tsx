@@ -34,10 +34,10 @@ export default function SectionScaffold({
 
   return (
     <SectionHeaderProvider initialTitle={cfg.label} initialActions={actions}>
-      {/* Header container: centered; match content width for clients */}
+      {/* Header container: centered; match content width for clients/orders */}
       <div
         className={
-          section === "clients"
+          section === "clients" || section === "orders"
             ? "mx-auto w-full px-4 sm:px-6 pt-4 max-w-6xl lg:max-w-7xl xl:max-w-[85rem] 2xl:max-w-[100rem]"
             : "mx-auto max-w-6xl px-4 pt-4"
         }
@@ -46,10 +46,10 @@ export default function SectionScaffold({
         <SectionHeader />
       </div>
 
-      {/* Content container: centered; clients section uses wider max on desktop */}
+      {/* Content container: centered; clients/orders use wider max on desktop */}
       <div
         className={
-          section === "clients"
+          section === "clients" || section === "orders"
             ? "mx-auto w-full px-4 sm:px-6 pb-6 max-w-6xl lg:max-w-7xl xl:max-w-[85rem] 2xl:max-w-[100rem]"
             : "mx-auto max-w-6xl px-4 pb-6"
         }

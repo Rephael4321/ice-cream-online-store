@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import { List } from "react-window";
 import { Button, showToast, Input } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { useAuth } from "@/components/auth/auth-context";
@@ -12,6 +13,14 @@ import {
   apiGet,
   apiPatch,
 } from "@/lib/api/client";
+
+const DEBOUNCE_MS = 350;
+const SEARCHING_MESSAGE_DELAY_MS = 2000;
+// Card height: smaller than 340 so rows aren’t over-spaced; gap like client list (172+16=188)
+const ROW_HEIGHT = 260;
+const ROW_GAP = 8;
+const ITEM_SIZE = ROW_HEIGHT + ROW_GAP;
+const OVERSCAN_COUNT = 3;
 
 type PaymentMethod = null | "" | "credit" | "paybox" | "cash";
 
@@ -35,6 +44,74 @@ type Order = {
   clientUnpaidTotal?: number | null;
 };
 
+type OrderRowProps = {
+  index: number;
+  style: React.CSSProperties;
+  ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: string };
+  orders: Order[];
+  onDelete: (id: number) => void;
+  selectMode: boolean;
+  selectedOrders: Set<number>;
+  onSelectToggle: (id: number) => void;
+  onEnterSelectMode: (id: number) => void;
+  onChangePayment: (orderId: number, method: PaymentMethod) => void;
+  onToggleReady: (orderId: number, current: boolean) => void;
+  onToggleDelivered: (orderId: number, current?: boolean) => void;
+  canEditPayment: boolean;
+  canEditDebt: boolean;
+  onDebtUpdated: () => void;
+};
+
+const OrderRow = memo(function OrderRow({
+  index,
+  style,
+  ariaAttributes,
+  orders,
+  onDelete,
+  selectMode,
+  selectedOrders,
+  onSelectToggle,
+  onEnterSelectMode,
+  onChangePayment,
+  onToggleReady,
+  onToggleDelivered,
+  canEditPayment,
+  canEditDebt,
+  onDebtUpdated,
+}: OrderRowProps) {
+  const order = orders[index];
+  if (!order) return null;
+  return (
+    <div style={style} className="pr-0" {...ariaAttributes}>
+      <div
+        style={{
+          height: ROW_HEIGHT,
+          minHeight: ROW_HEIGHT,
+          marginBottom: ROW_GAP,
+        }}
+        className="overflow-hidden [&>li]:m-0 [&>li]:block [&>li]:list-none"
+      >
+        <SingleOrder
+          order={order}
+          onDelete={onDelete}
+          selectMode={selectMode}
+          selected={selectedOrders.has(order.orderId)}
+          onSelectToggle={() => onSelectToggle(order.orderId)}
+          onEnterSelectMode={() => onEnterSelectMode(order.orderId)}
+          onChangePayment={(m) => onChangePayment(order.orderId, m)}
+          onToggleReady={() => onToggleReady(order.orderId, order.isReady)}
+          onToggleDelivered={() =>
+            onToggleDelivered(order.orderId, order.isDelivered)
+          }
+          canEditPayment={canEditPayment}
+          canEditDebt={canEditDebt}
+          onDebtUpdated={onDebtUpdated}
+        />
+      </div>
+    </div>
+  );
+});
+
 const SCROLL_KEY = "lastViewedOrder";
 const sanitizePaymentMethod = (v: unknown): PaymentMethod =>
   v === "credit" || v === "paybox" || v === "cash" ? v : "";
@@ -44,16 +121,19 @@ export default function ListOrder() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Set<number>>(new Set());
   const [hasUnnotified, setHasUnnotified] = useState(false);
+  const [showSearchingMessage, setShowSearchingMessage] = useState(false);
+  const [listHeight, setListHeight] = useState(500);
 
   const canEditPayment = role !== "driver";
 
-  const containerRef = useRef<HTMLUListElement>(null);
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const searchingDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getLast7DaysRange = () => {
     const now = new Date();
@@ -105,14 +185,18 @@ export default function ListOrder() {
 
   const searchOrders = async (query: string) => {
     if (!query) {
-      // ↩️ When clearing search, show PENDING by default (respect unpaidOnly)
       await fetchOrders({
         pending: true,
         unpaid: unpaidOnly,
       });
       return;
     }
-    setLoading(true);
+    setShowSearchingMessage(false);
+    if (searchingDelayRef.current) clearTimeout(searchingDelayRef.current);
+    searchingDelayRef.current = setTimeout(() => {
+      setShowSearchingMessage(true);
+      searchingDelayRef.current = null;
+    }, SEARCHING_MESSAGE_DELAY_MS);
     try {
       const res = await apiGet(
         `/api/orders/search?query=${encodeURIComponent(query)}`,
@@ -132,27 +216,42 @@ export default function ListOrder() {
     } catch {
       showToast("❌ שגיאה בחיפוש", "error");
     } finally {
-      setLoading(false);
+      if (searchingDelayRef.current) {
+        clearTimeout(searchingDelayRef.current);
+        searchingDelayRef.current = null;
+      }
+      setShowSearchingMessage(false);
     }
   };
 
-  // 📅 On mount and when date or unpaid filter changes -> refetch
+  // Debounce search input
   useEffect(() => {
-    if (search.trim()) return;
-    if (selectedDate === null) {
-      fetchOrders({ pending: true, unpaid: unpaidOnly });
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Single source: when debouncedSearch / selectedDate / unpaidOnly change → search or fetch by date
+  useEffect(() => {
+    if (debouncedSearch) {
+      searchOrders(debouncedSearch);
     } else {
-      const dateStr = selectedDate.toLocaleDateString("sv-SE");
-      fetchOrders({ from: dateStr, to: dateStr, unpaid: unpaidOnly });
+      if (selectedDate === null) {
+        fetchOrders({ pending: true, unpaid: unpaidOnly });
+      } else {
+        const dateStr = selectedDate.toLocaleDateString("sv-SE");
+        fetchOrders({ from: dateStr, to: dateStr, unpaid: unpaidOnly });
+      }
     }
-  }, [selectedDate, unpaidOnly, search]);
+  }, [debouncedSearch, selectedDate, unpaidOnly]);
 
   // 🔄 Refresh when page becomes visible (handles mobile back button)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && !loading) {
-        if (search.trim()) {
-          searchOrders(search.trim());
+        if (debouncedSearch.trim()) {
+          searchOrders(debouncedSearch.trim());
         } else if (selectedDate === null) {
           fetchOrders({ pending: true, unpaid: unpaidOnly });
         } else {
@@ -167,12 +266,24 @@ export default function ListOrder() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [search, selectedDate, unpaidOnly, loading]);
+  }, [debouncedSearch, selectedDate, unpaidOnly, loading]);
 
-  // 🔖 Restore scroll-to-last-viewed
+  // ResizeObserver for virtual list height
+  useEffect(() => {
+    const el = listContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setListHeight(el.clientHeight);
+    });
+    ro.observe(el);
+    setListHeight(el.clientHeight);
+    return () => ro.disconnect();
+  }, [loading, orders.length]);
+
+  // 🔖 Restore scroll-to-last-viewed (virtual list: scroll to index if possible)
   useEffect(() => {
     const raw = localStorage.getItem(SCROLL_KEY);
-    if (!raw) return;
+    if (!raw || orders.length === 0) return;
     try {
       const { orderId, timestamp } = JSON.parse(raw);
       const now = Date.now();
@@ -181,9 +292,10 @@ export default function ListOrder() {
         localStorage.removeItem(SCROLL_KEY);
         return;
       }
-      const el = document.querySelector(`[data-order-id="${orderId}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const index = orders.findIndex((o) => o.orderId === orderId);
+      if (index >= 0) {
+        const el = document.querySelector(`[data-order-id="${orderId}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
         localStorage.removeItem(SCROLL_KEY);
       }
     } catch {
@@ -222,12 +334,12 @@ export default function ListOrder() {
     setSelectMode(false);
   };
 
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      searchOrders(value.trim());
-    }, 300);
+  const handleDebtUpdated = () => {
+    if (debouncedSearch.trim()) searchOrders(debouncedSearch);
+    else if (selectedDate !== null) {
+      const dateStr = selectedDate.toLocaleDateString("sv-SE");
+      fetchOrders({ from: dateStr, to: dateStr, unpaid: unpaidOnly });
+    } else fetchOrders({ pending: true, unpaid: unpaidOnly });
   };
 
   const toggleOrderSelection = (id: number) => {
@@ -309,10 +421,15 @@ export default function ListOrder() {
     }
   };
 
+  const onEnterSelectMode = (id: number) => {
+    setSelectMode(true);
+    toggleOrderSelection(id);
+  };
+
   return (
     <main
       dir="rtl"
-      className="px-4 sm:px-6 md:px-10 max-w-7xl mx-auto relative"
+      className="h-full flex flex-col overflow-hidden w-full max-w-full mx-auto relative"
     >
       <HeaderHydrator title="הזמנות" />
 
@@ -338,9 +455,9 @@ export default function ListOrder() {
         </div>
       )}
 
-      <div className="py-6 space-y-6">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden py-4 space-y-4">
         {/* 🔍 Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap flex-shrink-0">
           <div className="flex items-center gap-2">
             <label className="font-semibold">סנן לפי תאריך:</label>
             <DatePicker
@@ -350,7 +467,7 @@ export default function ListOrder() {
               dateFormat="dd/MM/yyyy"
               className="border px-3 py-2 rounded"
               isClearable
-              disabled={search.trim().length > 0}
+              disabled={searchQuery.trim().length > 0}
             />
           </div>
 
@@ -367,56 +484,55 @@ export default function ListOrder() {
           <Input
             type="text"
             placeholder="חיפוש לפי שם, כתובת, טלפון או מספר הזמנה"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full sm:max-w-xs"
           />
+          {showSearchingMessage && (
+            <span className="text-sm text-gray-500 self-end pb-2">מחפש...</span>
+          )}
         </div>
 
         {hasUnnotified && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm font-medium">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm font-medium flex-shrink-0">
             ⚠️ ישנן הזמנות שלא נשלחה אליהן הודעת וואטסאפ.
           </div>
         )}
 
         {loading ? (
-          <p>טוען הזמנות...</p>
+          <p className="flex-shrink-0">טוען הזמנות...</p>
         ) : orders.length === 0 ? (
-          <p>לא נמצאו הזמנות.</p>
+          <p className="flex-shrink-0">לא נמצאו הזמנות.</p>
         ) : (
-          <ul className="space-y-4" ref={containerRef}>
-            {orders.map((order) => (
-              <SingleOrder
-                key={order.orderId}
-                order={order}
-                onDelete={handleDelete}
-                selectMode={selectMode}
-                selected={selectedOrders.has(order.orderId)}
-                onSelectToggle={() => toggleOrderSelection(order.orderId)}
-                onEnterSelectMode={() => {
-                  setSelectMode(true);
-                  toggleOrderSelection(order.orderId);
-                }}
-                onChangePayment={(m) => updatePaymentMethod(order.orderId, m)}
-                onToggleReady={() => toggleReady(order.orderId, order.isReady)}
-                onToggleDelivered={() =>
-                  toggleDelivered(order.orderId, order.isDelivered)
-                }
-                canEditPayment={canEditPayment}
-                canEditDebt={role === "admin"}
-                onDebtUpdated={() => {
-                  if (search.trim()) searchOrders(search.trim());
-                  else if (selectedDate)
-                    fetchOrders({
-                      from: selectedDate.toLocaleDateString("sv-SE"),
-                      to: selectedDate.toLocaleDateString("sv-SE"),
-                      unpaid: unpaidOnly,
-                    });
-                  else fetchOrders({ pending: true, unpaid: unpaidOnly });
-                }}
-              />
-            ))}
-          </ul>
+          <div
+            ref={listContainerRef}
+            dir="rtl"
+            className="flex-1 min-h-0"
+          >
+            <List
+              rowComponent={OrderRow}
+              rowCount={orders.length}
+              rowHeight={ITEM_SIZE}
+              rowProps={{
+                orders,
+                onDelete: handleDelete,
+                selectMode,
+                selectedOrders,
+                onSelectToggle: toggleOrderSelection,
+                onEnterSelectMode,
+                onChangePayment: updatePaymentMethod,
+                onToggleReady: toggleReady,
+                onToggleDelivered: toggleDelivered,
+                canEditPayment,
+                canEditDebt: role === "admin",
+                onDebtUpdated: handleDebtUpdated,
+              }}
+              overscanCount={OVERSCAN_COUNT}
+              defaultHeight={500}
+              style={{ height: listHeight, width: "100%" }}
+              dir="rtl"
+            />
+          </div>
         )}
       </div>
     </main>
