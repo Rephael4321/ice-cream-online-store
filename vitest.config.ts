@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["tests/api/**/*.test.ts", "tests/lib/**/*.test.ts"],
+    include: ["tests/api/**/*.test.ts", "tests/lib/**/*.test.ts", "tests/pages/**/*.test.tsx"],
     globalSetup: ["./tests/globalSetup.ts"],
     setupFiles: ["./tests/setup.ts"],
   },

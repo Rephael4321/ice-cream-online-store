@@ -33,9 +33,10 @@ async function getResults(query: string): Promise<Product[]> {
 export default async function SearchResultsPage({
   searchParams,
 }: {
-  searchParams: { query?: string };
+  searchParams: Promise<{ query?: string }>;
 }) {
-  const query = searchParams.query?.trim();
+  const params = await searchParams;
+  const query = params.query?.trim();
   if (!query) return notFound();
 
   const results = await getResults(query);
