@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useEffect, useRef, useState } from "react";
-import { List } from "react-window";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { Button, showToast, Input } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { useAuth } from "@/components/auth/auth-context";
@@ -17,15 +17,9 @@ import {
 const DEBOUNCE_MS = 350;
 const SEARCHING_MESSAGE_DELAY_MS = 2000;
 // Card height: smaller than 340 so rows aren’t over-spaced; gap like client list (172+16=188)
-// Row height is responsive: ROW_HEIGHT_MOBILE below MOBILE_BREAKPOINT_PX so card is not clipped.
 const ROW_GAP = 8;
-const OVERSCAN_COUNT = 3;
-const ROW_HEIGHT_DESKTOP = 260;
-// Tablet: tighter row (card height + ROW_GAP only), like client list, so gap between cards is small
-const ROW_HEIGHT_TABLET = 220;
-const ROW_HEIGHT_MOBILE = 500;
-const TABLET_BREAKPOINT_PX = 768;
-const MOBILE_BREAKPOINT_PX = 1024;
+/** Initial height estimate for Virtuoso; items are measured dynamically so cards are never clipped. */
+const DEFAULT_ITEM_HEIGHT_ESTIMATE = 280;
 
 type PaymentMethod = null | "" | "credit" | "paybox" | "cash";
 
@@ -50,12 +44,8 @@ type Order = {
 };
 
 type OrderRowProps = {
-  index: number;
-  style: React.CSSProperties;
-  ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: string };
-  rowHeight: number;
+  order: Order;
   rowGap: number;
-  orders: Order[];
   onDelete: (id: number) => void | Promise<void>;
   selectMode: boolean;
   selectedOrders: Set<number>;
@@ -70,12 +60,8 @@ type OrderRowProps = {
 };
 
 const OrderRow = memo(function OrderRow({
-  index,
-  style,
-  ariaAttributes,
-  rowHeight,
+  order,
   rowGap,
-  orders,
   onDelete,
   selectMode,
   selectedOrders,
@@ -87,36 +73,29 @@ const OrderRow = memo(function OrderRow({
   canEditPayment,
   canEditDebt,
   onDebtUpdated,
-}: OrderRowProps): React.ReactElement | null {
-  const order = orders[index];
-  if (!order) return null;
+}: OrderRowProps): React.ReactElement {
   return (
-    <div style={style} className="pr-0" {...ariaAttributes}>
-      <div
-        style={{
-          height: rowHeight,
-          minHeight: rowHeight,
-          marginBottom: rowGap,
-        }}
-        className="overflow-hidden [&>li]:m-0 [&>li]:block [&>li]:list-none"
-      >
-        <SingleOrder
-          order={order}
-          onDelete={onDelete}
-          selectMode={selectMode}
-          selected={selectedOrders.has(order.orderId)}
-          onSelectToggle={() => onSelectToggle(order.orderId)}
-          onEnterSelectMode={() => onEnterSelectMode(order.orderId)}
-          onChangePayment={(m) => onChangePayment(order.orderId, m)}
-          onToggleReady={() => onToggleReady(order.orderId, order.isReady)}
-          onToggleDelivered={() =>
-            onToggleDelivered(order.orderId, order.isDelivered)
-          }
-          canEditPayment={canEditPayment}
-          canEditDebt={canEditDebt}
-          onDebtUpdated={onDebtUpdated}
-        />
-      </div>
+    <div
+      style={{ paddingBottom: rowGap }}
+      className="pr-0 [&>li]:m-0 [&>li]:block [&>li]:list-none"
+      data-order-id={order.orderId}
+    >
+      <SingleOrder
+        order={order}
+        onDelete={onDelete}
+        selectMode={selectMode}
+        selected={selectedOrders.has(order.orderId)}
+        onSelectToggle={() => onSelectToggle(order.orderId)}
+        onEnterSelectMode={() => onEnterSelectMode(order.orderId)}
+        onChangePayment={(m) => onChangePayment(order.orderId, m)}
+        onToggleReady={() => onToggleReady(order.orderId, order.isReady)}
+        onToggleDelivered={() =>
+          onToggleDelivered(order.orderId, order.isDelivered)
+        }
+        canEditPayment={canEditPayment}
+        canEditDebt={canEditDebt}
+        onDebtUpdated={onDebtUpdated}
+      />
     </div>
   );
 });
@@ -139,30 +118,12 @@ export default function ListOrder() {
   const [showSearchingMessage, setShowSearchingMessage] = useState(false);
   const [listHeight, setListHeight] = useState(500);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [rowHeight, setRowHeight] = useState(ROW_HEIGHT_DESKTOP);
 
   const canEditPayment = role !== "driver";
 
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const searchingDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Responsive row height: desktop | tablet (≤1024) | mobile (≤768)
-  useEffect(() => {
-    const mqMobile = window.matchMedia(`(max-width: ${TABLET_BREAKPOINT_PX}px)`);
-    const mqTablet = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
-    const update = () => {
-      if (mqMobile.matches) setRowHeight(ROW_HEIGHT_MOBILE);
-      else if (mqTablet.matches) setRowHeight(ROW_HEIGHT_TABLET);
-      else setRowHeight(ROW_HEIGHT_DESKTOP);
-    };
-    update();
-    mqMobile.addEventListener("change", update);
-    mqTablet.addEventListener("change", update);
-    return () => {
-      mqMobile.removeEventListener("change", update);
-      mqTablet.removeEventListener("change", update);
-    };
-  }, []);
 
   const getLast7DaysRange = () => {
     const now = new Date();
@@ -309,7 +270,7 @@ export default function ListOrder() {
     return () => ro.disconnect();
   }, [loading, orders.length]);
 
-  // 🔖 Restore scroll-to-last-viewed (virtual list: scroll to index if possible)
+  // 🔖 Restore scroll-to-last-viewed (virtual list: scroll to index via Virtuoso API)
   useEffect(() => {
     const raw = localStorage.getItem(SCROLL_KEY);
     if (!raw || orders.length === 0) return;
@@ -323,8 +284,11 @@ export default function ListOrder() {
       }
       const index = orders.findIndex((o) => o.orderId === orderId);
       if (index >= 0) {
-        const el = document.querySelector(`[data-order-id="${orderId}"]`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        virtuosoRef.current?.scrollToIndex({
+          index,
+          align: "center",
+          behavior: "smooth",
+        });
         localStorage.removeItem(SCROLL_KEY);
       }
     } catch {
@@ -570,31 +534,28 @@ export default function ListOrder() {
             dir="rtl"
             className="flex-1 min-h-0"
           >
-            <List
-              rowComponent={(props: OrderRowProps) => <OrderRow {...props} />}
-              rowCount={orders.length}
-              rowHeight={rowHeight + ROW_GAP}
-              // List injects index, style, ariaAttributes per row; rowProps supplies the rest
-              rowProps={{
-                rowHeight,
-                rowGap: ROW_GAP,
-                orders,
-                onDelete: handleDelete,
-                selectMode,
-                selectedOrders,
-                onSelectToggle: toggleOrderSelection,
-                onEnterSelectMode,
-                onChangePayment: updatePaymentMethod,
-                onToggleReady: toggleReady,
-                onToggleDelivered: toggleDelivered,
-                canEditPayment,
-                canEditDebt: role === "admin",
-                onDebtUpdated: handleDebtUpdated,
-              } as any}
-              overscanCount={OVERSCAN_COUNT}
-              defaultHeight={500}
+            <Virtuoso
+              ref={virtuosoRef}
+              data={orders}
+              itemContent={(index, order) => (
+                <OrderRow
+                  order={order}
+                  rowGap={ROW_GAP}
+                  onDelete={handleDelete}
+                  selectMode={selectMode}
+                  selectedOrders={selectedOrders}
+                  onSelectToggle={toggleOrderSelection}
+                  onEnterSelectMode={onEnterSelectMode}
+                  onChangePayment={updatePaymentMethod}
+                  onToggleReady={toggleReady}
+                  onToggleDelivered={toggleDelivered}
+                  canEditPayment={canEditPayment}
+                  canEditDebt={role === "admin"}
+                  onDebtUpdated={handleDebtUpdated}
+                />
+              )}
+              defaultItemHeight={DEFAULT_ITEM_HEIGHT_ESTIMATE}
               style={{ height: listHeight, width: "100%" }}
-              dir="rtl"
             />
           </div>
         )}

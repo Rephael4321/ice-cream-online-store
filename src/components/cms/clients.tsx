@@ -3,7 +3,7 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { List } from "react-window";
+import { Virtuoso } from "react-virtuoso";
 import { Button, Input, Label, showToast } from "@/components/cms/ui";
 import { HeaderHydrator } from "@/components/cms/sections/header/section-header";
 import { apiDelete, apiGet } from "@/lib/api/client";
@@ -20,36 +20,24 @@ type Client = {
 
 const DEBOUNCE_MS = 350;
 const SEARCHING_MESSAGE_DELAY_MS = 2000;
-const ROW_HEIGHT = 172;
 const ROW_GAP = 16;
-const ITEM_SIZE = ROW_HEIGHT + ROW_GAP;
-const OVERSCAN_COUNT = 3;
+/** Initial height estimate for Virtuoso; items are measured dynamically so cards are never clipped. */
+const DEFAULT_ITEM_HEIGHT_ESTIMATE = 200;
 
 type ClientRowProps = {
-  index: number;
-  style: React.CSSProperties;
-  ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: string };
-  clients: Client[];
+  client: Client;
   onCopy: (phone: string) => void;
   onDelete: (id: number) => void;
 };
 
 const ClientRow = memo(function ClientRow({
-  index,
-  style,
-  ariaAttributes,
-  clients,
+  client,
   onCopy,
   onDelete,
 }: ClientRowProps) {
-  const client = clients[index];
-  if (!client) return null;
   return (
-    <div style={style} className="pr-0" {...ariaAttributes}>
-      <div
-        className="border rounded p-3 sm:p-4 shadow flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white"
-        style={{ height: ROW_HEIGHT, minHeight: ROW_HEIGHT }}
-      >
+    <div style={{ paddingBottom: ROW_GAP }} className="pr-0">
+      <div className="border rounded p-3 sm:p-4 shadow flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white">
         <div className="space-y-1 min-w-0 flex-1 overflow-hidden">
           <p className="truncate">שם: {client.name}</p>
           <p className="truncate" title={client.address || undefined}>
@@ -267,19 +255,17 @@ export default function Clients() {
             dir="rtl"
             className="flex-1 min-h-0"
           >
-            <List
-              rowComponent={ClientRow}
-              rowCount={clients.length}
-              rowHeight={ITEM_SIZE}
-              rowProps={{
-                clients,
-                onCopy: handleCopy,
-                onDelete: handleDelete,
-              }}
-              overscanCount={OVERSCAN_COUNT}
-              defaultHeight={500}
+            <Virtuoso
+              data={clients}
+              itemContent={(index, client) => (
+                <ClientRow
+                  client={client}
+                  onCopy={handleCopy}
+                  onDelete={handleDelete}
+                />
+              )}
+              defaultItemHeight={DEFAULT_ITEM_HEIGHT_ESTIMATE}
               style={{ height: listHeight, width: "100%" }}
-              dir="rtl"
             />
           </div>
         )}
