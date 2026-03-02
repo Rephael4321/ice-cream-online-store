@@ -24,7 +24,6 @@
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| GET | `/api/auth/entry` | **Anyone** | Redirect to external auth app (`AUTH_SERVER_API_URL`) with query params. No auth. | Yes (CMS auth setup) |
 | POST | `/api/auth/verify` | **Anyone** | Verify a JWT (body `token`). Returns `valid`, `payload` (role, id, name, exp, iat) or 401. No cookie required. | Yes (jwt-gatekeeper) |
 
 ---
@@ -176,7 +175,7 @@ The Google API key is never sent to the client. These routes proxy Google Places
 
 | Role | Allowed actions |
 |------|------------------|
-| **Anyone (no auth)** | All GETs (except where middleware restricts), POST `/api/orders`, POST `/api/auth/verify`, GET `/api/auth/entry`, GET `/api/img-proxy`, GET `/api/places/autocomplete`, GET `/api/places/details`, GET `/api/categories` (and name-based category GETs), GET `/api/orders/by-phone`, PATCH `/api/orders/[id]/notify`, POST `/api/products/stock` (get stock), POST `/api/products/sale-groups`. |
+| **Anyone (no auth)** | All GETs (except where middleware restricts), POST `/api/orders`, POST `/api/auth/verify`, GET `/api/img-proxy`, GET `/api/places/autocomplete`, GET `/api/places/details`, GET `/api/categories` (and name-based category GETs), GET `/api/orders/by-phone`, PATCH `/api/orders/[id]/notify`, POST `/api/products/stock` (get stock), POST `/api/products/sale-groups`. |
 | **Client** | GET `/api/orders/client/[id]` only when cookie `phoneNumber` matches the order’s client phone. |
 | **Driver** | Same as admin for: PATCH `/api/orders/[id]/status`, PATCH `/api/orders/[id]/delivery`, PATCH `/api/orders/[id]/payment`, PATCH `/api/clients/[id]/address`. All other non-GET: admin only. |
 | **Admin** | All non-GET endpoints (except those with skipAuth). GETs are public; admin also gets redirect from `/api/orders/client/[id]` to CMS order page. |

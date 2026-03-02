@@ -32,7 +32,6 @@ Server-side fetch (e.g. in Server Components, `MainMenu`, search page) may still
   - `POST /api/products/stock` (get product stock) – `skipAuth: true`
   - `POST /api/products/sale-groups` – `skipAuth: true`
   - `PATCH /api/orders/[id]/notify` – `skipAuth: true`
-  - `GET /api/auth/entry` – redirect to auth app
   - `POST /api/auth/verify` – verify JWT token (no auth required to call)
 
 All other API routes under `src/app/api` are protected (JWT required unless `skipAuth` or no middleware).
