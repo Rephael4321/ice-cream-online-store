@@ -20,15 +20,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Token expired" }, { status: 401 });
     }
 
-    return NextResponse.json({ 
-      valid: true, 
+    return NextResponse.json({
+      valid: true,
       payload: {
         role: payload.role,
         id: payload.id,
-        name: payload.name,
         exp: payload.exp,
-        iat: payload.iat
-      }
+        iat: payload.iat,
+      },
     });
   } catch (err) {
     console.error("JWT verification error:", err);

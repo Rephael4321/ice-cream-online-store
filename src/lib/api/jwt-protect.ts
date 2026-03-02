@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJWT } from "@/lib/jwt";
 
-export type Role = "admin" | "driver" | "client";
+export type Role = "admin" | "driver";
 
 export function extractRole(payload: any): Role | undefined {
   // Prefer explicit role
-  if (
-    payload?.role === "admin" ||
-    payload?.role === "driver" ||
-    payload?.role === "client"
-  ) {
+  if (payload?.role === "admin" || payload?.role === "driver") {
     return payload.role;
   }
   // Back-compat with your existing admin tokens

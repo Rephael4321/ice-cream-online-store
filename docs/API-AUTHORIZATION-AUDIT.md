@@ -1,7 +1,7 @@
 # API Authorization Audit
 
 **Summary:** Who can do what on every API endpoint.  
-**Auth model:** JWT cookie `token`; roles: `admin`, `driver`, `client`.  
+**Auth model:** JWT cookie `token`; roles: `admin`, `driver`.  
 **Rules (from `protectAPI`):** GET is **public**; non-GET requires valid JWT and role in allowed set (default **admin only**; some routes allow **driver** or use **skipAuth** / **no middleware**).
 
 **Conventions:** Client-side calls should use `src/lib/api/client.ts` (`api`, `apiGet`, `apiPost`, etc.). See `docs/conventions/API-USAGE.md`. Category APIs are **name-based only**; id-based category routes were removed.
@@ -24,7 +24,7 @@
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| POST | `/api/auth/verify` | **Anyone** | Verify a JWT (body `token`). Returns `valid`, `payload` (role, id, name, exp, iat) or 401. No cookie required. | Yes (jwt-gatekeeper) |
+| POST | `/api/auth/verify` | **Anyone** | Verify a JWT (body `token`). Returns `valid`, `payload` (role, id, exp, iat) or 401. No cookie required. | Yes (jwt-gatekeeper) |
 
 ---
 

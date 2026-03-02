@@ -26,11 +26,7 @@ describe("POST /api/auth/verify", () => {
   });
 
   it("returns 200 with valid: true and payload for valid token", async () => {
-    const token = await createJWT({
-      role: "admin",
-      id: "admin",
-      name: "Test Admin",
-    });
+    const token = await createJWT({ role: "admin", id: "admin" });
     const res = await POST(createRequest({ token }));
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -38,6 +34,6 @@ describe("POST /api/auth/verify", () => {
     expect(json.payload).toBeDefined();
     expect(json.payload.role).toBe("admin");
     expect(json.payload.id).toBe("admin");
-    expect(json.payload.name).toBe("Test Admin");
+    expect(json.payload).not.toHaveProperty("name");
   });
 });

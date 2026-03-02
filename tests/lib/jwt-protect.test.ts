@@ -54,13 +54,4 @@ describe("protectAPI", () => {
     expect(result).toBeNull();
   });
 
-  it("returns 403 for POST with client token on admin-only route", async () => {
-    const token = await createJWT({ role: "client", id: "user1" });
-    const req = createMockRequest("POST", token);
-    const result = await protectAPI(req);
-    expect(result).not.toBeNull();
-    expect(result!.status).toBe(403);
-    const json = await result!.json();
-    expect(json.error).toContain("Forbidden");
-  });
 });

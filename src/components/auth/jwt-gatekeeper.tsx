@@ -11,7 +11,6 @@ type ExtraJwt = {
   role?: string;
   roles?: string[];
   id?: string;
-  name?: string;
   exp?: number;
   iat?: number;
 };
