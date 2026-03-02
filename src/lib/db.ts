@@ -1,40 +1,31 @@
 // src/lib/db.ts
 import { Pool } from "pg";
 
-// Load and validate required environment variables
-const {
-  PG_HOST,
-  PG_PORT,
-  PG_USER,
-  PG_PASSWORD,
-  PG_DATABASE,
-  PG_USE_SSL,
-  NODE_ENV,
-} = process.env;
+const DATABASE_URL = process.env.DATABASE_URL;
+const NODE_ENV = process.env.NODE_ENV;
 
-if (!PG_HOST || !PG_PORT || !PG_USER || !PG_PASSWORD || !PG_DATABASE) {
+if (!DATABASE_URL) {
   throw new Error(
-    "❌ Missing one or more required PostgreSQL environment variables."
+    "❌ Missing DATABASE_URL. Set it to your PostgreSQL connection string (e.g. postgresql://user:password@host:port/database)."
   );
 }
 
-// Optional SSL (e.g., for Neon)
-const shouldUseSSL = PG_USE_SSL === "true";
-
 // Prevent accidental writes to dev DB during test runs
-if (NODE_ENV === "test" && PG_DATABASE === "neondb") {
-  throw new Error(
-    "❌ Test environment is connected to the DEV database! Aborting."
-  );
+try {
+  const url = new URL(DATABASE_URL);
+  const dbName = url.pathname?.replace(/^\//, "") || "";
+  if (NODE_ENV === "test" && dbName === "neondb") {
+    throw new Error(
+      "❌ Test environment is connected to the DEV database! Aborting."
+    );
+  }
+} catch (err) {
+  if (err instanceof Error && err.message.includes("DEV database")) throw err;
+  // URL parse failed; skip test guard
 }
 
 const pool = new Pool({
-  host: PG_HOST,
-  port: Number(PG_PORT),
-  user: PG_USER,
-  password: PG_PASSWORD,
-  database: PG_DATABASE,
-  ssl: shouldUseSSL ? { rejectUnauthorized: false } : false,
+  connectionString: DATABASE_URL,
 });
 
 export default pool;

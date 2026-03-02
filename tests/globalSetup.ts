@@ -11,6 +11,32 @@ import { pgDump, pgRestore } from "pg-dump-restore";
 // Use process.cwd() so we load .env from project root when you run "npm test" (same as setup.ts fix).
 const rootDir = process.cwd();
 
+/** Parse DATABASE_URL into { host, port, database, username, password }. */
+function parseDatabaseUrl(url: string): { host: string; port: number; database: string; username: string; password: string } {
+  const u = new URL(url);
+  return {
+    host: u.hostname,
+    port: u.port ? Number(u.port) : 5432,
+    database: (u.pathname || "/").replace(/^\//, "") || "",
+    username: decodeURIComponent(u.username || ""),
+    password: decodeURIComponent(u.password || ""),
+  };
+}
+
+/** From env object, get DB config from DATABASE_URL or legacy PG_* vars. */
+function getDbConfig(env: Record<string, string>): { host: string; port: number; database: string; username: string; password: string } {
+  if (env.DATABASE_URL) {
+    return parseDatabaseUrl(env.DATABASE_URL);
+  }
+  return {
+    host: env.PG_HOST || "localhost",
+    port: Number(env.PG_PORT) || 5432,
+    database: env.PG_DATABASE || "",
+    username: env.PG_USER || "",
+    password: env.PG_PASSWORD || "",
+  };
+}
+
 /** Load .env into a plain object by reading the file (avoids dotenv/vitest cwd issues). */
 function loadEnvToObject(envFile: string): Record<string, string> {
   const envPath = path.resolve(rootDir, envFile);
@@ -101,30 +127,18 @@ export default async function globalSetup(): Promise<void> {
 
   // Load both env files into objects (do not use process.env — it can be wrong in Vitest globalSetup)
   const envLocal = loadEnvToObject(".env.local");
-  const devDb = {
-    host: envLocal.PG_HOST || "localhost",
-    port: Number(envLocal.PG_PORT) || 5432,
-    database: envLocal.PG_DATABASE || "",
-    username: envLocal.PG_USER || "",
-    password: envLocal.PG_PASSWORD || "",
-  };
+  const devDb = getDbConfig(envLocal);
   if (!devDb.database || !devDb.username || !devDb.password) {
     throw new Error(
-      ".env.local must define PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD for the dev DB"
+      ".env.local must define DATABASE_URL (or PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD) for the dev DB"
     );
   }
 
   const envTest = loadEnvToObject(".env.test");
-  const testDb = {
-    host: envTest.PG_HOST || "localhost",
-    port: Number(envTest.PG_PORT) || 5432,
-    database: envTest.PG_DATABASE || "",
-    username: envTest.PG_USER || "",
-    password: envTest.PG_PASSWORD || "",
-  };
+  const testDb = getDbConfig(envTest);
   if (!testDb.database || !testDb.username || !testDb.password) {
     throw new Error(
-      ".env.test must define PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD for the test DB (got from " + rootDir + "/.env.test)"
+      ".env.test must define DATABASE_URL (or PG_*) for the test DB (got from " + rootDir + "/.env.test)"
     );
   }
 
