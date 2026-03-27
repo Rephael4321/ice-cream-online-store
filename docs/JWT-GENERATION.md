@@ -10,8 +10,8 @@ Use the script when you have (or can clone) the ice-cream-online-store repo and 
 
 ### 1. Where the script lives
 
-- **Path:** `src/scripts/generate-token.ts`
-- **Entry:** `npm run generate-token` (or `npx tsx src/scripts/generate-token.ts` from project root)
+- **Path:** `scripts/generate-token.ts`
+- **Entry:** `npm run generate-token` (or `npx tsx scripts/generate-token.ts` from project root)
 
 ### 2. What you need
 

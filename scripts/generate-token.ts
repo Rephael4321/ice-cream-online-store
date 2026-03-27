@@ -1,14 +1,14 @@
 /**
  * Generate a JWT for CMS login. Not exposed as an API — run locally:
- *   npx tsx src/scripts/generate-token.ts [role] [expiry] [path]
- *   npx tsx src/scripts/generate-token.ts --role=driver --expiry=8h --path=/orders --port=3000
+ *   npx tsx scripts/generate-token.ts [role] [expiry] [path]
+ *   npx tsx scripts/generate-token.ts --role=driver --expiry=8h --path=/orders --port=3000
  *
  * Loads .env.local for JWT_SECRET and NEXT_PUBLIC_SITE_URL.
  */
 
 import path from "path";
 import { config } from "dotenv";
-import { createJWTWithExpiry, parseExpiry } from "../lib/jwt";
+import { createJWTWithExpiry, parseExpiry } from "../src/lib/jwt";
 
 // Load .env.local from project root
 config({ path: path.resolve(process.cwd(), ".env.local") });

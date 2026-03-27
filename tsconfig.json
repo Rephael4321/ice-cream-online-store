@@ -36,7 +36,7 @@
     "**/*.ts",
     "**/*.tsx",
     "src/app/(store)/main-menu",
-    "src/scripts/generate-token.ts",
+    "scripts/generate-token.ts",
     "tests",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
