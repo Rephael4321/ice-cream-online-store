@@ -116,6 +116,7 @@ async function runDockerPgRestore(localUrl: string, dumpPath: string, image: str
     "pg_restore",
     "--clean",
     "--no-owner",
+    "--no-acl",
     "--dbname",
     dockerLocalUrl,
     containerDumpPath,
@@ -213,7 +214,7 @@ async function main(): Promise<void> {
 
     console.log("Step 2/2: Restoring to local database...");
     try {
-      await runCommand("pg_restore", ["--clean", "--no-owner", "--dbname", localUrl, dumpPath]);
+      await runCommand("pg_restore", ["--clean", "--no-owner", "--no-acl", "--dbname", localUrl, dumpPath]);
     } catch (err) {
       if (!isSpawnNotFoundError(err)) throw err;
       if (!usingDockerClient) {
