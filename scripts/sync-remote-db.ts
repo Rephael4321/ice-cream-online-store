@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { createInterface } from "readline/promises";
 import { stdin as input, stdout as output } from "process";
 import { config } from "dotenv";
+import { exportDbSchemaToDocs } from "./export-db-schema";
 
 config({ path: path.resolve(process.cwd(), ".env.local") });
 
@@ -221,7 +222,10 @@ async function main(): Promise<void> {
       await runDockerPgRestore(localUrl, dumpPath, dockerClientImage);
     }
 
-    console.log("\nSuccess! Database sync complete.");
+    console.log("Step 3/3: Exporting schema to docs/db-schema.txt...");
+    await exportDbSchemaToDocs(localUrl);
+
+    console.log("\nSuccess! Database sync complete and schema docs updated.");
   } finally {
     await cleanupDumpFile(dumpPath);
   }
