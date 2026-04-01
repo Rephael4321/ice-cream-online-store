@@ -43,7 +43,7 @@ const allowedHosts = new Set(
 );
 
 export async function proxy(req: NextRequest) {
-  const { pathname, origin } = req.nextUrl;
+  const { pathname } = req.nextUrl;
 
   const rejectToken = () => {
     const response = NextResponse.redirect(new URL("/", req.url));
@@ -81,11 +81,10 @@ export async function proxy(req: NextRequest) {
       const allowed = allowedHosts.has(u.hostname);
       if (!isHttp || !allowed) return NextResponse.next();
 
-      const proxied = new URL("/api/img-proxy", origin);
-      proxied.searchParams.set("url", src);
+      const proxiedPath = `/api/img-proxy?url=${encodeURIComponent(src)}`;
 
       const rewritten = req.nextUrl.clone();
-      rewritten.searchParams.set("url", proxied.toString());
+      rewritten.searchParams.set("url", proxiedPath);
 
       return NextResponse.rewrite(rewritten);
     } catch {
