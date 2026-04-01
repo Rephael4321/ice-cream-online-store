@@ -1,4 +1,3 @@
-// middleware.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJWT } from "./src/lib/jwt";
 
@@ -20,7 +19,6 @@ function isProtectedCmsPath(pathname: string): boolean {
   );
 }
 
-// Run on both the optimizer route and root-mounted CMS routes
 export const config = {
   matcher: [
     "/_next/image",
@@ -39,8 +37,6 @@ export const config = {
   ],
 };
 
-// Comma-separated allowlist of image origins (set in env):
-// ALLOWED_IMAGE_HOSTS=ice-cream-online-store.s3.amazonaws.com
 const allowedHosts = new Set(
   (process.env.ALLOWED_IMAGE_HOSTS ?? "")
     .split(",")
@@ -48,7 +44,7 @@ const allowedHosts = new Set(
     .filter(Boolean)
 );
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname, origin } = req.nextUrl;
 
   const rejectToken = (redirectPath: string) => {
@@ -75,11 +71,9 @@ export async function middleware(req: NextRequest) {
     return response;
   };
 
-  // ---- A) Image optimizer rewrite → proxy ----
   if (pathname === "/_next/image") {
     const src = req.nextUrl.searchParams.get("url");
     if (!src) return NextResponse.next();
-    // 2) if it proxied don't proxy it
     if (src.startsWith("/api/img-proxy")) return NextResponse.next();
 
     try {
@@ -96,12 +90,10 @@ export async function middleware(req: NextRequest) {
 
       return NextResponse.rewrite(rewritten);
     } catch {
-      // src wasn't an absolute URL; skip
       return NextResponse.next();
     }
   }
 
-  // ---- B) JWT gate for root-mounted CMS routes ----
   if (isProtectedCmsPath(pathname)) {
     const cookieToken = req.cookies.get("token")?.value;
     const urlToken = req.nextUrl.searchParams.get("token") ?? undefined;

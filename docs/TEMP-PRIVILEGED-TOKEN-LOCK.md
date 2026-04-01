@@ -18,7 +18,9 @@ This repository currently rejects every privileged JWT except one explicit allow
 - `verifyJWT()` returns `null` for every token except the exact `ADMIN_TOKEN` value
 - `createJWT()` rejects privileged token issuance
 - `createJWTWithExpiry()` rejects privileged token issuance
-- CMS page routes redirect as if no valid token was sent
+- CMS page routes are gated in `proxy.ts`
+- A first protected request with `?token=` may bootstrap the cookie only when it matches the allowlisted `ADMIN_TOKEN`
+- Rejected CMS JWT access redirects as if no valid token was sent
 - Protected API routes return `401` as if no valid token was sent
 - Token cookies are cleared when protected CMS routes reject access
 
