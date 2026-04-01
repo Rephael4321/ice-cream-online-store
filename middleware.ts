@@ -107,12 +107,12 @@ export async function middleware(req: NextRequest) {
     const urlToken = req.nextUrl.searchParams.get("token") ?? undefined;
     const token = cookieToken ?? urlToken;
     if (!token) {
-      return rejectToken("/store");
+      return rejectToken("/");
     }
 
     const payload = await verifyJWT(token);
     if (!payload) {
-      return rejectToken("/store");
+      return rejectToken("/");
     }
 
     if (!cookieToken && urlToken && urlToken === token) {
