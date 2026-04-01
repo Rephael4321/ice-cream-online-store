@@ -61,6 +61,20 @@ export async function middleware(req: NextRequest) {
     return response;
   };
 
+  const acceptBootstrapToken = (token: string) => {
+    const cleanUrl = req.nextUrl.clone();
+    cleanUrl.searchParams.delete("token");
+
+    const response = NextResponse.redirect(cleanUrl);
+    response.cookies.set("token", token, {
+      path: "/",
+      sameSite: "lax",
+      secure: req.nextUrl.protocol === "https:",
+      maxAge: 60 * 60 * 24 * 14,
+    });
+    return response;
+  };
+
   // ---- A) Image optimizer rewrite → proxy ----
   if (pathname === "/_next/image") {
     const src = req.nextUrl.searchParams.get("url");
@@ -89,7 +103,9 @@ export async function middleware(req: NextRequest) {
 
   // ---- B) JWT gate for root-mounted CMS routes ----
   if (isProtectedCmsPath(pathname)) {
-    const token = req.cookies.get("token")?.value;
+    const cookieToken = req.cookies.get("token")?.value;
+    const urlToken = req.nextUrl.searchParams.get("token") ?? undefined;
+    const token = cookieToken ?? urlToken;
     if (!token) {
       return rejectToken("/store");
     }
@@ -97,6 +113,10 @@ export async function middleware(req: NextRequest) {
     const payload = await verifyJWT(token);
     if (!payload) {
       return rejectToken("/store");
+    }
+
+    if (!cookieToken && urlToken && urlToken === token) {
+      return acceptBootstrapToken(urlToken);
     }
   }
 
