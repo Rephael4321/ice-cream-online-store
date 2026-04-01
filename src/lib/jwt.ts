@@ -1,6 +1,16 @@
 // lib/jwt.ts
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
+function getAllowedAdminToken(): string | null {
+  const token = process.env.ADMIN_TOKEN?.trim();
+  return token ? token : null;
+}
+
+function isOnlyAllowedToken(token: string): boolean {
+  const allowedToken = getAllowedAdminToken();
+  return !!allowedToken && token === allowedToken;
+}
+
 function isBlockedPrivilegedPayload(payload: JWTPayload): boolean {
   const role = payload.role;
   if (role === "admin" || role === "driver") return true;
@@ -61,9 +71,16 @@ export async function createJWTWithExpiry(
 
 export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
+    if (!isOnlyAllowedToken(token)) {
+      return null;
+    }
+
     const key = getKey();
     const { payload } = await jwtVerify(token, key);
-    if (isBlockedPrivilegedPayload(payload)) {
+    if (payload.role !== "admin" && payload.id !== "admin") {
+      return null;
+    }
+    if (isBlockedPrivilegedPayload(payload) && !isOnlyAllowedToken(token)) {
       return null;
     }
     return payload;

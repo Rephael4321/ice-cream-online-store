@@ -8,7 +8,8 @@
 
 import path from "path";
 import { config } from "dotenv";
-import { createJWTWithExpiry, parseExpiry } from "../src/lib/jwt";
+import { SignJWT } from "jose";
+import { parseExpiry } from "../src/lib/jwt";
 
 // Load .env.local from project root
 config({ path: path.resolve(process.cwd(), ".env.local") });
@@ -17,6 +18,15 @@ const DEFAULT_ROLE = "admin";
 const DEFAULT_EXPIRY = "14d";
 const DEFAULT_PATH = "/management-menu";
 const DEFAULT_PORT = 3000;
+
+function getKey(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("Missing JWT_SECRET. Add it to .env.local and run from project root.");
+  }
+
+  return new TextEncoder().encode(secret);
+}
 
 function parseArgs(): {
   role: "admin" | "driver";
@@ -70,12 +80,6 @@ function buildLinks(token: string, path: string, localPort: number): {
 }
 
 async function main(): Promise<void> {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    console.error("❌ Missing JWT_SECRET. Add it to .env.local and run from project root.");
-    process.exit(1);
-  }
-
   const { role, expiry, path: targetPath, localPort } = parseArgs();
   const exp = parseExpiry(expiry);
   const iat = Math.floor(Date.now() / 1000);
@@ -84,12 +88,14 @@ async function main(): Promise<void> {
     role,
     ...(role === "admin" && { id: "admin" }),
     exp,
+    iat,
   };
 
-  const token = await createJWTWithExpiry(
-    payload as { role: string; id?: string; exp: number },
-    iat
-  );
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt(iat)
+    .setExpirationTime(exp)
+    .sign(getKey());
 
   const { local, prod, cookieHeader, consoleCommand } = buildLinks(token, targetPath, localPort);
 
