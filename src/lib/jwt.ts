@@ -1,26 +1,28 @@
 // lib/jwt.ts
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import {
+  createPrivilegedSessionRecord,
+  generateJwtJti,
+  generateSessionKey,
+  getActivePrivilegedSession,
+  hashSessionToken,
+  SESSION_MAX_AGE_SECONDS,
+  type PrivilegedRole,
+  type SessionUser,
+} from "@/lib/auth/session";
+import pool from "@/lib/db";
 
-function getAllowedAdminToken(): string | null {
-  const token = process.env.ADMIN_TOKEN?.trim();
-  return token ? token : null;
-}
+export type PrivilegedJWTPayload = JWTPayload & {
+  role: PrivilegedRole;
+  sid: string;
+  jti: string;
+  type: "access";
+  sub: string;
+};
 
-function isOnlyAllowedToken(token: string): boolean {
-  const allowedToken = getAllowedAdminToken();
-  return !!allowedToken && token === allowedToken;
-}
-
-function isBlockedPrivilegedPayload(payload: JWTPayload): boolean {
-  const role = payload.role;
-  if (role === "admin" || role === "driver") return true;
-  if (payload.admin === true) return true;
-  if (payload.id === "admin") return true;
-  if (Array.isArray(payload.roles)) {
-    return payload.roles.includes("admin") || payload.roles.includes("driver");
-  }
-  return false;
-}
+export type VerifiedPrivilegedSession = SessionUser & {
+  payload: PrivilegedJWTPayload;
+};
 
 function getKey(): Uint8Array {
   const secret = process.env.JWT_SECRET;
@@ -28,15 +30,32 @@ function getKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+function isPrivilegedRole(value: unknown): value is PrivilegedRole {
+  return value === "admin" || value === "driver";
+}
+
+function normalizePrivilegedPayload(payload: JWTPayload): PrivilegedJWTPayload | null {
+  const role = payload.role;
+  const sid = payload.sid;
+  const jti = payload.jti;
+  const sub = payload.sub;
+  const type = payload.type;
+
+  if (!isPrivilegedRole(role)) return null;
+  if (typeof sid !== "string" || !sid) return null;
+  if (typeof jti !== "string" || !jti) return null;
+  if (typeof sub !== "string" || !sub) return null;
+  if (type !== "access") return null;
+
+  return payload as PrivilegedJWTPayload;
+}
+
 export async function createJWT(payload: JWTPayload): Promise<string> {
-  if (isBlockedPrivilegedPayload(payload)) {
-    throw new Error("Privileged JWT issuance is disabled");
-  }
   const key = getKey();
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("14d")
+    .setExpirationTime(SESSION_MAX_AGE_SECONDS)
     .sign(key);
 }
 
@@ -57,9 +76,6 @@ export async function createJWTWithExpiry(
   payload: Omit<JWTPayload, "iat" | "exp"> & { exp: number },
   iat?: number
 ): Promise<string> {
-  if (isBlockedPrivilegedPayload(payload)) {
-    throw new Error("Privileged JWT issuance is disabled");
-  }
   const key = getKey();
   const now = iat ?? Math.floor(Date.now() / 1000);
   return await new SignJWT({ ...payload, iat, exp: payload.exp })
@@ -69,20 +85,78 @@ export async function createJWTWithExpiry(
     .sign(key);
 }
 
+export async function createPrivilegedAccessToken(params: {
+  userId: number;
+  role: PrivilegedRole;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}): Promise<string> {
+  const key = getKey();
+  const sessionKey = generateSessionKey();
+  const jwtJti = generateJwtJti();
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + SESSION_MAX_AGE_SECONDS;
+
+  const payload: PrivilegedJWTPayload = {
+    sub: String(params.userId),
+    role: params.role,
+    sid: sessionKey,
+    jti: jwtJti,
+    type: "access",
+    iat: now,
+    exp,
+  };
+
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt(now)
+    .setExpirationTime(exp)
+    .sign(key);
+
+  await createPrivilegedSessionRecord(pool, {
+    userId: params.userId,
+    sessionKey,
+    jwtJti,
+    sessionTokenHash: hashSessionToken(token),
+    expiresAt: new Date(exp * 1000),
+    userAgent: params.userAgent ?? null,
+    ipAddress: params.ipAddress ?? null,
+  });
+
+  return token;
+}
+
+export async function verifyPrivilegedSession(
+  token: string
+): Promise<VerifiedPrivilegedSession | null> {
+  try {
+    const payload = await verifyJWT(token);
+    const normalized = payload ? normalizePrivilegedPayload(payload) : null;
+    if (!normalized) return null;
+
+    const userId = Number(normalized.sub);
+    if (!Number.isInteger(userId) || userId <= 0) return null;
+
+    const session = await getActivePrivilegedSession(token, {
+      userId,
+      sessionKey: normalized.sid,
+      jwtJti: normalized.jti,
+    });
+    if (!session) return null;
+
+    return {
+      ...session,
+      payload: normalized,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
-    if (!isOnlyAllowedToken(token)) {
-      return null;
-    }
-
     const key = getKey();
     const { payload } = await jwtVerify(token, key);
-    if (payload.role !== "admin" && payload.id !== "admin") {
-      return null;
-    }
-    if (isBlockedPrivilegedPayload(payload) && !isOnlyAllowedToken(token)) {
-      return null;
-    }
     return payload;
   } catch {
     return null;

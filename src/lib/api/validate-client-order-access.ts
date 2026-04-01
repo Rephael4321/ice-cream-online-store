@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyJWT } from "@/lib/jwt";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
+import { verifyPrivilegedSession } from "@/lib/jwt";
 
 export async function validateClientOrderAccess(
   req: NextRequest,
@@ -8,7 +9,7 @@ export async function validateClientOrderAccess(
 ): Promise<NextResponse | void> {
   const cookie = cookies();
   const phone = (await cookie).get("phoneNumber")?.value;
-  const token = (await cookie).get("token")?.value;
+  const token = (await cookie).get(AUTH_COOKIE_NAME)?.value;
   const { id } = await context.params;
   const orderId = Number(id);
 
@@ -19,8 +20,8 @@ export async function validateClientOrderAccess(
     return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
   }
 
-  const payload = token ? await verifyJWT(token) : null;
-  const isAdmin = payload?.role === "admin" || payload?.id === "admin";
+  const session = token ? await verifyPrivilegedSession(token) : null;
+  const isAdmin = session?.role === "admin";
 
   if (isAdmin) {
     const url = `/orders/${orderId}`;

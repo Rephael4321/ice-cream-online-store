@@ -1,36 +1,16 @@
 # Temporary Privileged Token Lock
 
-This repository currently rejects every privileged JWT except one explicit allowlisted admin token.
+This document is now historical context.
 
-## What is allowed
+The emergency single-token allowlist has been replaced by stateful privileged sessions backed by the `users` and `sessions` tables.
 
-- Only the exact token string stored in `ADMIN_TOKEN`
-- That token must still verify successfully and decode to the expected admin payload
+## Superseded by
 
-## What is blocked
+- `db/migrations/001_stateful_privileged_sessions.sql`
+- `docs/JWT-GENERATION.md`
 
-- Any other JWT, even if it is otherwise valid and signed correctly
-- Any JWT payload that identifies as `driver`
-- Legacy admin payload shapes such as `admin: true` or `id: "admin"` unless the token string exactly matches `ADMIN_TOKEN`
+## Notes
 
-## Current behavior
-
-- `verifyJWT()` returns `null` for every token except the exact `ADMIN_TOKEN` value
-- `createJWT()` rejects privileged token issuance
-- `createJWTWithExpiry()` rejects privileged token issuance
-- CMS page routes are gated in `proxy.ts`
-- A first protected request with `?token=` may bootstrap the cookie only when it matches the allowlisted `ADMIN_TOKEN`
-- Rejected CMS JWT access redirects as if no valid token was sent
-- Protected API routes return `401` as if no valid token was sent
-- Token cookies are cleared when protected CMS routes reject access
-
-## Why this exists
-
-This is an emergency temporary lock intended to disable leaked privileged access while preserving one controlled admin token for this app.
-
-## Before removing
-
-- Rotate `JWT_SECRET`
-- Remove or replace the `ADMIN_TOKEN` exception
-- Re-issue any legitimate admin or driver tokens
-- Re-test CMS pages and protected API routes
+- privileged auth now uses revocable, session-backed management links
+- raw `ADMIN_TOKEN` allowlisting is no longer the intended production model
+- `?token=` CMS bootstrap links are supported again, but only for tokens that map to active DB sessions

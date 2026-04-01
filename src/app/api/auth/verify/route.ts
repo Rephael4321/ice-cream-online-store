@@ -1,32 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT } from "@/lib/jwt";
+import { verifyPrivilegedSession } from "@/lib/jwt";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
-    const { token } = await req.json();
-    
+    const body = await req.json().catch(() => ({}));
+    const token =
+      typeof body?.token === "string"
+        ? body.token
+        : req.cookies.get(AUTH_COOKIE_NAME)?.value;
+
     if (!token) {
       return NextResponse.json({ error: "Token required" }, { status: 400 });
     }
 
-    const payload = await verifyJWT(token);
-    
-    if (!payload) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
+    const session = await verifyPrivilegedSession(token);
 
-    // Check if token is expired
-    if (payload.exp && Date.now() >= payload.exp * 1000) {
-      return NextResponse.json({ error: "Token expired" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     return NextResponse.json({
       valid: true,
-      payload: {
-        role: payload.role,
-        id: payload.id,
-        exp: payload.exp,
-        iat: payload.iat,
+      user: {
+        id: session.userId,
+        role: session.role,
+      },
+      session: {
+        id: session.sessionId,
+        expiresAt: session.expiresAt.toISOString(),
       },
     });
   } catch (err) {

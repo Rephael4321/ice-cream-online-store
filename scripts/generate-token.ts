@@ -1,18 +1,11 @@
 /**
- * Generate a JWT for CMS login. Not exposed as an API — run locally:
- *   npx tsx scripts/generate-token.ts [role] [expiry] [path]
- *   npx tsx scripts/generate-token.ts --role=driver --expiry=8h --path=/orders --port=3000
- *
- * Loads .env.local for JWT_SECRET and NEXT_PUBLIC_SITE_URL.
+ * Generate a stateful CMS login token for one of the seeded privileged roles.
  */
 
 import path from "path";
 import { config } from "dotenv";
+const dotenvResult = config({ path: path.resolve(process.cwd(), ".env.local") });
 import { SignJWT } from "jose";
-import { parseExpiry } from "../src/lib/jwt";
-
-// Load .env.local from project root
-config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const DEFAULT_ROLE = "admin";
 const DEFAULT_EXPIRY = "14d";
@@ -24,7 +17,6 @@ function getKey(): Uint8Array {
   if (!secret) {
     throw new Error("Missing JWT_SECRET. Add it to .env.local and run from project root.");
   }
-
   return new TextEncoder().encode(secret);
 }
 
@@ -63,62 +55,101 @@ function parseArgs(): {
   return result;
 }
 
-function buildLinks(token: string, path: string, localPort: number): {
-  local: string;
-  prod: string | null;
-  cookieHeader: string;
-  consoleCommand: string;
-} {
+function buildLinks(token: string, path: string, localPort: number) {
   const pathWithSlash = path.startsWith("/") ? path : `/${path}`;
   const query = `?token=${encodeURIComponent(token)}`;
   const local = `http://localhost:${localPort}${pathWithSlash}${query}`;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   const prod = siteUrl ? `${siteUrl}${pathWithSlash}${query}` : null;
-  const cookieHeader = `Cookie: token=${token}`;
-  const consoleCommand = `document.cookie = "token=${token}; path=/; max-age=${14 * 86400}; SameSite=Lax";`;
-  return { local, prod, cookieHeader, consoleCommand };
+  return { local, prod };
 }
 
-async function main(): Promise<void> {
-  const { role, expiry, path: targetPath, localPort } = parseArgs();
-  const exp = parseExpiry(expiry);
-  const iat = Math.floor(Date.now() / 1000);
+async function createTokenForRole(
+  role: "admin" | "driver",
+  exp: number,
+  deps: {
+    pool: typeof import("../src/lib/db").default;
+    createPrivilegedSessionRecord: typeof import("../src/lib/auth/session").createPrivilegedSessionRecord;
+    generateJwtJti: typeof import("../src/lib/auth/session").generateJwtJti;
+    generateSessionKey: typeof import("../src/lib/auth/session").generateSessionKey;
+    hashSessionToken: typeof import("../src/lib/auth/session").hashSessionToken;
+  }
+): Promise<string> {
+  const userResult = await deps.pool.query(
+    `SELECT id, role FROM users WHERE role = $1 LIMIT 1`,
+    [role]
+  );
 
-  const payload: Record<string, unknown> = {
+  if (!userResult.rowCount) {
+    throw new Error(`Missing seeded user for role "${role}". Run the migration first.`);
+  }
+
+  const userId = Number(userResult.rows[0].id);
+  const sessionKey = deps.generateSessionKey();
+  const jwtJti = deps.generateJwtJti();
+  const now = Math.floor(Date.now() / 1000);
+
+  const token = await new SignJWT({
+    sub: String(userId),
     role,
-    ...(role === "admin" && { id: "admin" }),
+    sid: sessionKey,
+    jti: jwtJti,
+    type: "access",
+    iat: now,
     exp,
-    iat,
-  };
-
-  const token = await new SignJWT(payload)
+  })
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt(iat)
+    .setIssuedAt(now)
     .setExpirationTime(exp)
     .sign(getKey());
 
-  const { local, prod, cookieHeader, consoleCommand } = buildLinks(token, targetPath, localPort);
+  await deps.createPrivilegedSessionRecord(deps.pool, {
+    userId,
+    sessionKey,
+    jwtJti,
+    sessionTokenHash: deps.hashSessionToken(token),
+    expiresAt: new Date(exp * 1000),
+    userAgent: "scripts/generate-token",
+    ipAddress: null,
+  });
 
-  const expiresAt = new Date(exp * 1000).toISOString();
-  const issuedAt = new Date(iat * 1000).toISOString();
+  return token;
+}
 
-  console.log("\n--- JWT generated ---\n");
-  console.log("Role:    ", role);
-  console.log("Issued:  ", issuedAt);
-  console.log("Expires: ", expiresAt);
-  console.log("\nToken (copy):\n");
+async function main() {
+  const [{ default: pool }, jwtModule, sessionModule] = await Promise.all([
+    import("../src/lib/db"),
+    import("../src/lib/jwt"),
+    import("../src/lib/auth/session"),
+  ]);
+
+  const { role, expiry, path: targetPath, localPort } = parseArgs();
+  const exp = jwtModule.parseExpiry(expiry);
+  const token = await createTokenForRole(role, exp, {
+    pool,
+    createPrivilegedSessionRecord: sessionModule.createPrivilegedSessionRecord,
+    generateJwtJti: sessionModule.generateJwtJti,
+    generateSessionKey: sessionModule.generateSessionKey,
+    hashSessionToken: sessionModule.hashSessionToken,
+  });
+  const { local, prod } = buildLinks(token, targetPath, localPort);
+
+  console.log("\n--- session-backed CMS token generated ---\n");
+  console.log("Role:   ", role);
+  console.log("Local:  ", local);
+  if (prod) console.log("Prod:   ", prod);
+  console.log("\nToken:\n");
   console.log(token);
-  console.log("\n--- Quick links ---\n");
-  console.log("Local:   ", local);
-  if (prod) console.log("Prod:    ", prod);
-  console.log("\n--- Cookie (browser) ---\n");
-  console.log("Header:  ", cookieHeader);
-  console.log("\nConsole (paste in browser DevTools):\n");
-  console.log(consoleCommand);
   console.log("\n");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    const { default: pool } = await import("../src/lib/db");
+    await pool.end();
+  });
+  

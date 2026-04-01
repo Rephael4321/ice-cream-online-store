@@ -1,4 +1,5 @@
 import Cart from "@/components/store/cart/cart";
+import LogoutButton from "@/components/cms/logout-button";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -42,6 +43,7 @@ export default function CmsNavbar() {
           >
             כלי ניהול
           </Link>
+          <LogoutButton />
         </div>
 
         {/* Cart */}
@@ -88,6 +90,7 @@ export default function CmsNavbar() {
           >
             כלי ניהול
           </Link>
+          <LogoutButton />
         </div>
       </div>
     </div>

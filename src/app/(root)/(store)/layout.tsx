@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { verifyJWT } from "@/lib/jwt";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
+import { verifyPrivilegedSession } from "@/lib/jwt";
 import Navbar from "@/components/store/navbar";
 import SearchBar from "@/components/store/search-products/search-bar";
 
@@ -27,11 +28,9 @@ export default async function StoreLayout({
   children: React.ReactNode;
 }) {
   const cookie = cookies();
-  const token = (await cookie).get("token")?.value;
-  const payload = token ? await verifyJWT(token) : null;
-  const isAdmin = Boolean(
-    payload && (payload.role === "admin" || payload.id === "admin")
-  );
+  const token = (await cookie).get(AUTH_COOKIE_NAME)?.value;
+  const session = token ? await verifyPrivilegedSession(token) : null;
+  const isAdmin = session?.role === "admin";
 
   return (
     <>

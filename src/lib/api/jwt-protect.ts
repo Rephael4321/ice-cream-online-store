@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT } from "@/lib/jwt";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
+import { verifyPrivilegedSession } from "@/lib/jwt";
 
 export type Role = "admin" | "driver";
 
@@ -26,26 +27,18 @@ export async function protectAPI(
   // Public GET (unchanged)
   if (req.method === "GET") return null;
 
-  const token = req.cookies.get("token")?.value;
+  const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!token) {
     return NextResponse.json({ error: "Missing token" }, { status: 401 });
   }
 
   try {
-    const payload = await verifyJWT(token);
-    if (!payload) {
+    const session = await verifyPrivilegedSession(token);
+    if (!session) {
       return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    // If your verifyJWT doesn’t already enforce exp, keep this:
-    if (payload.exp && Date.now() >= payload.exp * 1000) {
-      return NextResponse.json({ error: "Token expired" }, { status: 401 });
-    }
-
-    const role = extractRole(payload);
-    if (!role) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const role = session.role;
 
     // Default behavior = admin-only (matches your current setup)
     const allowedSet = new Set<Role>(

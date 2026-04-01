@@ -2,55 +2,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import Cookies from "js-cookie";
-import { apiPost } from "@/lib/api/client";
+import { useRouter, usePathname } from "next/navigation";
+import { apiGet } from "@/lib/api/client";
 import { AuthContext } from "./auth-context";
 
-type ExtraJwt = {
-  role?: string;
-  roles?: string[];
-  id?: string;
-  exp?: number;
-  iat?: number;
+type SessionUser = {
+  id: number;
+  role: string;
 };
 
-// Server-side JWT verification via API
-async function verifyJWTClient(token: string): Promise<ExtraJwt | null> {
+async function getCurrentSession(): Promise<SessionUser | null> {
   try {
-    const response = await apiPost("/api/auth/verify", { token });
+    const response = await apiGet("/api/auth/session", { cache: "no-store" });
 
     if (!response.ok) {
       return null;
     }
 
     const data = await response.json();
-    return data.payload || null;
+    return data.authenticated ? data.user ?? null : null;
   } catch (err) {
-    console.error("JWT verification failed:", err);
+    console.error("Session lookup failed:", err);
     return null;
   }
 }
 
-function isExpired(payload: ExtraJwt | null): boolean {
-  if (!payload) return true;
-  if (typeof payload.exp === "number") {
-    const nowSec = Math.floor(Date.now() / 1000);
-    return payload.exp <= nowSec;
-  }
+function hasRole(p: SessionUser | undefined | null, name: string) {
+  if (!p) return false;
+  if (p.role === name) return true;
   return false;
 }
 
-function hasRole(p: ExtraJwt | undefined, name: string) {
-  if (!p) return false;
-  if (p.role === name) return true;
-  return Array.isArray(p.roles) && p.roles.includes(name);
-}
-
-function isDriver(p?: ExtraJwt) {
+function isDriver(p?: SessionUser | null) {
   return hasRole(p, "driver");
 }
-function isAdmin(p?: ExtraJwt) {
+function isAdmin(p?: SessionUser | null) {
   return hasRole(p, "admin");
 }
 
@@ -68,60 +54,20 @@ export default function JwtGatekeeper({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function verifyAndAuthorize() {
-      // 1) Accept ?token= for first-time deep links into CMS
-      const urlToken = searchParams.get("token");
-      if (urlToken) {
-        // Verify the URL token
-        const payload = await verifyJWTClient(urlToken);
-        if (!payload || isExpired(payload)) {
-          Cookies.remove("token", { path: "/" });
-          router.replace("/");
-          return;
-        }
-        // Persist cookie then strip ?token=
-        const isHttps =
-          typeof window !== "undefined" && window.location.protocol === "https:";
-        Cookies.set("token", urlToken, {
-          path: "/",
-          expires: 14,
-          sameSite: "lax",
-          secure: isHttps,
-        });
-        const clean = new URL(window.location.href);
-        clean.searchParams.delete("token");
-        router.replace(clean.toString());
-        return; // wait for next render with clean URL
-      }
-
-      // 2) Use cookie token for all CMS auth
-      const token = Cookies.get("token");
-
-      // No cookie → Only store pages should be accessible (but this wrapper runs in CMS),
-      // so bounce CMS visitors without a token back to /store.
-      if (!token) {
+      const payload = await getCurrentSession();
+      if (!payload) {
         router.replace("/");
         return;
       }
 
-      // Verify the token with signature checking
-      const payload = await verifyJWTClient(token);
-      if (!payload || isExpired(payload)) {
-        Cookies.remove("token", { path: "/" });
-        router.replace("/");
-        return;
-      }
-
-      // 3) Role-based CMS gating
-      const roleValue = payload?.role ?? null;
+      const roleValue = payload.role ?? null;
       if (isDriver(payload)) {
-        // Driver may ONLY access /orders and /orders/[id]
         if (!isDriverAllowedCmsPath(pathname)) {
           router.replace("/orders");
           return;
@@ -131,13 +77,17 @@ export default function JwtGatekeeper({
         return;
       }
 
-      // Admin (or any non-driver) → full CMS access
+      if (!isAdmin(payload)) {
+        router.replace("/");
+        return;
+      }
+
       setRole(roleValue);
       setAuthorized(true);
     }
 
     verifyAndAuthorize();
-  }, [searchParams, pathname, router]);
+  }, [pathname, router]);
 
   if (!authorized) return null;
   return (

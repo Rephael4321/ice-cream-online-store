@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { cookies } from "next/headers";
-import { verifyJWT } from "@/lib/jwt";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
+import { verifyPrivilegedSession } from "@/lib/jwt";
 import { getSiteUrl } from "@/lib/site-url";
 import SingleProduct from "@/components/store/single-product";
 import SaleGroupCluster from "@/components/store/sale-group-cluster";
@@ -73,11 +74,9 @@ export default async function ProductsByCategory({ params }: Props) {
 
   // Admin flag
   const cookieStore = cookies();
-  const token = (await cookieStore).get("token")?.value;
-  const payload = token ? await verifyJWT(token) : null;
-  const isAdmin = Boolean(
-    payload && (payload.role === "admin" || payload.id === "admin")
-  );
+  const token = (await cookieStore).get(AUTH_COOKIE_NAME)?.value;
+  const session = token ? await verifyPrivilegedSession(token) : null;
+  const isAdmin = session?.role === "admin";
 
   const baseUrl = getSiteUrl();
   // Try child categories first (unchanged)

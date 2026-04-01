@@ -17,6 +17,10 @@ type DbIdentity = {
   port: number | null;
 };
 
+function quoteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
 function cleanInput(str: string): string {
   return str
     .trim()
@@ -114,13 +118,38 @@ async function runDockerPgRestore(localUrl: string, dumpPath: string, image: str
     `type=bind,source=${hostDumpDir},target=/work,readonly`,
     image,
     "pg_restore",
-    "--clean",
     "--no-owner",
     "--no-acl",
     "--dbname",
     dockerLocalUrl,
     containerDumpPath,
   ]);
+}
+
+function getMaintenanceConnectionString(connectionString: string): string {
+  const parsed = new URL(connectionString);
+  parsed.pathname = "/postgres";
+  return parsed.toString();
+}
+
+async function recreateDatabase(localUrl: string): Promise<void> {
+  const parsed = new URL(localUrl);
+  const dbName = parsed.pathname.replace(/^\//, "");
+  if (!dbName) {
+    throw new Error("Could not determine local database name.");
+  }
+
+  const maintenanceUrl = getMaintenanceConnectionString(localUrl);
+  const maintenancePool = new Pool({ connectionString: maintenanceUrl });
+
+  try {
+    await maintenancePool.query(
+      `DROP DATABASE IF EXISTS ${quoteIdentifier(dbName)} WITH (FORCE)`
+    );
+    await maintenancePool.query(`CREATE DATABASE ${quoteIdentifier(dbName)}`);
+  } finally {
+    await maintenancePool.end();
+  }
 }
 
 async function cleanupDumpFile(dumpPath: string): Promise<void> {
@@ -212,9 +241,12 @@ async function main(): Promise<void> {
       dockerClientImage = await runDockerPgDump(remoteUrl, dumpPath);
     }
 
-    console.log("Step 2/2: Restoring to local database...");
+    console.log("Step 2/3: Recreating local database...");
+    await recreateDatabase(localUrl);
+
+    console.log("Step 3/3: Restoring to local database...");
     try {
-      await runCommand("pg_restore", ["--clean", "--no-owner", "--no-acl", "--dbname", localUrl, dumpPath]);
+      await runCommand("pg_restore", ["--no-owner", "--no-acl", "--dbname", localUrl, dumpPath]);
     } catch (err) {
       if (!isSpawnNotFoundError(err)) throw err;
       if (!usingDockerClient) {
@@ -223,7 +255,7 @@ async function main(): Promise<void> {
       await runDockerPgRestore(localUrl, dumpPath, dockerClientImage);
     }
 
-    console.log("Step 3/3: Exporting schema to docs/db-schema.txt...");
+    console.log("Step 4/4: Exporting schema to docs/db-schema.txt...");
     await exportDbSchemaToDocs(localUrl);
 
     console.log("\nSuccess! Database sync complete and schema docs updated.");

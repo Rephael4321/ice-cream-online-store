@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
 import { z } from "zod";
 import pool from "@/lib/db";
-import { verifyJWT } from "@/lib/jwt";
-import { extractRole } from "@/lib/api/jwt-protect";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
+import { verifyPrivilegedSession } from "@/lib/jwt";
 
 // Accept either the new paymentMethod flow or the old isPaid boolean
 const PaymentMethodEnum = z.enum(["credit", "paybox", "cash"]);
@@ -43,12 +43,12 @@ async function updatePayment(
   // Resolve recorded_by from JWT (for audit)
   let recordedBy: string | null = null;
   try {
-    const token = req.cookies.get("token")?.value;
+    const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
     if (token) {
-      const payload = await verifyJWT(token);
-      const role = extractRole(payload);
-      const id = payload?.id != null ? String(payload.id) : null;
-      recordedBy = role && id ? `${role}:${id}` : id;
+      const session = await verifyPrivilegedSession(token);
+      if (session) {
+        recordedBy = `${session.role}:${session.userId}`;
+      }
     }
   } catch {
     // ignore
