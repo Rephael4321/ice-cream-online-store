@@ -1,6 +1,17 @@
 // lib/jwt.ts
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
+function isBlockedPrivilegedPayload(payload: JWTPayload): boolean {
+  const role = payload.role;
+  if (role === "admin" || role === "driver") return true;
+  if (payload.admin === true) return true;
+  if (payload.id === "admin") return true;
+  if (Array.isArray(payload.roles)) {
+    return payload.roles.includes("admin") || payload.roles.includes("driver");
+  }
+  return false;
+}
+
 function getKey(): Uint8Array {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("Missing JWT_SECRET. Add JWT_SECRET to .env.local");
@@ -8,6 +19,9 @@ function getKey(): Uint8Array {
 }
 
 export async function createJWT(payload: JWTPayload): Promise<string> {
+  if (isBlockedPrivilegedPayload(payload)) {
+    throw new Error("Privileged JWT issuance is disabled");
+  }
   const key = getKey();
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -33,6 +47,9 @@ export async function createJWTWithExpiry(
   payload: Omit<JWTPayload, "iat" | "exp"> & { exp: number },
   iat?: number
 ): Promise<string> {
+  if (isBlockedPrivilegedPayload(payload)) {
+    throw new Error("Privileged JWT issuance is disabled");
+  }
   const key = getKey();
   const now = iat ?? Math.floor(Date.now() / 1000);
   return await new SignJWT({ ...payload, iat, exp: payload.exp })
@@ -46,6 +63,9 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
     const key = getKey();
     const { payload } = await jwtVerify(token, key);
+    if (isBlockedPrivilegedPayload(payload)) {
+      return null;
+    }
     return payload;
   } catch {
     return null;

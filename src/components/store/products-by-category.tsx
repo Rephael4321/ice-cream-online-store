@@ -74,7 +74,10 @@ export default async function ProductsByCategory({ params }: Props) {
   // Admin flag
   const cookieStore = cookies();
   const token = (await cookieStore).get("token")?.value;
-  const isAdmin = !!(token && verifyJWT(token));
+  const payload = token ? await verifyJWT(token) : null;
+  const isAdmin = Boolean(
+    payload && (payload.role === "admin" || payload.id === "admin")
+  );
 
   const baseUrl = getSiteUrl();
   // Try child categories first (unchanged)

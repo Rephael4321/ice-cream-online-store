@@ -2,8 +2,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJWT } from "./src/lib/jwt";
 
-// Run on both the optimizer route and your CMS routes
-export const config = { matcher: ["/_next/image", "/cms/:path*"] };
+const cmsPrefixes = [
+  "/management-menu",
+  "/products",
+  "/categories",
+  "/sale-groups",
+  "/orders",
+  "/clients",
+  "/storage-areas",
+  "/link-product-to-category",
+  "/auth/setup",
+] as const;
+
+function isProtectedCmsPath(pathname: string): boolean {
+  return cmsPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+// Run on both the optimizer route and root-mounted CMS routes
+export const config = {
+  matcher: [
+    "/_next/image",
+    "/management-menu",
+    "/management-menu/:path*",
+    "/products/:path*",
+    "/categories/:path*",
+    "/sale-groups/:path*",
+    "/orders/:path*",
+    "/clients/:path*",
+    "/storage-areas/:path*",
+    "/link-product-to-category",
+    "/link-product-to-category/:path*",
+    "/auth/setup",
+    "/auth/setup/:path*",
+  ],
+};
 
 // Comma-separated allowlist of image origins (set in env):
 // ALLOWED_IMAGE_HOSTS=ice-cream-online-store.s3.amazonaws.com
@@ -16,6 +50,16 @@ const allowedHosts = new Set(
 
 export async function middleware(req: NextRequest) {
   const { pathname, origin } = req.nextUrl;
+
+  const rejectToken = (redirectPath: string) => {
+    const response = NextResponse.redirect(new URL(redirectPath, req.url));
+    response.cookies.set("token", "", {
+      path: "/",
+      expires: new Date(0),
+      maxAge: 0,
+    });
+    return response;
+  };
 
   // ---- A) Image optimizer rewrite → proxy ----
   if (pathname === "/_next/image") {
@@ -43,17 +87,16 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // ---- B) JWT gate for /cms/* (fast, edge-safe) ----
-  if (pathname.startsWith("/cms")) {
+  // ---- B) JWT gate for root-mounted CMS routes ----
+  if (isProtectedCmsPath(pathname)) {
     const token = req.cookies.get("token")?.value;
     if (!token) {
-      return NextResponse.redirect(new URL("/store", req.url));
+      return rejectToken("/store");
     }
 
-    // IMPORTANT: await verification (your original code didn't)
-    const payload = await verifyJWT(token); // jose checks exp/nbf
+    const payload = await verifyJWT(token);
     if (!payload) {
-      return NextResponse.redirect(new URL("/store", req.url));
+      return rejectToken("/store");
     }
   }
 

@@ -38,7 +38,10 @@ const toAdminSanitized = (name: string) => name.trim().replace(/\s+/g, "-");
 export default async function MainMenu() {
   const cookie = cookies();
   const token = (await cookie).get("token")?.value;
-  const isAdmin = !!(token && verifyJWT(token));
+  const payload = token ? await verifyJWT(token) : null;
+  const isAdmin = Boolean(
+    payload && (payload.role === "admin" || payload.id === "admin")
+  );
 
   // 🔧 Delivery config from env (falls back to sensible defaults)
   const DELIVERY_THRESHOLD = Number(

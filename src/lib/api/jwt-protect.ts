@@ -33,9 +33,12 @@ export async function protectAPI(
 
   try {
     const payload = await verifyJWT(token);
+    if (!payload) {
+      return NextResponse.json({ error: "Missing token" }, { status: 401 });
+    }
 
     // If your verifyJWT doesn’t already enforce exp, keep this:
-    if (payload?.exp && Date.now() >= payload.exp * 1000) {
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
       return NextResponse.json({ error: "Token expired" }, { status: 401 });
     }
 
