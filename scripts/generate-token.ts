@@ -1,5 +1,6 @@
 /**
- * Generate a stateful CMS login token for one of the seeded privileged roles.
+ * Generate a privileged CMS login JWT for one of the seeded roles.
+ * DB session is created on first visit with ?token= (see verifyPrivilegedSession).
  */
 
 import path from "path";
@@ -74,16 +75,13 @@ async function createTokenForRole(
   exp: number,
   deps: {
     pool: typeof import("../src/lib/db").default;
-    createPrivilegedSessionRecord: typeof import("../src/lib/auth/session").createPrivilegedSessionRecord;
     generateJwtJti: typeof import("../src/lib/auth/session").generateJwtJti;
     generateSessionKey: typeof import("../src/lib/auth/session").generateSessionKey;
-    hashSessionToken: typeof import("../src/lib/auth/session").hashSessionToken;
   }
 ): Promise<string> {
-  const userResult = await deps.pool.query(
-    `SELECT id, role FROM users WHERE role = $1 LIMIT 1`,
-    [role]
-  );
+  const userResult = await deps.pool.query(`SELECT id, role FROM users WHERE role = $1 LIMIT 1`, [
+    role,
+  ]);
 
   if (!userResult.rowCount) {
     throw new Error(`Missing seeded user for role "${role}". Run the migration first.`);
@@ -94,7 +92,7 @@ async function createTokenForRole(
   const jwtJti = deps.generateJwtJti();
   const now = Math.floor(Date.now() / 1000);
 
-  const token = await new SignJWT({
+  return await new SignJWT({
     sub: String(userId),
     role,
     sid: sessionKey,
@@ -107,18 +105,6 @@ async function createTokenForRole(
     .setIssuedAt(now)
     .setExpirationTime(exp)
     .sign(getKey());
-
-  await deps.createPrivilegedSessionRecord(deps.pool, {
-    userId,
-    sessionKey,
-    jwtJti,
-    sessionTokenHash: deps.hashSessionToken(token),
-    expiresAt: new Date(exp * 1000),
-    userAgent: "scripts/generate-token",
-    ipAddress: null,
-  });
-
-  return token;
 }
 
 async function main() {
@@ -132,14 +118,12 @@ async function main() {
   const exp = jwtModule.parseExpiry(expiry);
   const token = await createTokenForRole(role, exp, {
     pool,
-    createPrivilegedSessionRecord: sessionModule.createPrivilegedSessionRecord,
     generateJwtJti: sessionModule.generateJwtJti,
     generateSessionKey: sessionModule.generateSessionKey,
-    hashSessionToken: sessionModule.hashSessionToken,
   });
   const { local, prod } = buildLinks(token, targetPath, localPort);
 
-  console.log("\n--- session-backed CMS token generated ---\n");
+  console.log("\n--- CMS login JWT (session created on first ?token= visit) ---\n");
   console.log("Role:   ", role);
   console.log("Local:  ", local);
   if (prod) console.log("Prod:   ", prod);
@@ -157,4 +141,3 @@ main()
     const { default: pool } = await import("../src/lib/db");
     await pool.end();
   });
-  

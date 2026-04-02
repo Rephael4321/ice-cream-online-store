@@ -6,6 +6,7 @@ import {
   generateSessionKey,
   getActivePrivilegedSession,
   hashSessionToken,
+  isRevokedPrivilegedToken,
   SESSION_MAX_AGE_SECONDS,
   type PrivilegedRole,
   type SessionUser,
@@ -85,11 +86,10 @@ export async function createJWTWithExpiry(
     .sign(key);
 }
 
+/** JWT only; `sessions` row is created on first successful CMS visit (see verifyPrivilegedSession). */
 export async function createPrivilegedAccessToken(params: {
   userId: number;
   role: PrivilegedRole;
-  userAgent?: string | null;
-  ipAddress?: string | null;
 }): Promise<string> {
   const key = getKey();
   const sessionKey = generateSessionKey();
@@ -107,23 +107,11 @@ export async function createPrivilegedAccessToken(params: {
     exp,
   };
 
-  const token = await new SignJWT(payload)
+  return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt(now)
     .setExpirationTime(exp)
     .sign(key);
-
-  await createPrivilegedSessionRecord(pool, {
-    userId: params.userId,
-    sessionKey,
-    jwtJti,
-    sessionTokenHash: hashSessionToken(token),
-    expiresAt: new Date(exp * 1000),
-    userAgent: params.userAgent ?? null,
-    ipAddress: params.ipAddress ?? null,
-  });
-
-  return token;
 }
 
 export async function verifyPrivilegedSession(
@@ -137,17 +125,51 @@ export async function verifyPrivilegedSession(
     const userId = Number(normalized.sub);
     if (!Number.isInteger(userId) || userId <= 0) return null;
 
-    const session = await getActivePrivilegedSession(token, {
+    const expSec = normalized.exp;
+    if (typeof expSec !== "number" || !Number.isFinite(expSec)) return null;
+    if (expSec * 1000 <= Date.now()) return null;
+
+    let session = await getActivePrivilegedSession(token, {
+      userId,
+      sessionKey: normalized.sid,
+      jwtJti: normalized.jti,
+    });
+    if (session) {
+      return { ...session, payload: normalized };
+    }
+
+    if (await isRevokedPrivilegedToken(token)) {
+      return null;
+    }
+
+    try {
+      await createPrivilegedSessionRecord(pool, {
+        userId,
+        sessionKey: normalized.sid,
+        jwtJti: normalized.jti,
+        sessionTokenHash: hashSessionToken(token),
+        expiresAt: new Date(expSec * 1000),
+        userAgent: null,
+        ipAddress: null,
+      });
+    } catch (e: unknown) {
+      const code =
+        typeof e === "object" && e !== null && "code" in e
+          ? (e as { code?: string }).code
+          : undefined;
+      if (code !== "23505") {
+        return null;
+      }
+    }
+
+    session = await getActivePrivilegedSession(token, {
       userId,
       sessionKey: normalized.sid,
       jwtJti: normalized.jti,
     });
     if (!session) return null;
 
-    return {
-      ...session,
-      payload: normalized,
-    };
+    return { ...session, payload: normalized };
   } catch {
     return null;
   }

@@ -113,19 +113,6 @@ export async function getActivePrivilegedSession(
   );
 
   if (!result.rowCount) {
-    const diagnostic = await pool.query(
-      `
-        SELECT
-          COUNT(*) FILTER (WHERE s.user_id = $1) AS user_match_count,
-          COUNT(*) FILTER (WHERE s.user_id = $1 AND s.session_key = $2) AS session_key_match_count,
-          COUNT(*) FILTER (WHERE s.user_id = $1 AND s.session_key = $2 AND s.jwt_jti = $3) AS jti_match_count,
-          COUNT(*) FILTER (WHERE s.user_id = $1 AND s.session_key = $2 AND s.jwt_jti = $3 AND s.session_token_hash = $4) AS token_hash_match_count,
-          COUNT(*) FILTER (WHERE s.user_id = $1 AND s.session_key = $2 AND s.jwt_jti = $3 AND s.session_token_hash = $4 AND s.revoked_at IS NULL) AS not_revoked_match_count,
-          COUNT(*) FILTER (WHERE s.user_id = $1 AND s.session_key = $2 AND s.jwt_jti = $3 AND s.session_token_hash = $4 AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_match_count
-        FROM sessions s
-      `,
-      [params.userId, params.sessionKey, params.jwtJti, tokenHash]
-    );
     return null;
   }
   const row = result.rows[0];
@@ -138,6 +125,22 @@ export async function getActivePrivilegedSession(
     jwtJti: String(row.jwt_jti),
     expiresAt: new Date(row.expires_at),
   };
+}
+
+/** Same bearer was logged out; blocks re-bootstrap with that JWT until a new token is minted. */
+export async function isRevokedPrivilegedToken(token: string): Promise<boolean> {
+  const tokenHash = hashSessionToken(token);
+  const result = await pool.query(
+    `
+      SELECT 1
+      FROM sessions
+      WHERE session_token_hash = $1
+        AND revoked_at IS NOT NULL
+      LIMIT 1
+    `,
+    [tokenHash]
+  );
+  return Boolean(result.rowCount);
 }
 
 export async function revokeSessionByToken(token: string): Promise<void> {
