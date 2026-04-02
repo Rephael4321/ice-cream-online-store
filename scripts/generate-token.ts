@@ -9,8 +9,9 @@ import { SignJWT } from "jose";
 
 const DEFAULT_ROLE = "admin";
 const DEFAULT_EXPIRY = "14d";
-const DEFAULT_PATH = "/management-menu";
+const DEFAULT_PATH = "/cms";
 const DEFAULT_PORT = 3000;
+const DEFAULT_PROD_SITE_URL = "https://haim-ice-cream.com";
 
 function getKey(): Uint8Array {
   const secret = process.env.JWT_SECRET;
@@ -59,8 +60,12 @@ function buildLinks(token: string, path: string, localPort: number) {
   const pathWithSlash = path.startsWith("/") ? path : `/${path}`;
   const query = `?token=${encodeURIComponent(token)}`;
   const local = `http://localhost:${localPort}${pathWithSlash}${query}`;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  const prod = siteUrl ? `${siteUrl}${pathWithSlash}${query}` : null;
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  const isLocalhost =
+    !configured ||
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configured);
+  const siteUrl = isLocalhost ? DEFAULT_PROD_SITE_URL : configured;
+  const prod = `${siteUrl}${pathWithSlash}${query}`;
   return { local, prod };
 }
 

@@ -1,5 +1,6 @@
 import ManagementMenu from "@/components/cms/management-menu";
 
-export default function ManagementMenuPage() {
+export default function CmsPage() {
   return <ManagementMenu />;
 }
+

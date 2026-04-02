@@ -34,7 +34,7 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
 
           {isAdmin && (
             <Link
-              href="/management-menu"
+              href="/cms"
               className="px-4 py-2 bg-red-100 text-red-700 text-lg rounded-md shadow-sm hover:bg-red-200 hover:text-red-900 transition font-semibold max-w-[200px] w-full sm:w-auto text-center"
             >
               ניהול חנות ⚙️
@@ -83,7 +83,7 @@ export default function Navbar({ isAdmin = false }: { isAdmin?: boolean }) {
 
           {isAdmin && (
             <Link
-              href="/management-menu"
+              href="/cms"
               className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-md shadow-sm hover:bg-red-200 hover:text-red-900 transition font-semibold w-full max-w-[180px] text-center"
             >
               ניהול חנות ⚙️

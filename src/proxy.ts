@@ -3,7 +3,7 @@ import { AUTH_COOKIE_NAME } from "./lib/auth/session";
 import { verifyPrivilegedSession } from "./lib/jwt";
 
 const cmsPrefixes = [
-  "/management-menu",
+  "/cms",
   "/products",
   "/categories",
   "/sale-groups",
@@ -22,8 +22,8 @@ function isProtectedCmsPath(pathname: string): boolean {
 export const config = {
   matcher: [
     "/_next/image",
-    "/management-menu",
-    "/management-menu/:path*",
+    "/cms",
+    "/cms/:path*",
     "/products/:path*",
     "/categories/:path*",
     "/sale-groups/:path*",

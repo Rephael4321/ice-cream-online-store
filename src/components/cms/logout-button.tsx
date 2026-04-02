@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiPost } from "@/lib/api/client";
 
-export default function LogoutButton() {
+export default function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
 
   async function onLogout() {
@@ -13,12 +14,15 @@ export default function LogoutButton() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={onLogout}
-      className="text-xl text-gray-700 hover:text-purple-700 transition hover:underline"
+    <Link
+      href="/"
+      onClick={(e) => {
+        e.preventDefault();
+        void onLogout();
+      }}
+      className={className}
     >
       התנתקות
-    </button>
+    </Link>
   );
 }
