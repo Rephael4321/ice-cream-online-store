@@ -48,6 +48,8 @@ function isDriverAllowedCmsPath(pathname: string) {
   );
 }
 
+const CMS_REJECTED_PATH = "/cms-unauthorized";
+
 export default function JwtGatekeeper({
   children,
 }: {
@@ -62,7 +64,7 @@ export default function JwtGatekeeper({
     async function verifyAndAuthorize() {
       const payload = await getCurrentSession();
       if (!payload) {
-        router.replace("/");
+        router.replace(CMS_REJECTED_PATH);
         return;
       }
 
@@ -78,7 +80,7 @@ export default function JwtGatekeeper({
       }
 
       if (!isAdmin(payload)) {
-        router.replace("/");
+        router.replace(CMS_REJECTED_PATH);
         return;
       }
 

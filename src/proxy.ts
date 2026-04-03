@@ -46,7 +46,10 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const rejectToken = () => {
-    const response = NextResponse.redirect(new URL("/", req.url));
+    const rewriteUrl = req.nextUrl.clone();
+    rewriteUrl.pathname = "/cms-unauthorized";
+    rewriteUrl.search = "";
+    const response = NextResponse.rewrite(rewriteUrl);
     response.cookies.set(AUTH_COOKIE_NAME, "", {
       path: "/",
       expires: new Date(0),
