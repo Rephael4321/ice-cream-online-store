@@ -9,7 +9,7 @@ const dotenvResult = config({ path: path.resolve(process.cwd(), ".env.local") })
 import { SignJWT } from "jose";
 
 const DEFAULT_ROLE = "admin";
-const DEFAULT_EXPIRY = "14d";
+const DEFAULT_EXPIRY = "1mo";
 const DEFAULT_PATH = "/cms";
 const DEFAULT_PORT = 3000;
 const DEFAULT_PROD_SITE_URL = "https://haim-ice-cream.com";
@@ -46,7 +46,7 @@ function parseArgs(): {
     else if (!arg.startsWith("--")) {
       if (result.role === DEFAULT_ROLE && (arg === "admin" || arg === "driver")) {
         result.role = arg;
-      } else if (result.expiry === DEFAULT_EXPIRY && /^\d+[dhm]$/i.test(arg)) {
+      } else if (result.expiry === DEFAULT_EXPIRY && /^\d+(mo|d|h|m)$/i.test(arg)) {
         result.expiry = arg;
       } else if (result.path === DEFAULT_PATH && arg.startsWith("/")) {
         result.path = arg;
@@ -115,7 +115,9 @@ async function main() {
   ]);
 
   const { role, expiry, path: targetPath, localPort } = parseArgs();
+  const nowSec = Math.floor(Date.now() / 1000);
   const exp = jwtModule.parseExpiry(expiry);
+  const cookieMaxAgeSeconds = Math.max(0, exp - nowSec);
   const token = await createTokenForRole(role, exp, {
     pool,
     generateJwtJti: sessionModule.generateJwtJti,
@@ -125,6 +127,8 @@ async function main() {
 
   console.log("\n--- CMS login JWT (session created on first ?token= visit) ---\n");
   console.log("Role:   ", role);
+  console.log("Expiry: ", new Date(exp * 1000).toISOString(), `(${expiry})`);
+  console.log("Cookie max-age (seconds):", cookieMaxAgeSeconds);
   console.log("Local:  ", local);
   if (prod) console.log("Prod:   ", prod);
   console.log("\nToken:\n");

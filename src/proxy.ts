@@ -1,6 +1,18 @@
+import { decodeJwt } from "jose";
 import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME } from "./lib/auth/session";
+import { AUTH_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "./lib/auth/session";
 import { verifyPrivilegedSession } from "./lib/jwt";
+
+function cookieMaxAgeForPrivilegedToken(token: string): number {
+  try {
+    const { exp } = decodeJwt(token);
+    if (typeof exp !== "number") return SESSION_MAX_AGE_SECONDS;
+    const now = Math.floor(Date.now() / 1000);
+    return Math.max(0, exp - now);
+  } catch {
+    return SESSION_MAX_AGE_SECONDS;
+  }
+}
 
 const cmsPrefixes = [
   "/cms",
@@ -68,7 +80,7 @@ export async function proxy(req: NextRequest) {
       httpOnly: true,
       sameSite: "lax",
       secure: req.nextUrl.protocol === "https:",
-      maxAge: 60 * 60 * 8,
+      maxAge: cookieMaxAgeForPrivilegedToken(token),
     });
     return response;
   };

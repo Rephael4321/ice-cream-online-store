@@ -60,15 +60,16 @@ export async function createJWT(payload: JWTPayload): Promise<string> {
     .sign(key);
 }
 
-/** Parse expiry string (e.g. "14d", "8h") to seconds from now. */
+/** Parse expiry string (e.g. "1mo", "14d", "8h", "30m") to absolute exp (unix seconds). `mo` = 30-day month. */
 export function parseExpiry(expiry: string): number {
-  const match = expiry.trim().match(/^(\d+)(d|h|m)$/i);
-  if (!match) throw new Error(`Invalid expiry "${expiry}". Use e.g. 14d, 8h, 30m.`);
-  const [, num, unit] = match;
+  const match = expiry.trim().match(/^(\d+)(mo|d|h|m)$/i);
+  if (!match) throw new Error(`Invalid expiry "${expiry}". Use e.g. 1mo, 14d, 8h, 30m.`);
+  const [, num, unitRaw] = match;
   const n = Number(num);
   if (!Number.isFinite(n) || n <= 0) throw new Error(`Invalid expiry number: ${num}`);
-  const multipliers: Record<string, number> = { d: 86400, h: 3600, m: 60 };
-  const seconds = n * (multipliers[unit.toLowerCase()] ?? 60);
+  const unit = unitRaw.toLowerCase();
+  const multipliers: Record<string, number> = { mo: 86400 * 30, d: 86400, h: 3600, m: 60 };
+  const seconds = n * (multipliers[unit] ?? 60);
   return Math.floor(Date.now() / 1000) + seconds;
 }
 
