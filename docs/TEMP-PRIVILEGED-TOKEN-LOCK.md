@@ -8,6 +8,7 @@ The emergency single-token allowlist has been replaced by stateful privileged se
 
 - `db/migrations/001_stateful_privileged_sessions.sql`
 - `docs/JWT-GENERATION.md`
+- Edge + cookie behavior for CMS paths: `docs/CMS-MIDDLEWARE.md`
 
 ## Notes
 

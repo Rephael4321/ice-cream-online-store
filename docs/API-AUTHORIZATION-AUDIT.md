@@ -1,7 +1,7 @@
 # API Authorization Audit
 
 **Summary:** Who can do what on every API endpoint.  
-**Auth model:** JWT cookie `token`; roles: `admin`, `driver`.  
+**Auth model:** HTTP-only cookie **`token`** holding a JWT backed by a row in **`sessions`** (`verifyPrivilegedSession` in `src/lib/jwt.ts`); roles: `admin`, `driver`.  
 **Rules (from `protectAPI`):** GET is **public**; non-GET requires valid JWT and role in allowed set (default **admin only**; some routes allow **driver** or use **skipAuth** / **no middleware**).
 
 **Conventions:** Client-side calls should use `src/lib/api/client.ts` (`api`, `apiGet`, `apiPost`, etc.). See `docs/conventions/API-USAGE.md`. Category APIs are **name-based only**; id-based category routes were removed.
@@ -24,7 +24,9 @@
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| POST | `/api/auth/verify` | **Anyone** | Verify a JWT (body `token`). Returns `valid`, `payload` (role, id, exp, iat) or 401. No cookie required. | Yes (jwt-gatekeeper) |
+| POST | `/api/auth/verify` | **Anyone** | Verify privileged session: JSON body may include `token`; if omitted, uses `token` cookie. Returns `valid: true`, `user` (`id`, `role`), `session` (`id`, `expiresAt`), or 400/401. | Yes |
+| GET | `/api/auth/session` | **Anyone** | Returns `{ authenticated: false }` or `authenticated: true` with `user`, `session`. Clears invalid cookie. | Yes (JwtGatekeeper) |
+| POST | `/api/auth/logout` | **Anyone** | Revokes current session (and optional `?all=1` for all sessions for user when token valid). Always clears `token` cookie. No JWT required to call. | Yes (CMS logout) |
 
 ---
 
@@ -120,7 +122,7 @@ The Google API key is never sent to the client. These routes proxy Google Places
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
 | GET | `/api/orders` | **Admin** | List orders (CMS). Query: `from`, `to`, `pending=1`, `unpaid=1`. | Yes (fulfillment list) |
-| POST | `/api/orders` | **Anyone** | **skipAuth** – create order (checkout). Body: phone, items, address, etc. | Yes (cart checkout) |
+| POST | `/api/orders` | **Anyone** | **skipAuth** – create order (checkout). Body: `phone`, `items`, optional `isNotified`. After successful DB commit, server **fire-and-forget** sends Web Push to all stored subscriptions for users with role `admin` or `driver` (no-op if VAPID env missing or no rows). | Yes (cart checkout) |
 | GET | `/api/orders/search` | **Admin** | Search orders. | Yes (fulfillment list) |
 | GET | `/api/orders/by-phone?phone=...` | **Anyone** (GET) | List orders for a phone number. **No proof of identity** – anyone who knows the phone can list orders. | Yes (order-history-modal) |
 | GET | `/api/orders/client/[id]` | **Client** (cookie `phoneNumber`) or **Admin** (redirect) | Get order by ID: client only if order belongs to that phone; admin redirected to CMS. | Yes (store order page) |
@@ -145,6 +147,8 @@ The Google API key is never sent to the client. These routes proxy Google Places
 | PUT | `/api/clients/[id]` | **Admin** | Full client update (name, phone, address, address_lat, address_lng). | Yes (client-details) |
 | PATCH | `/api/clients/[id]/address` | **Admin**, **Driver** | Update only address, address_lat, address_lng. At least one field required. | Yes (order address page) |
 | DELETE | `/api/clients/[id]` | **Admin** | Delete client. | Yes (clients list, client-details) |
+| POST | `/api/clients/[id]/payments` | **Admin**, **Driver** | Record a payment for the client. | Client payment UI |
+| PATCH | `/api/clients/[id]/debt-adjustment` | **Admin** | Adjust debt to a target total (`targetTotalDebt`). | CMS |
 
 ---
 
@@ -171,13 +175,26 @@ The Google API key is never sent to the client. These routes proxy Google Places
 
 ---
 
+## 12. Web Push (VAPID)
+
+Requires `VAPID_*` env vars and migration `002_push_subscriptions.sql`. See [`ENVIRONMENT.md`](./ENVIRONMENT.md).
+
+| Method | Endpoint | Who can call | What they can do | Used |
+|--------|----------|---------------|------------------|------|
+| GET | `/api/push/vapid-public-key` | **Anyone** | **skipAuth** – returns `{ publicKey, configured: true }` or 503 if not configured. | CMS `/notifications` page (enable flow) |
+| POST | `/api/push/subscribe` | **Admin**, **Driver** | Upsert `push_subscriptions` row for JWT `users.id` (JSON body: browser `PushSubscription`). | CMS `/notifications` |
+| DELETE | `/api/push/subscribe` | **Admin**, **Driver** | JSON body: optional `endpoint` to delete one device row, or empty object to delete all rows for current user. | CMS disable flow |
+| POST | `/api/push/test` | **Admin**, **Driver** | Send a test payload to current user’s subscriptions only. | CMS `/notifications` |
+
+---
+
 ## Role summary
 
 | Role | Allowed actions |
 |------|------------------|
-| **Anyone (no auth)** | All GETs (except where middleware restricts), POST `/api/orders`, POST `/api/auth/verify`, GET `/api/img-proxy`, GET `/api/places/autocomplete`, GET `/api/places/details`, GET `/api/categories` (and name-based category GETs), GET `/api/orders/by-phone`, PATCH `/api/orders/[id]/notify`, POST `/api/products/stock` (get stock), POST `/api/products/sale-groups`. |
+| **Anyone (no auth)** | All GETs (except where middleware restricts), POST `/api/orders`, POST `/api/auth/verify`, GET `/api/auth/session`, POST `/api/auth/logout`, GET `/api/img-proxy`, GET `/api/places/autocomplete`, GET `/api/places/details`, GET `/api/categories` (and name-based category GETs), GET `/api/orders/by-phone`, PATCH `/api/orders/[id]/notify`, POST `/api/products/stock` (get stock), POST `/api/products/sale-groups`, GET `/api/push/vapid-public-key`. |
 | **Client** | GET `/api/orders/client/[id]` only when cookie `phoneNumber` matches the order’s client phone. |
-| **Driver** | Same as admin for: PATCH `/api/orders/[id]/status`, PATCH `/api/orders/[id]/delivery`, PATCH `/api/orders/[id]/payment`, PATCH `/api/clients/[id]/address`. All other non-GET: admin only. |
+| **Driver** | Same as admin for: PATCH `/api/orders/[id]/status`, PATCH `/api/orders/[id]/delivery`, PATCH `/api/orders/[id]/payment`, PATCH `/api/clients/[id]/address`, POST `/api/clients/[id]/payments`, POST/DELETE `/api/push/subscribe`, POST `/api/push/test`. CMS UI: drivers may open `/cms` (menu) and `/notifications` only among non-order client paths. All other non-GET: admin only unless listed here. |
 | **Admin** | All non-GET endpoints (except those with skipAuth). GETs are public; admin also gets redirect from `/api/orders/client/[id]` to CMS order page. |
 
 ---
@@ -193,7 +210,7 @@ The following routes were removed and must not be referenced:
 - **Sale groups:** `POST /api/sale-groups/[id]/items` (productId in body), `DELETE /api/sale-groups/[id]/items` (productId in query). App uses `POST/DELETE .../items/[productId]` only.
 - **Storage:** `GET /api/storage/unplaced-products`
 
-Use name-based category APIs and the remaining endpoints only. See `docs/refactor/REFACTORING-PLAN.md` (Category 1). For sale-group items, use `GET .../items` to list and `POST/DELETE .../items/[productId]` to add/remove.
+Use name-based category APIs and the remaining endpoints only. For sale-group items, use `GET .../items` to list and `POST/DELETE .../items/[productId]` to add/remove.
 
 ---
 
@@ -202,4 +219,6 @@ Use name-based category APIs and the remaining endpoints only. See `docs/refacto
 1. **`/api/categories` (POST, PATCH)** – Protected with `withMiddleware` (admin-only for POST and PATCH).
 2. **`/api/orders/by-phone?phone=...`** – GET is public; anyone who knows a phone number can list that client’s orders. Consider requiring cookie/session or signed token.
 3. **`/api/orders/[id]/notify`** – PATCH is unauthenticated; anyone can set `is_notified` for any order ID. Acceptable only if used by a trusted webhook; otherwise restrict (e.g. secret header or internal-only).
-4. **`/api/auth/verify`** – Accepts token in body; no cookie. Fine for “validate this token” flows; ensure callers are not exposed to token theft (e.g. use over HTTPS only).
+4. **`/api/auth/verify`** – Accepts token in JSON body or falls back to `token` cookie. Verifies **stateful** privileged session (DB), not JWT signature alone. Use HTTPS in production.
+5. **Privileged JWT and cookie lifetime** – JWT `exp` drives DB `sessions.expires_at` and (via edge middleware) the **`token`** cookie `maxAge` on `?token=` bootstrap. Defaults and CLI flags for minted tokens: [`JWT-GENERATION.md`](./JWT-GENERATION.md).
+6. **Web Push** – `GET /api/push/vapid-public-key` exposes only the **public** VAPID key (by design). Subscriptions are stored per **`users.id`** (admin/driver row), not tied to `sessions`. Stale endpoints are deleted when the push service returns **404/410**. Use **HTTPS** in production; prefer **`mailto:`** for `VAPID_SUBJECT` in dev (see [`ENVIRONMENT.md`](./ENVIRONMENT.md)).

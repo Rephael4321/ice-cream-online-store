@@ -19,22 +19,27 @@ import { apiGet, apiPost } from "@/lib/api/client";
 const res = await apiGet("/api/orders");
 const data = await res.json();
 
-await apiPost("/api/orders", { clientPhone: "...", items: [...] });
+await apiPost("/api/orders", { phone: "...", items: [...] });
 ```
 
 Server-side fetch (e.g. in Server Components, `MainMenu`, search page) may still use absolute URLs and raw `fetch`; the client is for browser-originated requests.
 
 ## Route protection
 
-- **Protected routes** – Use `withMiddleware(handler)` from `@/lib/api/with-middleware`. By default this runs `protectAPI` (JWT required; admin role for mutating actions). Some routes allow extra roles via `allowed` (e.g. `driver`).
+- **Protected routes** – Use `withMiddleware(handler)` from `@/lib/api/with-middleware`. By default this runs `protectAPI` (JWT required; admin role for mutating actions). Some routes allow extra roles via `allowed: ["driver"]` (e.g. order status, push subscribe/test).
 - **Public routes** – Either no middleware, or `withMiddleware(handler, { skipAuth: true })`. Examples:
   - `POST /api/orders` (create order) – `skipAuth: true`
   - `POST /api/products/stock` (get product stock) – `skipAuth: true`
   - `POST /api/products/sale-groups` – `skipAuth: true`
   - `PATCH /api/orders/[id]/notify` – `skipAuth: true`
-  - `POST /api/auth/verify` – verify JWT token (no auth required to call)
+  - `POST /api/auth/verify` – verify privileged session (JSON `token` or `token` cookie); returns `user` + `session` when valid (see `docs/API-AUTHORIZATION-AUDIT.md`)
+  - `GET /api/auth/session` – read current session without mutating (invalid cookie cleared on response)
+  - `POST /api/auth/logout` – revoke and clear cookie (callable without valid session)
+  - `GET /api/push/vapid-public-key` – public VAPID key for Web Push subscribe (`skipAuth`)
 
 All other API routes under `src/app/api` are protected (JWT required unless `skipAuth` or no middleware).
+
+Environment variables for server and public config are listed in `docs/ENVIRONMENT.md`.
 
 ## Category APIs
 
