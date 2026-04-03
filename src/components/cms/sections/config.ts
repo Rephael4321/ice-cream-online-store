@@ -42,6 +42,15 @@ export const CMS_SECTIONS = {
     nav: [{ key: "list", label: "צפה והכן הזמנות", href: "/orders" }],
   } as const satisfies CMSSection,
 
+  notifications: {
+    label: "התראות דחיפה",
+    base: "/notifications",
+    nav: [
+      { key: "push", label: "התראות", href: "/notifications" },
+      { key: "orders", label: "הזמנות", href: "/orders" },
+    ],
+  } as const satisfies CMSSection,
+
   clients: {
     label: "לקוחות",
     base: "/clients",

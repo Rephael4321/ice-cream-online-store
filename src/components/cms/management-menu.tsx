@@ -9,6 +9,7 @@ import {
   ReceiptText,
   Users2,
   Warehouse,
+  Bell,
 } from "lucide-react";
 
 const SECTION_ORDER: CMSSectionKey[] = [
@@ -16,6 +17,7 @@ const SECTION_ORDER: CMSSectionKey[] = [
   "categories",
   "saleGroups",
   "orders",
+  "notifications",
   "clients",
   "storage",
 ];
@@ -43,6 +45,8 @@ function describe(section: CMSSectionKey, linkKey: string): string {
       return linkKey === "new" ? "צור קבוצת מבצע חדשה." : "נהל קבוצות מבצע.";
     case "orders":
       return "צפה, הכן והשלם הזמנות.";
+    case "notifications":
+      return "הפעל התראות דחיפה על הזמנות חדשות.";
     case "clients":
       return "ניהול וצפייה בלקוחות.";
     case "storage":
@@ -57,6 +61,7 @@ const ICONS: Record<CMSSectionKey, any> = {
   categories: FolderTree,
   saleGroups: BadgePercent,
   orders: ReceiptText,
+  notifications: Bell,
   clients: Users2,
   storage: Warehouse,
 };

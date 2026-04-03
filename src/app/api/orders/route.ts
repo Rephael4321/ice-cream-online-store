@@ -1,6 +1,7 @@
 // app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withMiddleware } from "@/lib/api/with-middleware";
+import { notifyNewOrder } from "@/lib/push/notify-new-order";
 import pool from "@/lib/db";
 
 /* ---------- Constants from env ---------- */
@@ -314,6 +315,10 @@ async function createOrder(req: NextRequest) {
     }
 
     await client.query("COMMIT");
+
+    void notifyNewOrder(orderId).catch((e) =>
+      console.error("[push] notifyNewOrder:", e)
+    );
 
     const baseResponse: any = {
       orderId,

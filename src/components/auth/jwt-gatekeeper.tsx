@@ -40,11 +40,13 @@ function isAdmin(p?: SessionUser | null) {
   return hasRole(p, "admin");
 }
 
-// CMS paths a driver may visit: /orders, /orders/[id], /orders/client/[clientId]/unpaid, /clients/[id]/payment
+// CMS paths a driver may visit: /cms (menu hub), /orders, …, /notifications, /clients/[id]/payment
 function isDriverAllowedCmsPath(pathname: string) {
   return (
+    pathname === "/cms" ||
     /^\/orders(\/(client\/[^/]+\/unpaid|\d+))?$/.test(pathname) ||
-    /^\/clients\/\d+\/payment$/.test(pathname)
+    /^\/clients\/\d+\/payment$/.test(pathname) ||
+    pathname === "/notifications"
   );
 }
 
