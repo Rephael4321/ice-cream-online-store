@@ -1,5 +1,3 @@
-"use client";
-
 import { CMS_SECTIONS, CMSSectionKey } from "@/components/cms/sections/config";
 import Link from "next/link";
 import {
@@ -79,25 +77,22 @@ const tiles = SECTION_ORDER.map((key) => {
   };
 });
 
+const tileClassName = `
+  group relative isolate overflow-hidden rounded-3xl
+  bg-white shadow-sm hover:shadow-md transition
+  ring-1 ring-black/5 hover:ring-black/10 focus:outline-none
+  focus-visible:ring-2 focus-visible:ring-indigo-400
+`;
+
 export default function ManagementMenu() {
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6">
-      {/* Page title (no subtitle) */}
       <h1 className="text-2xl font-bold text-center mb-8">כלי ניהול</h1>
 
       {/* Bright, spacious tiles */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {tiles.map(({ key, title, href, action, desc, Icon }) => (
-          <Link
-            key={key}
-            href={href}
-            className="
-              group relative isolate overflow-hidden rounded-3xl
-              bg-white shadow-sm hover:shadow-md transition
-              ring-1 ring-black/5 hover:ring-black/10 focus:outline-none
-              focus-visible:ring-2 focus-visible:ring-indigo-400
-            "
-          >
+          <Link key={key} href={href} className={tileClassName}>
             {/* Slim accent bar (keeps UI general-purpose) */}
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-teal-400" />
 

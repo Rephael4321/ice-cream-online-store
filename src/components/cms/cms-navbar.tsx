@@ -1,6 +1,12 @@
 import Cart from "@/components/store/cart/cart";
 import CmsNavbarBrand from "@/components/cms/cms-navbar-brand";
+import CmsNavbarCopySiteUrl from "@/components/cms/cms-navbar-copy-site-url";
 import Link from "next/link";
+
+const copySiteUrlNavClassDesktop =
+  "text-xl text-gray-700 hover:text-purple-700 transition hover:underline";
+const copySiteUrlNavClassMobile =
+  "text-base text-gray-700 hover:text-purple-700 transition hover:underline";
 
 export default function CmsNavbar() {
   return (
@@ -33,6 +39,7 @@ export default function CmsNavbar() {
           >
             כלי ניהול
           </Link>
+          <CmsNavbarCopySiteUrl className={copySiteUrlNavClassDesktop} />
         </div>
 
         {/* Cart */}
@@ -51,7 +58,7 @@ export default function CmsNavbar() {
         </div>
 
         {/* Bottom: Centered nav buttons with max width */}
-        <div className="flex justify-between mt-3 px-16 w-full max-w-[640px] mx-auto">
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-3 px-4 w-full max-w-[640px] mx-auto">
           <Link
             href="/"
             className="text-base text-gray-700 hover:text-purple-700 transition hover:underline"
@@ -70,6 +77,7 @@ export default function CmsNavbar() {
           >
             כלי ניהול
           </Link>
+          <CmsNavbarCopySiteUrl className={copySiteUrlNavClassMobile} />
         </div>
       </div>
     </div>
