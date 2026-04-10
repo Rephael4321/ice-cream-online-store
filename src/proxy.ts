@@ -32,6 +32,13 @@ function isProtectedCmsPath(pathname: string): boolean {
   );
 }
 
+function isLegacyManagementMenuPath(pathname: string): boolean {
+  return (
+    pathname === "/management-menu" ||
+    pathname.startsWith("/management-menu/")
+  );
+}
+
 export const config = {
   matcher: [
     "/_next/image",
@@ -47,6 +54,8 @@ export const config = {
     "/storage-areas/:path*",
     "/link-product-to-category",
     "/link-product-to-category/:path*",
+    "/management-menu",
+    "/management-menu/:path*",
   ],
 };
 
@@ -59,6 +68,13 @@ const allowedHosts = new Set(
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (isLegacyManagementMenuPath(pathname)) {
+    const home = new URL("/", req.nextUrl.origin);
+    home.search = "";
+    home.hash = "";
+    return NextResponse.redirect(home, 307);
+  }
 
   const rejectToken = () => {
     const rewriteUrl = req.nextUrl.clone();

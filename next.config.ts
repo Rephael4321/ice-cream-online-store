@@ -6,13 +6,6 @@ const REGION = process.env.AWS_REGION || "us-east-1";
 const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
   // eslint: no longer configurable here in Next.js 16; use eslint.config.js or CLI
-  async redirects() {
-    return [
-      // Legacy / mistaken URL → public home (query string dropped)
-      { source: "/management-menu", destination: "/", permanent: false },
-      { source: "/management-menu/:path*", destination: "/", permanent: false },
-    ];
-  },
   images: {
     // Next.js 16: allow local images (public folder + img-proxy)
     localPatterns: [

@@ -3,7 +3,7 @@
 This module exports:
 
 - **`proxy(req)`** – intended as the default export of the Next.js **middleware** entry file.
-- **`config.matcher`** – limits work to CMS HTML routes, `link-product-to-category`, and `/_next/image` (for allowed-host image rewrites).
+- **`config.matcher`** – CMS HTML routes, `link-product-to-category`, `/_next/image` (image rewrites), and **`/management-menu`** (redirect-only).
 
 ## What it does
 
@@ -17,21 +17,17 @@ This module exports:
 
 ## Wiring it in Next.js
 
-The repo keeps the implementation in **`src/proxy.ts`**. Next.js expects middleware at the project root or under `src/`. If you do not already have a middleware file, add for example **`src/middleware.ts`**:
+The repo keeps the implementation in **`src/proxy.ts`**. In Next.js 16+, that file is the **edge proxy** entry (do **not** add a separate **`src/middleware.ts`** alongside it — the build will fail).
 
-```ts
-export { proxy as default, config } from "./proxy";
-```
+**`export async function proxy`** runs for paths in **`config.matcher`**. It handles **`/_next/image`**, CMS auth, and (first in the function body) the legacy **`/management-menu`** redirect (see below).
 
-(Adjust the import path if your middleware file lives at the repository root instead of `src/`.)
-
-Without this export, only the **client** `JwtGatekeeper` enforces CMS role rules; the edge gate and image rewrite above will not run.
+Without a working **`proxy`** export, only the **client** `JwtGatekeeper` enforces CMS role rules; the edge gate and image rewrite above will not run.
 
 ## Legacy `/management-menu` URL
 
-Some deployments or old links may use **`/management-menu`** (sometimes with **`?token=`**). That path is **not** a CMS route in this app and is **not** covered by `src/proxy.ts` matchers.
+Some deployments or old links may use **`/management-menu`** (sometimes with **`?token=`**). That path is **not** a CMS route in this app.
 
-**`next.config.ts`** defines **`redirects()`** so that **`/management-menu`** and **`/management-menu/*`** respond with a **307** to **`/`** (store home). The query string is **dropped** so bootstrap tokens are not carried to the homepage URL.
+**`src/proxy.ts`** includes **`/management-menu`** and **`/management-menu/:path*`** in **`config.matcher`**. At the start of **`proxy`**, those requests get a **307** to the site root built as **`new URL("/", origin)`**, with **`search`** and **`hash`** cleared so the address bar shows only **`/`** (no `?token=`, no fragment).
 
 Privileged users should open the management hub at **`/cms?token=...`** (see [`JWT-GENERATION.md`](./JWT-GENERATION.md)).
 
