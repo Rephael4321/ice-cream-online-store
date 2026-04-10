@@ -27,6 +27,14 @@ export { proxy as default, config } from "./proxy";
 
 Without this export, only the **client** `JwtGatekeeper` enforces CMS role rules; the edge gate and image rewrite above will not run.
 
+## Legacy `/management-menu` URL
+
+Some deployments or old links may use **`/management-menu`** (sometimes with **`?token=`**). That path is **not** a CMS route in this app and is **not** covered by `src/proxy.ts` matchers.
+
+**`next.config.ts`** defines **`redirects()`** so that **`/management-menu`** and **`/management-menu/*`** respond with a **307** to **`/`** (store home). The query string is **dropped** so bootstrap tokens are not carried to the homepage URL.
+
+Privileged users should open the management hub at **`/cms?token=...`** (see [`JWT-GENERATION.md`](./JWT-GENERATION.md)).
+
 ## Client-side CMS gate
 
 `src/components/auth/jwt-gatekeeper.tsx` calls `GET /api/auth/session` and sends users who lack a session or admin role to `/cms-unauthorized` (404). **Drivers** may only use `/cms` (management menu), `/notifications` (Web Push setup), `/orders` (list, detail, client unpaid), and `/clients/[id]/payment`; any other CMS path redirects to `/orders` (not 404).

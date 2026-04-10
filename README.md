@@ -27,7 +27,7 @@ Next.js app for an RTL Hebrew storefront (menu, cart, checkout) and a privileged
 | [`docs/API-AUTHORIZATION-AUDIT.md`](docs/API-AUTHORIZATION-AUDIT.md) | Every `/api/*` route and who may call it |
 | [`docs/conventions/API-USAGE.md`](docs/conventions/API-USAGE.md) | Client `api` / `apiGet` / `apiPost` usage |
 | [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | Environment variables used in code |
-| [`docs/CMS-MIDDLEWARE.md`](docs/CMS-MIDDLEWARE.md) | `src/proxy.ts` edge gate and image host rewrite |
+| [`docs/CMS-MIDDLEWARE.md`](docs/CMS-MIDDLEWARE.md) | `src/proxy.ts` edge gate, image host rewrite, legacy `/management-menu` → `/` redirect |
 
 ## Learn More
 
