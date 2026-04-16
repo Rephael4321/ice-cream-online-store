@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { isAdminEquivalentRole } from "@/lib/auth/roles";
 import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
 import { verifyPrivilegedSession } from "@/lib/jwt";
 
@@ -21,9 +22,9 @@ export async function validateClientOrderAccess(
   }
 
   const session = token ? await verifyPrivilegedSession(token) : null;
-  const isAdmin = session?.role === "admin";
+  const isPrivilegedForCms = isAdminEquivalentRole(session?.role);
 
-  if (isAdmin) {
+  if (isPrivilegedForCms) {
     const url = `/orders/${orderId}`;
     console.log("🧑‍💼 Admin detected – redirecting to CMS:", url);
     return NextResponse.redirect(new URL(url, req.url));

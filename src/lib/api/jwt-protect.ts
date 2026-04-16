@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  ADMIN_EQUIVALENT_ROLES,
+  extractPrivilegedRoleFromPayload,
+  type PrivilegedRole,
+} from "@/lib/auth/roles";
 import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
 import { verifyPrivilegedSession } from "@/lib/jwt";
 
-export type Role = "admin" | "driver";
+/** Privileged role used in API allowlists (admin-equivalent roles implied where documented). */
+export type Role = PrivilegedRole;
 
 export function extractRole(payload: any): Role | undefined {
-  // Prefer explicit role
-  if (payload?.role === "admin" || payload?.role === "driver") {
-    return payload.role;
-  }
-  // Back-compat with your existing admin tokens
-  if (payload?.admin === true || payload?.id === "admin") return "admin";
-  return undefined;
+  return extractPrivilegedRoleFromPayload(payload);
 }
 
 /**
  * Enforces:
  * - GET is public (unchanged)
  * - Non-GET: by default admin-only, unless `allowed` is provided.
- * - If `allowed` is provided, admin is *implicitly* allowed too.
+ * - If `allowed` is provided, admin-equivalent roles (`admin`, `superuser`) are *implicitly* allowed too.
  */
 export async function protectAPI(
   req: NextRequest,
@@ -40,9 +40,11 @@ export async function protectAPI(
 
     const role = session.role;
 
-    // Default behavior = admin-only (matches your current setup)
+    const adminEquivalent = [...ADMIN_EQUIVALENT_ROLES] as Role[];
     const allowedSet = new Set<Role>(
-      allowed && allowed.length ? [...allowed, "admin"] : ["admin"]
+      allowed && allowed.length
+        ? [...allowed, ...adminEquivalent]
+        : [...adminEquivalent]
     );
 
     if (!allowedSet.has(role)) {

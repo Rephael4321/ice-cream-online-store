@@ -8,6 +8,7 @@ import { HeaderHydrator } from "@/components/cms/sections/header/section-header"
 import { useAuth } from "@/components/auth/auth-context";
 import { AddressSearch, type SelectedPlace } from "@/components/address-search";
 import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api/client";
+import { isAdminEquivalentRole } from "@/lib/auth/roles";
 
 type Client = {
   id: number;
@@ -147,7 +148,7 @@ export default function ClientDetails() {
 
   const showDebtBlock =
     !!client &&
-    (role === "admin" ||
+    (isAdminEquivalentRole(role ?? undefined) ||
       (client.unpaidTotal != null &&
         (client.unpaidTotal > 0 || (client.manualDebtAdjustment ?? 0) !== 0)));
 
@@ -288,7 +289,7 @@ export default function ClientDetails() {
                   <>
                     <p className="font-semibold text-amber-800 flex items-center gap-2 flex-wrap">
                       סה״כ חוב: ₪{Number(client.unpaidTotal).toFixed(2)}
-                      {role === "admin" && (
+                      {isAdminEquivalentRole(role ?? undefined) && (
                         <button
                           type="button"
                           onClick={handleStartEditDebt}

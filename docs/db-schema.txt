@@ -421,5 +421,5 @@
 
 ✅ Check Constraints:
   - users_id_not_null: id IS NOT NULL
-  - users_role_check: (role = ANY (ARRAY['admin'::text, 'driver'::text]))
+  - users_role_check: (role = ANY (ARRAY['admin'::text, 'superuser'::text, 'driver'::text]))
   - users_role_not_null: role IS NOT NULL

@@ -2,13 +2,13 @@
 
 Privileged access uses:
 
-- a minimal `users` table with exactly two seeded roles: `admin` and `driver`
+- a minimal `users` table with seeded privileged roles: `admin`, `superuser` (admin-equivalent), and `driver` (see migrations `001_stateful_privileged_sessions.sql` and `003_superuser_role.sql`)
 - a `sessions` table for revocable server-backed sessions
 - `scripts/generate-token.ts` to mint a **JWT only** (no DB row yet)
 - the **first** successful CMS visit with `?token=` creates the matching `sessions` row
 - `POST /api/auth/logout` revokes the current session so that **same bearer token** cannot be bootstrapped again
 - `GET /api/auth/session` to inspect the current authenticated session
-- DB migrations: `db/migrations/001_stateful_privileged_sessions.sql` (users + sessions); `002_push_subscriptions.sql` (optional Web Push for privileged users)
+- DB migrations: `001_stateful_privileged_sessions.sql` (users + sessions); `003_superuser_role.sql` (adds `superuser` role); `002_push_subscriptions.sql` (optional Web Push for privileged users)
 
 ## Flow
 
@@ -32,18 +32,18 @@ Default behavior:
 
 | Flag | Example | Purpose |
 |------|---------|---------|
-| `--role=` | `--role=driver` | `admin` or `driver` |
+| `--role=` | `--role=driver` | `admin`, `superuser`, or `driver` |
 | `--expiry=` | `--expiry=7d` | Overrides default `1mo` |
 | `--path=` | `--path=/orders` | First segment of printed links (must start with `/`) |
 | `--port=` | `--port=3000` | Local URL port |
 
-Positional args (when still at defaults): `admin` / `driver`, then an expiry like `14d`, then a path like `/cms`.
+Positional args (when still at defaults): `admin` / `superuser` / `driver`, then an expiry like `14d`, then a path like `/cms`.
 
 **Console output** includes JWT **expiry** (ISO-8601 + the shorthand you passed) and **Cookie max-age (seconds)** — the same window the bootstrap cookie uses when middleware sets it from `exp`.
 
 ## Seed model
 
-- the migration inserts exactly two users: one `admin`, one `driver`
+- migrations insert one row per privileged role: `admin`, `superuser`, and `driver` (idempotent)
 - there are no emails or passwords in the current model
 
 ## Cookie and JWT lifetimes (code reference)
@@ -62,4 +62,4 @@ Positional args (when still at defaults): `admin` / `driver`, then an expiry lik
 Invalid or missing privileged sessions should **not** send users to the public home page.
 
 - **Edge middleware** (`src/proxy.ts`, when wired as Next.js middleware — see [`CMS-MIDDLEWARE.md`](./CMS-MIDDLEWARE.md)): clears the `token` cookie and **rewrites** to `/cms-unauthorized`, which calls `notFound()` and renders the root **`not-found`** page (404). The browser URL may still show the original CMS path.
-- **Client** (`JwtGatekeeper`): if `GET /api/auth/session` returns unauthenticated, or the user is not **admin** on a CMS route, navigates to `/cms-unauthorized` (same 404). **Drivers** on a disallowed CMS path are redirected to `/orders`. Allowed driver paths include `/cms`, `/notifications`, order fulfillment URLs, and client payment; see [`CMS-MIDDLEWARE.md`](./CMS-MIDDLEWARE.md).
+- **Client** (`JwtGatekeeper`): if `GET /api/auth/session` returns unauthenticated, or the user is neither **admin-equivalent** (`admin`, `superuser`) nor **driver** on a CMS route, navigates to `/cms-unauthorized` (same 404). **Drivers** on a disallowed CMS path are redirected to `/orders`. Allowed driver paths include `/cms`, `/notifications`, order fulfillment URLs, and client payment; see [`CMS-MIDDLEWARE.md`](./CMS-MIDDLEWARE.md).

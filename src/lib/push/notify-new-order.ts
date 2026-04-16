@@ -13,7 +13,7 @@ export const PUSH_ERROR_NO_SUBSCRIPTIONS_FOR_USER =
   "אין מנויי דחיפה רשומים למשתמש זה";
 
 /**
- * Fan-out to all admin/driver push subscriptions. Safe to fire-and-forget.
+ * Fan-out to all admin/superuser/driver push subscriptions. Safe to fire-and-forget.
  */
 export async function notifyNewOrder(orderId: number): Promise<void> {
   if (!ensureWebPushConfigured()) return;

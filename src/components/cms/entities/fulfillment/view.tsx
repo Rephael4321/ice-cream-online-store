@@ -13,6 +13,7 @@ import {
   apiGet,
   apiPatch,
 } from "@/lib/api/client";
+import { isAdminEquivalentRole } from "@/lib/auth/roles";
 
 type PaymentMethod = "" | "credit" | "paybox" | "cash";
 
@@ -384,7 +385,7 @@ export default function ViewOrder() {
           clientUnpaidTotal={
             order.clientUnpaidTotal != null ? Number(order.clientUnpaidTotal) : undefined
           }
-          canEditDebt={role === "admin"}
+          canEditDebt={isAdminEquivalentRole(role ?? undefined)}
           onDebtSave={async (targetTotalDebt) => {
             if (order.clientId == null) return;
             const r = await apiPatch(

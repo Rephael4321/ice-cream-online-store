@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { apiGet } from "@/lib/api/client";
+import { isAdminEquivalentRole } from "@/lib/auth/roles";
 import { AuthContext } from "./auth-context";
 
 type SessionUser = {
@@ -36,8 +37,8 @@ function hasRole(p: SessionUser | undefined | null, name: string) {
 function isDriver(p?: SessionUser | null) {
   return hasRole(p, "driver");
 }
-function isAdmin(p?: SessionUser | null) {
-  return hasRole(p, "admin");
+function isAdminEquivalent(p?: SessionUser | null) {
+  return isAdminEquivalentRole(p?.role);
 }
 
 // CMS paths a driver may visit: /cms (menu hub), /orders, …, /notifications, /clients/[id]/payment
@@ -81,7 +82,7 @@ export default function JwtGatekeeper({
         return;
       }
 
-      if (!isAdmin(payload)) {
+      if (!isAdminEquivalent(payload)) {
         router.replace(CMS_REJECTED_PATH);
         return;
       }

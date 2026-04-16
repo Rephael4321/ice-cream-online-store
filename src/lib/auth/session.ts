@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import pool from "@/lib/db";
+import type { PrivilegedRole } from "@/lib/auth/roles";
 
-export type PrivilegedRole = "admin" | "driver";
+export type { PrivilegedRole } from "@/lib/auth/roles";
 
 export type SessionUser = {
   userId: number;

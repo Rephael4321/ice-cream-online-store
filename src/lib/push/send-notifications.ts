@@ -69,7 +69,7 @@ export async function fetchSubscriptionsForPrivilegedRoles(): Promise<
     `SELECT ps.id, ps.user_id, ps.endpoint, ps.p256dh, ps.auth
      FROM push_subscriptions ps
      INNER JOIN users u ON u.id = ps.user_id
-     WHERE u.role IN ('admin', 'driver')`
+     WHERE u.role IN ('admin', 'superuser', 'driver')`
   );
   return rows.map((r) => ({
     id: r.id,

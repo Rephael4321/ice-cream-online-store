@@ -22,15 +22,17 @@ function getKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+type MintableRole = "admin" | "superuser" | "driver";
+
 function parseArgs(): {
-  role: "admin" | "driver";
+  role: MintableRole;
   expiry: string;
   path: string;
   localPort: number;
 } {
   const args = process.argv.slice(2);
   const result = {
-    role: DEFAULT_ROLE as "admin" | "driver",
+    role: DEFAULT_ROLE as MintableRole,
     expiry: DEFAULT_EXPIRY,
     path: DEFAULT_PATH,
     localPort: DEFAULT_PORT,
@@ -39,12 +41,15 @@ function parseArgs(): {
   for (const arg of args) {
     if (arg.startsWith("--role=")) {
       const v = arg.slice(7);
-      if (v === "admin" || v === "driver") result.role = v;
+      if (v === "admin" || v === "superuser" || v === "driver") result.role = v;
     } else if (arg.startsWith("--expiry=")) result.expiry = arg.slice(9);
     else if (arg.startsWith("--path=")) result.path = arg.slice(7) || "/";
     else if (arg.startsWith("--port=")) result.localPort = Number(arg.slice(7)) || DEFAULT_PORT;
     else if (!arg.startsWith("--")) {
-      if (result.role === DEFAULT_ROLE && (arg === "admin" || arg === "driver")) {
+      if (
+        result.role === DEFAULT_ROLE &&
+        (arg === "admin" || arg === "superuser" || arg === "driver")
+      ) {
         result.role = arg;
       } else if (result.expiry === DEFAULT_EXPIRY && /^\d+(mo|d|h|m)$/i.test(arg)) {
         result.expiry = arg;
@@ -71,7 +76,7 @@ function buildLinks(token: string, path: string, localPort: number) {
 }
 
 async function createTokenForRole(
-  role: "admin" | "driver",
+  role: MintableRole,
   exp: number,
   deps: {
     pool: typeof import("../src/lib/db").default;

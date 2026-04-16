@@ -13,6 +13,7 @@ import {
   apiGet,
   apiPatch,
 } from "@/lib/api/client";
+import { isAdminEquivalentRole } from "@/lib/auth/roles";
 
 const DEBOUNCE_MS = 350;
 const SEARCHING_MESSAGE_DELAY_MS = 2000;
@@ -550,7 +551,7 @@ export default function ListOrder() {
                   onToggleReady={toggleReady}
                   onToggleDelivered={toggleDelivered}
                   canEditPayment={canEditPayment}
-                  canEditDebt={role === "admin"}
+                  canEditDebt={isAdminEquivalentRole(role ?? undefined)}
                   onDebtUpdated={handleDebtUpdated}
                 />
               )}

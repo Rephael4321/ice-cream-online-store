@@ -18,6 +18,14 @@ describe("JWT lib", () => {
     expect(decoded!.iat).toBeDefined();
   });
 
+  it("verifyJWT preserves superuser role in payload", async () => {
+    const payload = { role: "superuser", id: "9" };
+    const token = await createJWT(payload);
+    const decoded = await verifyJWT(token);
+    expect(decoded).not.toBeNull();
+    expect(decoded!.role).toBe("superuser");
+  });
+
   it("verifyJWT returns null for invalid token", async () => {
     const decoded = await verifyJWT("not.a.valid.jwt");
     expect(decoded).toBeNull();

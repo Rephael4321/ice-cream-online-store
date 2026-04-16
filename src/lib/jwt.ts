@@ -32,7 +32,7 @@ function getKey(): Uint8Array {
 }
 
 function isPrivilegedRole(value: unknown): value is PrivilegedRole {
-  return value === "admin" || value === "driver";
+  return value === "admin" || value === "superuser" || value === "driver";
 }
 
 function normalizePrivilegedPayload(payload: JWTPayload): PrivilegedJWTPayload | null {

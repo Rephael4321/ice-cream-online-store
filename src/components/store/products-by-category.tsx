@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { cookies } from "next/headers";
+import { isAdminEquivalentRole } from "@/lib/auth/roles";
 import { AUTH_COOKIE_NAME } from "@/lib/auth/session";
 import { verifyPrivilegedSession } from "@/lib/jwt";
 import { getSiteUrl } from "@/lib/site-url";
@@ -76,7 +77,7 @@ export default async function ProductsByCategory({ params }: Props) {
   const cookieStore = cookies();
   const token = (await cookieStore).get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifyPrivilegedSession(token) : null;
-  const isAdmin = session?.role === "admin";
+  const isAdmin = isAdminEquivalentRole(session?.role);
 
   const baseUrl = getSiteUrl();
   // Try child categories first (unchanged)

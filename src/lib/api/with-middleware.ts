@@ -12,7 +12,7 @@ interface Options {
   middleware?: Middleware;
   skipAuth?: boolean;
   deprecated?: boolean | string;
-  /** Extra roles (besides admin) allowed on this route's non-GET methods */
+  /** Extra roles (besides admin-equivalent: `admin`, `superuser`) allowed on this route's non-GET methods */
   allowed?: Role[];
 }
 

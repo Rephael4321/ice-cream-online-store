@@ -2,7 +2,7 @@
 
 Next.js app for an RTL Hebrew storefront (menu, cart, checkout) and a privileged **CMS** (products, categories, orders, clients, images, storage). Data lives in **PostgreSQL**; product media uses **S3** (`MEDIA_BUCKET`).
 
-**Web Push (optional):** After migration `002_push_subscriptions.sql` and `VAPID_*` env vars, **admin** and **driver** can enable browser notifications for **new orders** from **כלי ניהול** → **התראות דחיפה** (`/notifications`). See [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md#web-push-vapid).
+**Web Push (optional):** After migration `002_push_subscriptions.sql` and `VAPID_*` env vars, **admin**, **superuser**, and **driver** can enable browser notifications for **new orders** from **כלי ניהול** → **התראות דחיפה** (`/notifications`). See [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md#web-push-vapid).
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Next.js app for an RTL Hebrew storefront (menu, cart, checkout) and a privileged
 | `npm run dev` | Dev server (Turbopack, port 3000) |
 | `npm run build` / `npm start` | Production build and server |
 | `npm test` | Vitest (optional DB clone from dev — see [`docs/TEST-DB-SETUP.md`](docs/TEST-DB-SETUP.md)) |
-| `npm run generate-token` | Mint a CMS bootstrap JWT for `admin` or `driver` (default lifetime **`1mo`**, optional `--expiry=` / `--role=` / `--path=` — see [`docs/JWT-GENERATION.md`](docs/JWT-GENERATION.md); needs `JWT_SECRET`, `DATABASE_URL`, seeded users) |
+| `npm run generate-token` | Mint a CMS bootstrap JWT for `admin`, `superuser`, or `driver` (default lifetime **`1mo`**, optional `--expiry=` / `--role=` / `--path=` — see [`docs/JWT-GENERATION.md`](docs/JWT-GENERATION.md); needs `JWT_SECRET`, `DATABASE_URL`, seeded users) |
 
 ## Documentation
 

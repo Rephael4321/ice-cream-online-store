@@ -26,7 +26,7 @@ Server-side fetch (e.g. in Server Components, `MainMenu`, search page) may still
 
 ## Route protection
 
-- **Protected routes** – Use `withMiddleware(handler)` from `@/lib/api/with-middleware`. By default this runs `protectAPI` (JWT required; admin role for mutating actions). Some routes allow extra roles via `allowed: ["driver"]` (e.g. order status, push subscribe/test).
+- **Protected routes** – Use `withMiddleware(handler)` from `@/lib/api/with-middleware`. By default this runs `protectAPI` (JWT required; **admin-equivalent** roles `admin` and `superuser` for mutating actions). Some routes allow extra roles via `allowed: ["driver"]` (e.g. order status, push subscribe/test); admin-equivalent roles remain allowed on those routes too.
 - **Public routes** – Either no middleware, or `withMiddleware(handler, { skipAuth: true })`. Examples:
   - `POST /api/orders` (create order) – `skipAuth: true`
   - `POST /api/products/stock` (get product stock) – `skipAuth: true`

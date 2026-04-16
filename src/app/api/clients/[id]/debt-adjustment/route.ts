@@ -81,5 +81,5 @@ async function updateDebtAdjustment(
   }
 }
 
-// Admin-only: do not pass allowed so only admin can PATCH (driver gets 403)
+// Admin-equivalent only (`admin`, `superuser`): do not pass allowed so drivers get 403
 export const PATCH = withMiddleware(updateDebtAdjustment);
