@@ -275,6 +275,34 @@
 ✅ Check Constraints:
   - products_id_not_null: id IS NOT NULL
 
+📦 Table: public.push_subscriptions
+  - auth text NOT NULL
+  - created_at timestamp with time zone NOT NULL DEFAULT now()
+  - endpoint text NOT NULL
+  - id integer NOT NULL
+  - p256dh text NOT NULL
+  - user_id integer NOT NULL
+
+🔗 Foreign Keys:
+  - push_subscriptions_user_id_fkey: user_id → public.users(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - push_subscriptions_endpoint_unique: endpoint [UNIQUE]
+  - push_subscriptions_pkey: id [PRIMARY KEY]
+
+📊 Indexes:
+  - idx_push_subscriptions_user_id: user_id [btree]
+  - push_subscriptions_endpoint_unique: endpoint [btree] [UNIQUE]
+  - push_subscriptions_pkey: id [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - push_subscriptions_auth_not_null: auth IS NOT NULL
+  - push_subscriptions_created_at_not_null: created_at IS NOT NULL
+  - push_subscriptions_endpoint_not_null: endpoint IS NOT NULL
+  - push_subscriptions_id_not_null: id IS NOT NULL
+  - push_subscriptions_p256dh_not_null: p256dh IS NOT NULL
+  - push_subscriptions_user_id_not_null: user_id IS NOT NULL
+
 📦 Table: public.sale_groups
   - created_at timestamp with time zone DEFAULT now()
   - id integer NOT NULL DEFAULT nextval('sale_groups_id_seq'::regclass)
@@ -317,6 +345,49 @@
 ✅ Check Constraints:
   - sales_id_not_null: id IS NOT NULL
 
+📦 Table: public.sessions
+  - created_at timestamp with time zone NOT NULL DEFAULT now()
+  - expires_at timestamp with time zone NOT NULL
+  - id integer NOT NULL
+  - ip_address inet
+  - jwt_jti text NOT NULL
+  - last_seen_at timestamp with time zone
+  - revoked_at timestamp with time zone
+  - revoked_reason text
+  - session_key text NOT NULL
+  - session_token_hash text NOT NULL
+  - updated_at timestamp with time zone NOT NULL DEFAULT now()
+  - user_agent text
+  - user_id integer NOT NULL
+
+🔗 Foreign Keys:
+  - sessions_user_id_fkey: user_id → public.users(id) ON DELETE CASCADE
+
+🔑 Unique Constraints:
+  - sessions_jwt_jti_key: jwt_jti [UNIQUE]
+  - sessions_pkey: id [PRIMARY KEY]
+  - sessions_session_key_key: session_key [UNIQUE]
+  - sessions_session_token_hash_key: session_token_hash [UNIQUE]
+
+📊 Indexes:
+  - idx_sessions_active_lookup: (user_id, revoked_at, expires_at) [btree]
+  - idx_sessions_expires_at: expires_at [btree]
+  - idx_sessions_user_id: user_id [btree]
+  - sessions_jwt_jti_key: jwt_jti [btree] [UNIQUE]
+  - sessions_pkey: id [btree] [UNIQUE]
+  - sessions_session_key_key: session_key [btree] [UNIQUE]
+  - sessions_session_token_hash_key: session_token_hash [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - sessions_created_at_not_null: created_at IS NOT NULL
+  - sessions_expires_at_not_null: expires_at IS NOT NULL
+  - sessions_id_not_null: id IS NOT NULL
+  - sessions_jwt_jti_not_null: jwt_jti IS NOT NULL
+  - sessions_session_key_not_null: session_key IS NOT NULL
+  - sessions_session_token_hash_not_null: session_token_hash IS NOT NULL
+  - sessions_updated_at_not_null: updated_at IS NOT NULL
+  - sessions_user_id_not_null: user_id IS NOT NULL
+
 📦 Table: public.storage_areas
   - created_at timestamp with time zone DEFAULT now()
   - id integer NOT NULL DEFAULT nextval('storage_areas_id_seq'::regclass)
@@ -335,3 +406,20 @@
 ✅ Check Constraints:
   - storage_areas_id_not_null: id IS NOT NULL
   - storage_areas_name_not_null: name IS NOT NULL
+
+📦 Table: public.users
+  - id integer NOT NULL
+  - role text NOT NULL
+
+🔑 Unique Constraints:
+  - users_pkey: id [PRIMARY KEY]
+  - users_role_key: role [UNIQUE]
+
+📊 Indexes:
+  - users_pkey: id [btree] [UNIQUE]
+  - users_role_key: role [btree] [UNIQUE]
+
+✅ Check Constraints:
+  - users_id_not_null: id IS NOT NULL
+  - users_role_check: (role = ANY (ARRAY['admin'::text, 'driver'::text]))
+  - users_role_not_null: role IS NOT NULL
