@@ -9,9 +9,24 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:ui": "vitest --ui",
+    "list": "tsx scripts/list-commands.ts",
+    "scripts": "tsx scripts/list-commands.ts",
     "generate-token": "tsx -r dotenv/config scripts/generate-token.ts DOTENV_CONFIG_PATH=.env.local",
     "sync-remote-db": "tsx scripts/sync-remote-db.ts",
     "match-image-sizes": "tsx scripts/match-image-sizes.ts"
+  },
+  "scriptDescriptions": {
+    "dev": "Start the Next.js dev server (port 3000).",
+    "build": "Build the production Next.js app.",
+    "start": "Start the production server (port 3000).",
+    "lint": "Run ESLint (Next.js).",
+    "test": "Run tests once (Vitest).",
+    "test:ui": "Run Vitest in UI mode.",
+    "list": "List available npm scripts with descriptions.",
+    "scripts": "Alias for `npm run list`.",
+    "generate-token": "Generate a token using .env.local configuration.",
+    "sync-remote-db": "Sync remote database into local environment.",
+    "match-image-sizes": "Normalize/match image sizes used by the app."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
