@@ -217,10 +217,25 @@ Implementation details (see `src/components/store/products-by-category.tsx`):
 - **Discrete products**: products that are not part of a rendered cluster are rendered normally.
 - **Order stability**: each cluster records `firstIndex` (the first occurrence of a product that belongs to that group in the API response) and clusters are rendered in the order of `firstIndex`. Standalone products keep their relative order around clusters.
 
-The cluster subtitle shows:
+Current cluster header behavior (`src/components/store/sale-group-cluster.tsx`):
 
-- bundle amount + price
-- increment step (“צעד”) derived from `sale_groups.increment_step`
+- The old title/subtitle line is intentionally removed (no `%` badge, no `מבצע קבוצתי: ...`, no `קחו ...` subtitle).
+- A single guidance line explains the mix-and-match rule:
+  - `אפשר לשלב מוצרים שונים בקבוצה - הכמות הכוללת נספרת יחד למבצע.`
+- A round-based counter is shown as:
+  - `נבחרו X מתוך N למימוש המבצע`
+  - `X` is the **current round** amount (0..N), not lifetime selected quantity.
+- A completion row is always rendered (space kept even when empty) to avoid layout jump.
+- Completion text grammar:
+  - 1 bundle: `הושלמה חבילה 1`
+  - 2+ bundles: `הושלמו {N} חבילות`
+- Progress uses an overlapped color bar with 5 colors:
+  - levels are drawn on top of each other in a single track
+  - fill direction is right-to-left
+  - colors cycle after the 5th level (round 6 reuses color 1).
+- On each newly completed bundle:
+  - confetti is fired via dynamic import of `canvas-confetti`
+  - a short pulse/ring highlight effect is applied on the cluster container.
 
 ### Product card interactions (quantity stepping)
 

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { toast } from "sonner";
 
 type SaleCategoryInfo = {
   id: number;
@@ -22,7 +23,8 @@ type SingleProductProps = {
     price: number;
     fromCategory?: boolean;
     category?: SaleCategoryInfo;
-    // fromGroup / group could exist, but not required here
+    fromGroup?: boolean;
+    group?: { id: number; name: string | null };
   };
   isAdmin?: boolean;
   /** When true, hide the individual price/sale price block (used inside clusters) */
@@ -74,14 +76,31 @@ export default function SingleProduct({
     return mod === 0 ? step : mod; // remove this many to reach previous multiple (or clear if <= step)
   };
 
+  const showMixAndMatchHintOnce = () => {
+    if (!sale?.fromGroup) return;
+    if (typeof window === "undefined") return;
+
+    const groupId = sale.group?.id;
+    const key = groupId
+      ? `saleGroupMixHintSeen:${groupId}`
+      : "saleGroupMixHintSeen:global";
+    const seen = window.localStorage.getItem(key) === "1";
+    if (seen) return;
+
+    toast.info("אפשר לשלב מוצרים שונים בקבוצה - הכמות הכוללת נספרת יחד.");
+    window.localStorage.setItem(key, "1");
+  };
+
   const handleAdd = () => {
     if (!inStock) return;
+    showMixAndMatchHintOnce();
     const delta = deltaToNextMultiple(quantity);
     addToCart({ id, productImage, productName, productPrice, sale }, delta);
   };
 
   const handleAddSalePack = () => {
     if (!inStock || !sale) return;
+    showMixAndMatchHintOnce();
     // Add the pack amount as requested. (Step affects +/– buttons; packs add exact sale amount.)
     addToCart(
       { id, productImage, productName, productPrice, sale },

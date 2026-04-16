@@ -154,7 +154,6 @@ export default async function ProductsByCategory({ params }: Props) {
   // ---- Build clusters for group-based sales (only when chosen sale is fromGroup) ----
   type Cluster = {
     groupId: number;
-    groupName: string | null;
     amount: number;
     price: number;
     items: Product[];
@@ -171,7 +170,6 @@ export default async function ProductsByCategory({ params }: Props) {
     if (!clustersById.has(g.id)) {
       clustersById.set(g.id, {
         groupId: g.id,
-        groupName: g.name ?? null,
         amount: groupInfo.amount,
         price: groupInfo.price,
         items: [],
@@ -199,26 +197,14 @@ export default async function ProductsByCategory({ params }: Props) {
     const clusterForHere = validClusters.find((c) => c.firstIndex === i);
 
     if (clusterForHere) {
-      // Derive a common step for the cluster (if mixed, we’ll just default to 1)
-      const clusterStep =
-        clusterForHere.items[0]?.incrementStep ??
-        clusterForHere.items[0]?.saleGroup?.incrementStep ??
-        1;
-
       content.push(
         <div
           key={`clusterwrap-${clusterForHere.groupId}-${i}`}
           className="col-span-full"
         >
           <SaleGroupCluster
-            title={
-              clusterForHere.groupName
-                ? `מבצע קבוצתי: ${clusterForHere.groupName}`
-                : `מבצע קבוצתי`
-            }
-            subtitle={`קחו ${
-              clusterForHere.amount
-            } ב־₪${clusterForHere.price.toFixed(2)} · צעד: ${clusterStep}`}
+            bundleAmount={clusterForHere.amount}
+            productIds={clusterForHere.items.map((prod) => prod.id)}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
               {clusterForHere.items.map((prod) => (
