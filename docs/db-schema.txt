@@ -20,8 +20,6 @@
   - categories_pkey: id [btree] [UNIQUE]
 
 ✅ Check Constraints:
-  - categories_id_not_null: id IS NOT NULL
-  - categories_name_not_null: name IS NOT NULL
   - categories_type_check: (type = ANY (ARRAY['collection'::text, 'sale'::text]))
   - type_check: (type = ANY (ARRAY['collection'::text, 'sale'::text]))
 
@@ -45,10 +43,7 @@
   - category_multi_items_pkey: (category_id, target_type, target_id) [btree] [UNIQUE]
 
 ✅ Check Constraints:
-  - category_multi_items_category_id_not_null: category_id IS NOT NULL
-  - category_multi_items_target_id_not_null: target_id IS NOT NULL
   - category_multi_items_target_type_check: (target_type = ANY (ARRAY['product'::text, 'category'::text, 'sale_group'::text]))
-  - category_multi_items_target_type_not_null: target_type IS NOT NULL
 
 📦 Table: public.category_sales
   - category_id integer NOT NULL
@@ -66,12 +61,6 @@
 
 📊 Indexes:
   - category_sales_pkey: id [btree] [UNIQUE]
-
-✅ Check Constraints:
-  - category_sales_category_id_not_null: category_id IS NOT NULL
-  - category_sales_id_not_null: id IS NOT NULL
-  - category_sales_quantity_not_null: quantity IS NOT NULL
-  - category_sales_sale_price_not_null: sale_price IS NOT NULL
 
 📦 Table: public.client_payments
   - amount numeric NOT NULL
@@ -93,11 +82,7 @@
 
 ✅ Check Constraints:
   - client_payments_amount_check: (amount >= 0::numeric)
-  - client_payments_amount_not_null: amount IS NOT NULL
-  - client_payments_client_id_not_null: client_id IS NOT NULL
-  - client_payments_id_not_null: id IS NOT NULL
   - client_payments_payment_method_check: (payment_method = ANY (ARRAY['credit'::text, 'paybox'::text, 'cash'::text]))
-  - client_payments_payment_method_not_null: payment_method IS NOT NULL
 
 📦 Table: public.clients
   - address text
@@ -117,9 +102,6 @@
 📊 Indexes:
   - clients_pkey: id [btree] [UNIQUE]
   - unique_phone: phone [btree] [UNIQUE]
-
-✅ Check Constraints:
-  - clients_id_not_null: id IS NOT NULL
 
 📦 Table: public.order_items
   - created_at timestamp with time zone DEFAULT now()
@@ -154,11 +136,7 @@
   - order_items_pkey: id [btree] [UNIQUE]
 
 ✅ Check Constraints:
-  - order_items_group_discount_not_null: group_discount IS NOT NULL
   - order_items_group_increment_step_pos: (group_increment_step IS NULL OR group_increment_step > 0)
-  - order_items_id_not_null: id IS NOT NULL
-  - order_items_order_id_not_null: order_id IS NOT NULL
-  - order_items_quantity_not_null: quantity IS NOT NULL
 
 📦 Table: public.orders
   - client_id integer
@@ -190,10 +168,6 @@
 
 ✅ Check Constraints:
   - orders_delivery_fee_nonneg: (delivery_fee >= 0::numeric)
-  - orders_delivery_fee_not_null: delivery_fee IS NOT NULL
-  - orders_group_discount_total_not_null: group_discount_total IS NOT NULL
-  - orders_id_not_null: id IS NOT NULL
-  - orders_is_delivered_not_null: is_delivered IS NOT NULL
 
 📦 Table: public.product_categories
   - category_id integer NOT NULL
@@ -211,10 +185,6 @@
 
 📊 Indexes:
   - product_categories_pkey: (product_id, category_id) [btree] [UNIQUE]
-
-✅ Check Constraints:
-  - product_categories_category_id_not_null: category_id IS NOT NULL
-  - product_categories_product_id_not_null: product_id IS NOT NULL
 
 📦 Table: public.product_sale_groups
   - color text
@@ -234,10 +204,6 @@
 📊 Indexes:
   - product_sale_groups_pkey: (product_id, sale_group_id) [btree] [UNIQUE]
 
-✅ Check Constraints:
-  - product_sale_groups_product_id_not_null: product_id IS NOT NULL
-  - product_sale_groups_sale_group_id_not_null: sale_group_id IS NOT NULL
-
 📦 Table: public.product_storage
   - product_id integer NOT NULL
   - storage_area_id integer
@@ -252,9 +218,6 @@
 
 📊 Indexes:
   - product_storage_pkey: product_id [btree] [UNIQUE]
-
-✅ Check Constraints:
-  - product_storage_product_id_not_null: product_id IS NOT NULL
 
 📦 Table: public.products
   - created_at timestamp with time zone DEFAULT now()
@@ -271,9 +234,6 @@
 
 📊 Indexes:
   - products_pkey: id [btree] [UNIQUE]
-
-✅ Check Constraints:
-  - products_id_not_null: id IS NOT NULL
 
 📦 Table: public.push_subscriptions
   - auth text NOT NULL
@@ -295,14 +255,6 @@
   - push_subscriptions_endpoint_unique: endpoint [btree] [UNIQUE]
   - push_subscriptions_pkey: id [btree] [UNIQUE]
 
-✅ Check Constraints:
-  - push_subscriptions_auth_not_null: auth IS NOT NULL
-  - push_subscriptions_created_at_not_null: created_at IS NOT NULL
-  - push_subscriptions_endpoint_not_null: endpoint IS NOT NULL
-  - push_subscriptions_id_not_null: id IS NOT NULL
-  - push_subscriptions_p256dh_not_null: p256dh IS NOT NULL
-  - push_subscriptions_user_id_not_null: user_id IS NOT NULL
-
 📦 Table: public.sale_groups
   - created_at timestamp with time zone DEFAULT now()
   - id integer NOT NULL DEFAULT nextval('sale_groups_id_seq'::regclass)
@@ -321,8 +273,6 @@
   - sale_groups_pkey: id [btree] [UNIQUE]
 
 ✅ Check Constraints:
-  - sale_groups_id_not_null: id IS NOT NULL
-  - sale_groups_increment_step_not_null: increment_step IS NOT NULL
   - sale_groups_increment_step_pos: (increment_step > 0)
 
 📦 Table: public.sales
@@ -341,9 +291,6 @@
 
 📊 Indexes:
   - sales_pkey: id [btree] [UNIQUE]
-
-✅ Check Constraints:
-  - sales_id_not_null: id IS NOT NULL
 
 📦 Table: public.sessions
   - created_at timestamp with time zone NOT NULL DEFAULT now()
@@ -378,16 +325,6 @@
   - sessions_session_key_key: session_key [btree] [UNIQUE]
   - sessions_session_token_hash_key: session_token_hash [btree] [UNIQUE]
 
-✅ Check Constraints:
-  - sessions_created_at_not_null: created_at IS NOT NULL
-  - sessions_expires_at_not_null: expires_at IS NOT NULL
-  - sessions_id_not_null: id IS NOT NULL
-  - sessions_jwt_jti_not_null: jwt_jti IS NOT NULL
-  - sessions_session_key_not_null: session_key IS NOT NULL
-  - sessions_session_token_hash_not_null: session_token_hash IS NOT NULL
-  - sessions_updated_at_not_null: updated_at IS NOT NULL
-  - sessions_user_id_not_null: user_id IS NOT NULL
-
 📦 Table: public.storage_areas
   - created_at timestamp with time zone DEFAULT now()
   - id integer NOT NULL DEFAULT nextval('storage_areas_id_seq'::regclass)
@@ -403,10 +340,6 @@
   - storage_areas_name_key: name [btree] [UNIQUE]
   - storage_areas_pkey: id [btree] [UNIQUE]
 
-✅ Check Constraints:
-  - storage_areas_id_not_null: id IS NOT NULL
-  - storage_areas_name_not_null: name IS NOT NULL
-
 📦 Table: public.users
   - id integer NOT NULL
   - role text NOT NULL
@@ -420,6 +353,4 @@
   - users_role_key: role [btree] [UNIQUE]
 
 ✅ Check Constraints:
-  - users_id_not_null: id IS NOT NULL
   - users_role_check: (role = ANY (ARRAY['admin'::text, 'superuser'::text, 'driver'::text]))
-  - users_role_not_null: role IS NOT NULL

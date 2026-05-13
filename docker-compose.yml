@@ -1,0 +1,43 @@
+# Compose file format: https://docs.docker.com/compose/compose-file/ (no legacy `version:` key)
+#
+# Local Postgres for ice-cream-online-store.
+#
+# Start:   docker compose up -d
+# Stop:    docker compose down
+# Logs:    docker compose logs -f db
+#
+# Match `.env.local` (same as local Docker):
+#   DATABASE_URL="postgresql://devuser:devpassword@localhost:5432/neondb"
+#
+# Fill the DB from a hosted Postgres (Neon, RDS, etc.):
+#   npm run sync-remote-db
+# (prompts for remote DATABASE_URL; dumps remote, recreates local DB, restores.)
+# If `pg_dump` / `pg_restore` are not on PATH, the script uses ephemeral `postgres:17`
+# containers; those connect back via host.docker.internal — supported on Docker Desktop
+# (Windows/macOS). On Linux Docker Engine 20.10+, host.docker.internal is usually available.
+#
+# First-time schema (empty DB): apply SQL in `db/migrations/` in filename order, or sync
+# from remote so schema + data match production.
+
+services:
+  db:
+    image: postgres:17
+    container_name: ice-cream-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: neondb
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - icecream_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devuser -d neondb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  icecream_pgdata:
