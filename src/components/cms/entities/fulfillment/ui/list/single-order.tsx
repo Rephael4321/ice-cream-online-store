@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Input, Label, showToast } from "@/components/cms/ui";
 import { useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AddressDisplay } from "../address-display";
 import { apiPatch } from "@/lib/api/client";
 
@@ -60,6 +61,7 @@ export default function SingleOrder({
   canEditDebt = false,
   onDebtUpdated,
 }: Props) {
+  const router = useRouter();
   const [editingDebt, setEditingDebt] = useState(false);
   const [debtInput, setDebtInput] = useState("");
   const [savingDebt, setSavingDebt] = useState(false);
@@ -362,7 +364,7 @@ export default function SingleOrder({
                     timestamp: Date.now(),
                   })
                 );
-                window.location.href = `/orders/${order.orderId}`;
+                router.push(`/orders/${order.orderId}`);
               }}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >

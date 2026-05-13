@@ -271,31 +271,51 @@ export default function ListOrder() {
     return () => ro.disconnect();
   }, [loading, orders.length]);
 
-  // 🔖 Restore scroll-to-last-viewed (virtual list: scroll to index via Virtuoso API)
+  // 🔖 Restore scroll-to-last-viewed (virtual list: scroll to index via Virtuoso API).
+  // Defer scroll + localStorage removal to a macrotask and clear that timer on cleanup so
+  // React 18 Strict Mode's double mount does not consume the key on the first (discarded) run.
   useEffect(() => {
+    if (loading || orders.length === 0) return;
+
     const raw = localStorage.getItem(SCROLL_KEY);
-    if (!raw || orders.length === 0) return;
+    if (!raw) return;
+
+    let orderId: number;
+    let timestamp: number;
     try {
-      const { orderId, timestamp } = JSON.parse(raw);
-      const now = Date.now();
-      const FOUR_HOURS = 4 * 60 * 60 * 1000;
-      if (now - timestamp > FOUR_HOURS) {
+      const parsed = JSON.parse(raw) as { orderId?: unknown; timestamp?: unknown };
+      orderId = Number(parsed.orderId);
+      timestamp = Number(parsed.timestamp);
+      if (!Number.isFinite(orderId) || !Number.isFinite(timestamp)) {
         localStorage.removeItem(SCROLL_KEY);
         return;
       }
-      const index = orders.findIndex((o) => o.orderId === orderId);
-      if (index >= 0) {
-        virtuosoRef.current?.scrollToIndex({
-          index,
-          align: "center",
-          behavior: "smooth",
-        });
-        localStorage.removeItem(SCROLL_KEY);
-      }
     } catch {
       localStorage.removeItem(SCROLL_KEY);
+      return;
     }
-  }, [orders]);
+
+    const now = Date.now();
+    const FOUR_HOURS = 4 * 60 * 60 * 1000;
+    if (now - timestamp > FOUR_HOURS) {
+      localStorage.removeItem(SCROLL_KEY);
+      return;
+    }
+
+    const index = orders.findIndex((o) => o.orderId === orderId);
+    if (index < 0) return;
+
+    const scrollTimer = window.setTimeout(() => {
+      virtuosoRef.current?.scrollToIndex({
+        index,
+        align: "center",
+        behavior: "auto",
+      });
+      localStorage.removeItem(SCROLL_KEY);
+    }, 0);
+
+    return () => clearTimeout(scrollTimer);
+  }, [orders, loading]);
 
   const handleDelete = async (orderId: number) => {
     if (!confirm("האם למחוק את ההזמנה?")) return;

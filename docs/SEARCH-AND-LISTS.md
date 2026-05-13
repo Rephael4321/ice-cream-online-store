@@ -1,9 +1,9 @@
-# Search bars and lists (URL, CMS/Store, react-window)
+# Search bars and lists (URL, CMS/Store, virtual lists)
 
-| List / feature           | URL                          | CMS / Store | Applied react-window |
-|-------------------------|------------------------------|-------------|---------------------|
-| Client list             | `/clients`                   | CMS         | Yes                 |
-| Orders / fulfillment    | `/orders`                    | CMS         | Yes                 |
+| List / feature           | URL                          | CMS / Store | Virtual list library |
+|-------------------------|------------------------------|-------------|----------------------|
+| Client list             | `/clients`                   | CMS         | react-window         |
+| Orders / fulfillment    | `/orders`                    | CMS         | react-virtuoso       |
 | Store product search    | `/search-products`           | Store       | No                  |
 | CMS products list       | `/products`                  | CMS         | No                  |
 | Sale group manage items | `/sale-groups/[id]/manage-items` | CMS     | No                  |
@@ -52,12 +52,21 @@ The following describes the implementation applied to the **client list** (`/cli
 
 ---
 
-# Orders list (same pattern)
+# Orders list (Virtuoso + filters)
 
-The **orders/fulfillment list** (`/orders`, CMS) uses the same pattern as the client list.
+The **orders/fulfillment list** (`/orders`, CMS) uses **react-virtuoso** (`Virtuoso`) for variable-height rows: `OrderRow` (memo) wraps `SingleOrder` with `data-order-id` on the wrapper; `ResizeObserver` on the list container drives `listHeight`; `defaultItemHeight` is an estimate while rows are measured.
 
-- **react-window:** `OrderRow` (memo) wraps `SingleOrder` in a fixed-height row (`ROW_HEIGHT = 340`, `ROW_GAP = 16`). List container uses `flex-1 min-h-0` and `ResizeObserver` for `listHeight`. `List` with `dir="rtl"`, same overscan and style.
 - **Search:** Server-side via `GET /api/orders/search?query=...`. Debounce 350 ms; "מחפש..." after 2 s. Single effect: when `debouncedSearch` / `selectedDate` / `unpaidOnly` change, either `searchOrders(debouncedSearch)` or `fetchOrders(...)` (by date or pending).
 - **Layout:** [src/app/(root)/(cms)/orders/layout.tsx](src/app/(root)/(cms)/orders/layout.tsx) wraps children in `flex flex-col h-[calc(100dvh-12rem)] overflow-hidden`. List component `main` is `h-full flex flex-col overflow-hidden`; list area `flex-1 min-h-0`.
 - **Scaffold:** Section scaffold uses the same wider max-widths when `section === "orders"` (with clients).
-- **Files:** [src/components/cms/entities/fulfillment/list.tsx](src/components/cms/entities/fulfillment/list.tsx), orders layout, section-scaffold.
+- **Files:** [src/components/cms/entities/fulfillment/list.tsx](src/components/cms/entities/fulfillment/list.tsx), [src/components/cms/entities/fulfillment/ui/list/single-order.tsx](src/components/cms/entities/fulfillment/ui/list/single-order.tsx), orders layout, section-scaffold.
+
+## Return to list: scroll to last opened order
+
+When staff open an order from the list (**צפייה**), the client stores `{ orderId, timestamp }` in `localStorage` under the key `lastViewedOrder`, then navigates with `router.push` to `/orders/[id]`.
+
+After returning to `/orders`, when orders have finished loading, [list.tsx](src/components/cms/entities/fulfillment/list.tsx) finds that order’s index in the current result set and calls `virtuosoRef.scrollToIndex` so the row is visible again. Entries older than four hours are ignored and removed.
+
+Scroll and `localStorage` removal run inside `setTimeout(0)`, with the timer cleared on effect cleanup, so **React 18 Strict Mode** does not consume the key on the discarded first effect run (which previously prevented restore in development).
+
+If the order is not in the current list (filters, pending list, or search changed), restore is skipped and the key is left in place so a later view that includes that order can still scroll to it within the TTL.
