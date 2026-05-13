@@ -178,7 +178,12 @@ export default function ProductImagesList() {
       )}
 
       {/* Server sorts; grid groups locally for UI only */}
-      <ProductImageGrid images={images} groupBy={sort} order={order} />
+      <ProductImageGrid
+        images={images}
+        groupBy={sort}
+        order={order}
+        onImageDeleted={() => fetchBatch({ reset: true })}
+      />
 
       {/* Load more */}
       {hasMore && (

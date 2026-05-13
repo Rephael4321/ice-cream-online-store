@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { assumeRole } from "@/lib/aws/assume-role";
+import { listUsedImageKeys } from "@/lib/aws/image-usage";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,8 @@ async function listImages(_req: NextRequest) {
       })
     );
 
+    const usedKeys = await listUsedImageKeys();
+
     // 3) Build response with friendly name from index
     const images =
       (result.Contents ?? []).map((item) => {
@@ -55,6 +58,7 @@ async function listImages(_req: NextRequest) {
           url,
           key,
           name: nameByKey.get(key) ?? (key.split("/").pop() || key), // ✅ use index name when available
+          inUse: usedKeys.has(key),
         };
       }) ?? [];
 

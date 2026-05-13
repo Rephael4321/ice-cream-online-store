@@ -156,10 +156,14 @@ The Google API key is never sent to the client. These routes proxy Google Places
 
 | Method | Endpoint | Who can call | What they can do | Used |
 |--------|----------|---------------|------------------|------|
-| GET | `/api/images` | **Anyone** (GET) | List images. | Yes (image view) |
+| GET | `/api/images` | **Anyone** (GET) | List S3 objects under `images/` with display names from the index. Each item includes `url`, `key`, `name`, and **`inUse`** (whether the key is referenced in the DB; see below). | Yes (image view / `ViewImages`) |
 | POST | `/api/images/upload` | **Admin**, **Superuser** | Upload image. | Yes (image-picker-panel, upload, upload-folder) |
 | POST | `/api/images/rename` | **Admin**, **Superuser** | Rename image. | Yes (image-tile) |
-| DELETE | `/api/images/delete` | **Admin**, **Superuser** | Delete image. | Yes (image view, image-tile) |
+| DELETE | `/api/images/delete` | **Admin**, **Superuser** | Delete S3 object and strip matching entries from `images-index.json`. JSON body: **`imageUrl`** (full URL) or **`key`** (e.g. `images/...`). Returns **409** if the key is still referenced by a product, category, or sale group. | Yes (image-tile, image view bulk delete, product `ImageCard` on `/products/images`) |
+
+**Catalog usage for delete and `inUse`:** Implemented in [`src/lib/aws/image-usage.ts`](../src/lib/aws/image-usage.ts) (`listUsedImageKeys`): scans **`products.image`**, **`categories.image`**, and **`sale_groups.image`**. URL paths are normalized (including `decodeURIComponent` on URL pathnames) so keys align with S3 listing.
+
+**CMS surfaces:** The menu link **ניהול תמונות** → **`/products/images`** lists **unused** images (`GET /api/products/unused-images`) with per-card delete (`ImageCard`). The separate full-library screen (`ViewImages` / `ImageTile`) uses **`GET /api/images`** and the same delete endpoint, with **`inUse`** disabling delete in the UI; the server always enforces usage on delete.
 
 ---
 

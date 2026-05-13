@@ -8,10 +8,12 @@ export default function ProductImageGrid({
   images,
   groupBy = "updated",
   order = "desc",
+  onImageDeleted,
 }: {
   images: ProductImage[];
   groupBy?: GroupBy;
   order?: "asc" | "desc";
+  onImageDeleted?: () => void;
 }) {
   const groups = useMemo(
     () => groupAndSortImages(images, groupBy, order),
@@ -28,7 +30,11 @@ export default function ProductImageGrid({
           <GroupDivider label={label} count={items.length} />
 
           {items.map((img) => (
-            <ImageCard key={img.key} image={img} />
+            <ImageCard
+              key={img.key}
+              image={img}
+              onDeleted={onImageDeleted}
+            />
           ))}
         </Fragment>
       ))}

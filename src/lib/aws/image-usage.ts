@@ -13,7 +13,12 @@ function toKey(v: string | null | undefined): string | null {
 
   try {
     const u = new URL(s);
-    const path = u.pathname.replace(/^\/+/, "");
+    let path = u.pathname.replace(/^\/+/, "");
+    try {
+      path = decodeURIComponent(path);
+    } catch {
+      /* keep path */
+    }
     return path.startsWith("images/") ? path : null;
   } catch {
     // not a URL; best-effort

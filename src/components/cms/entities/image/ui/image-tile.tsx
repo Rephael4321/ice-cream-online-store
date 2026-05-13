@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import type { ImageItem } from "./image-library-grid";
 import { api, apiPost } from "@/lib/api/client";
+import { Trash2 } from "lucide-react";
 
 export default function ImageTile({
   item,
@@ -15,6 +16,7 @@ export default function ImageTile({
   selected = false,
   onToggleSelect,
   onEnterSelectMode,
+  inUse = false,
 }: {
   item: ImageItem;
   open: boolean;
@@ -25,6 +27,8 @@ export default function ImageTile({
   selected?: boolean;
   onToggleSelect?: () => void;
   onEnterSelectMode?: () => void;
+  /** When true, delete is blocked (referenced by product, category, or sale group). */
+  inUse?: boolean;
 }) {
   const { url, key, name } = item;
 
@@ -75,6 +79,7 @@ export default function ImageTile({
   };
 
   const handleDelete = async () => {
+    if (inUse) return;
     if (!confirm("למחוק את התמונה הזו?")) return;
     try {
       const res = await api("/api/images/delete", {
@@ -82,7 +87,12 @@ export default function ImageTile({
         body: { imageUrl: url },
       });
       if (!res.ok) {
-        alert("מחיקה נכשלה");
+        const data = await res.json().catch(() => ({}));
+        alert(
+          typeof data?.error === "string"
+            ? data.error
+            : "מחיקה נכשלה"
+        );
         return;
       }
       window.location.reload();
@@ -115,6 +125,32 @@ export default function ImageTile({
       onTouchEnd={cancelTouch}
       onTouchMove={cancelTouch}
     >
+      {/* Quick delete (only when image is not referenced in the catalog) */}
+      {!selectMode && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleDelete();
+          }}
+          disabled={inUse}
+          title={
+            inUse
+              ? "לא ניתן למחוק — התמונה בשימוש (מוצר, קטגוריה או קבוצת מבצע)"
+              : "מחק תמונה"
+          }
+          className={[
+            "absolute right-2 top-2 z-20 rounded-md p-1.5 shadow-sm transition-colors",
+            inUse
+              ? "cursor-not-allowed bg-gray-200 text-gray-400"
+              : "bg-white/90 text-red-600 hover:bg-red-50 hover:text-red-700",
+          ].join(" ")}
+          aria-label={inUse ? "לא ניתן למחוק — בשימוש" : "מחק תמונה"}
+        >
+          <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+        </button>
+      )}
+
       {/* Selection Circle */}
       <div
         onClick={(e) => {
@@ -190,16 +226,22 @@ export default function ImageTile({
             >
               שינוי שם
             </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-2 rounded"
-            >
-              מחיקה
-            </button>
+            {!inUse ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete();
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-2 rounded"
+              >
+                מחיקה
+              </button>
+            ) : (
+              <p className="text-center text-xs text-white/90 px-2">
+                לא ניתן למחוק — התמונה בשימוש
+              </p>
+            )}
             <button
               type="button"
               onClick={(e) => {

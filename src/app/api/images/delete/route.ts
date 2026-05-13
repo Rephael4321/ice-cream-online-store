@@ -4,6 +4,7 @@ import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { assumeRole } from "@/lib/aws/assume-role";
 import { getJson, putJson } from "@/lib/aws/s3";
 import { INDEX_KEY, emptyIndex, ImagesIndex } from "@/lib/aws/images-index";
+import { listUsedImageKeys } from "@/lib/aws/image-usage";
 
 function toKey(input: string) {
   if (!input) return "";
@@ -31,6 +32,17 @@ async function deleteImage(req: NextRequest) {
       return NextResponse.json(
         { error: "Missing or invalid key/imageUrl" },
         { status: 400 }
+      );
+    }
+
+    const usedKeys = await listUsedImageKeys();
+    if (usedKeys.has(Key)) {
+      return NextResponse.json(
+        {
+          error:
+            "לא ניתן למחוק: התמונה בשימוש (מוצר, קטגוריה או קבוצת מבצע).",
+        },
+        { status: 409 }
       );
     }
 

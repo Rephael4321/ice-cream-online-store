@@ -7,7 +7,7 @@ import UploadFolder from "./upload-folder";
 import ImageLibraryGrid from "./ui/image-library-grid";
 import { api, apiGet } from "@/lib/api/client";
 
-type ImageItem = { url: string; key: string; name: string };
+type ImageItem = { url: string; key: string; name: string; inUse?: boolean };
 
 export default function ViewImages() {
   const [images, setImages] = useState<ImageItem[]>([]);
@@ -53,27 +53,59 @@ export default function ViewImages() {
   };
 
   const handleMultiDelete = async () => {
-    if (!confirm("האם למחוק את כל התמונות שנבחרו?")) return;
+    const selectedUrls = [...selectedImages];
+    const blocked = selectedUrls.filter((url) => {
+      const row = images.find((i) => i.url === url);
+      return row?.inUse;
+    });
+    const deletable = selectedUrls.filter((url) => {
+      const row = images.find((i) => i.url === url);
+      return row && !row.inUse;
+    });
+
+    if (deletable.length === 0) {
+      alert(
+        blocked.length > 0
+          ? "לא ניתן למחוק תמונות שנמצאות בשימוש (מוצר, קטגוריה או קבוצת מבצע)."
+          : "לא נבחרו תמונות למחיקה."
+      );
+      return;
+    }
+
+    const msg =
+      blocked.length > 0
+        ? `למחוק ${deletable.length} תמונות? (${blocked.length} בשימוש יידלגו)`
+        : `האם למחוק ${deletable.length} תמונות?`;
+    if (!confirm(msg)) return;
 
     setFreezeMsg("מוחק תמונות…");
     const deleted: string[] = [];
 
-    for (const url of selectedImages) {
+    for (const url of deletable) {
       const res = await api("/api/images/delete", {
         method: "DELETE",
         body: { imageUrl: url },
       });
-      if (res.ok) deleted.push(url);
+      if (res.ok) {
+        deleted.push(url);
+      } else {
+        const data = await res.json().catch(() => ({} as { error?: string }));
+        if (data?.error) console.warn("delete failed:", data.error);
+      }
     }
 
     setImages((prev) => prev.filter((img) => !deleted.includes(img.url)));
     setSelectedImages(new Set());
     setSelectMode(false);
     setFreezeMsg(null);
+
+    if (deleted.length < deletable.length) {
+      alert("חלק מהמחיקות נכשלו. רענן/י את הדף ונסה/י שוב.");
+    }
   };
 
   return (
-    <div dir="rtl" lang="he" className="mx-auto max-w-6ל p-4 sm:p-6 space-y-4">
+    <div dir="rtl" lang="he" className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
       {/* top bar in select mode */}
       {selectMode && (
         <div className="fixed top-[60px] left-1/2 -translate-x-1/2 z-[49] flex justify-between items-center bg-white border mt-12 p-3 rounded shadow w-full max-w-4xl">

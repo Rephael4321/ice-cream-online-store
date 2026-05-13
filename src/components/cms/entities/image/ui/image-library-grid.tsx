@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import ImageTile from "./image-tile";
 
-export type ImageItem = { url: string; key: string; name: string };
+export type ImageItem = { url: string; key: string; name: string; inUse?: boolean };
 
 type Props = {
   images?: ImageItem[];
@@ -55,6 +55,7 @@ export default function ImageLibraryGrid({
             onEnterSelectMode?.();
             onToggleSelect?.(img.url);
           }}
+          inUse={img.inUse === true}
         />
       ))}
     </div>
